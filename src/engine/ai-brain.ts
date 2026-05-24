@@ -56,9 +56,9 @@ export function adaptGenome(genome: AIGenome, history: AxisHistory): AIGenome {
 // AI zgenerira vozlišča za drevo (fiksna za MVP, Faza 2+ generirana)
 export function generateAITree(): AITreeNode[] {
   return [
-    // Faza 1 — Najti
-    { id: 'find_drones',    phase: 'find',      label: 'Izvidniški droni',     visibility: 'unknown', strength: 40, executed: false },
-    { id: 'find_satellite', phase: 'find',      label: 'Satelitsko mapiranje', visibility: 'unknown', strength: 60, executed: false },
+    // Faza 1 — Najti (prva 2 začneta kot partial — player vidi da se AI giblje)
+    { id: 'find_drones',    phase: 'find',      label: 'Izvidniški droni',     visibility: 'partial', strength: 40, executed: false },
+    { id: 'find_satellite', phase: 'find',      label: 'Satelitsko mapiranje', visibility: 'partial', strength: 60, executed: false },
     { id: 'find_sensors',   phase: 'find',      label: 'Senzorska mreža',      visibility: 'unknown', strength: 30, executed: false },
     { id: 'find_agents',    phase: 'find',      label: 'Infiltracijski agenti', visibility: 'unknown', strength: 50, executed: false },
     // Faza 2 — Razumeti

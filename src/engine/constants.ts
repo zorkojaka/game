@@ -21,6 +21,7 @@ export const INITIAL_CLAN_ACTIVITY = 0.60; // drugi klani aktivni — 60 % AI-ja
 export const SURVIVAL_PER_PERSON_PER_ROUND = 1;    // vsak človek poje 1 unit/rundo
 export const FORAGER_YIELD = 4;                     // en forager zbere 4 survival/rundo
 export const SCOUT_INTEL_YIELD = 8;                 // en scout = 8 intel/rundo
+export const SCOUT_FOG_YIELD = 4;                   // en scout = 4 enote za čiščenje megle/rundo
 export const SURVIVOR_RESCUE_CHANCE = 0.15;         // verjetnost najdbe novih preživelih
 
 // ─── M_os — modifikator pravilnosti osi v dani fazi ──────────────────────────

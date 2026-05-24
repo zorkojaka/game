@@ -11,7 +11,7 @@ import {
   INITIAL_POPULATION, INITIAL_SURVIVAL, INITIAL_COMBAT, INITIAL_INTELLIGENCE,
   INITIAL_AI_ROBOTS, INITIAL_AI_KNOWLEDGE, INITIAL_CLAN_ACTIVITY,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
-  SCOUT_INTEL_YIELD, CLAN_ACTIVITY_BY_PHASE, CLAN_ACTIVITY_EXPOSURE_MODIFIER,
+  SCOUT_INTEL_YIELD, SCOUT_FOG_YIELD, CLAN_ACTIVITY_BY_PHASE, CLAN_ACTIVITY_EXPOSURE_MODIFIER,
   CLAN_ACTIVITY_HIDDEN_MODIFIER, PHASE_EVENT_BASE_DAMAGE, PREPARED_DAMAGE_REDUCTION,
   M_OS,
 } from './constants.js';
@@ -69,12 +69,12 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   const intelGained = assignment.scouts * SCOUT_INTEL_YIELD;
   let intelligence = state.resources.intelligence + intelGained;
 
-  // 4. Megla — potrosi intel za odkrivanje AI drevesa
-  const { nodes: aiTree, intelSpent, revealed } = spendIntelOnFog(
-    state.aiTree,
-    intelligence * 0.5  // porabimo 50 % intela na odkrivanje
-  );
-  intelligence -= intelSpent;
+  // 4. Megla — izvidniki čistijo megle glede na os
+  // Espionage os: daje M_os bonus, ostali imajo 15 % bazne učinkovitosti
+  const fogEfficiency = assignment.axis === 'espionage' ? M_OS[state.phase].espionage : 0.15;
+  const fogBudget = Math.floor(assignment.scouts * SCOUT_FOG_YIELD * fogEfficiency);
+  const { nodes: aiTree, revealed } = spendIntelOnFog(state.aiTree, fogBudget);
+  // Ni odbitka intela — megla se čisti s časom izvidnikov, ne z intelom
 
   // 5. Šibke točke — odkrijemo, če smo dovolj razkrili sosednje vozlišče
   const aiWeakPoints = state.aiWeakPoints.map(wp => {
