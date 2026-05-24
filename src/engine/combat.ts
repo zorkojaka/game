@@ -1,0 +1,137 @@
+// Spopad — verjetnost iz razmerja moči + M_os modifikator
+// P(uspeh_A) = moč_A / (moč_A + moč_B)
+// moč = (osnova) × M_os
+
+import type { CombatResult, GameState, Assignment, AIPhase } from './types.js';
+import type { RNGState } from './rng.js';
+import { rngBool, rngInt } from './rng.js';
+import {
+  M_OS,
+  COMBAT_BASE_HUMAN_MULTIPLIER,
+  COMBAT_EQUIPMENT_MULTIPLIER,
+  AI_ROBOT_STRENGTH,
+  AI_FOREKNOWLEDGE_BONUS,
+  VICTORY_THRESHOLD,
+  PARTIAL_THRESHOLD,
+  DEFEAT_THRESHOLD,
+  AI_WEAK_POINT_EXPLOIT_BONUS,
+} from './constants.js';
+
+export function calcHumanStrength(
+  assignment: Assignment,
+  combatResources: number,
+  phase: AIPhase
+): number {
+  const base = assignment.combatants * COMBAT_BASE_HUMAN_MULTIPLIER
+    + combatResources * COMBAT_EQUIPMENT_MULTIPLIER;
+  const mAxis = M_OS[phase][assignment.axis];
+  return base * mAxis;
+}
+
+export function calcAIStrength(
+  state: GameState,
+  phase: AIPhase
+): number {
+  // AI roboti filtrirani skozi aktivnost klanov
+  const effectiveRobots = state.aiRobots * (1 - state.clanActivity);
+  const base = effectiveRobots * AI_ROBOT_STRENGTH;
+  // Bonus, če AI ve za nas
+  const foreknowledge = state.aiKnowledge > 0.5 ? AI_FOREKNOWLEDGE_BONUS : 1.0;
+  return base * foreknowledge;
+}
+
+export function calcSuccessProbability(
+  humanStr: number,
+  aiStr: number,
+  weakPointBonus: number = 0
+): number {
+  const adjusted = humanStr * (1 + weakPointBonus);
+  return adjusted / (adjusted + aiStr);
+}
+
+type Outcome = CombatResult['outcome'];
+
+function determineOutcome(p: number): Outcome {
+  if (p >= VICTORY_THRESHOLD) return 'victory';
+  if (p >= PARTIAL_THRESHOLD) return 'partial';
+  if (p >= DEFEAT_THRESHOLD) return 'defeat';
+  return 'annihilation';
+}
+
+// Plen sorazmeren z marginom zmage (isto za oba)
+function calcSpoils(
+  outcome: Outcome,
+  humanCombatants: number,
+  aiRobotsEngaged: number,
+  combatResources: number
+): Pick<CombatResult, 'spoils' | 'humanLost' | 'aiRobotsDestroyed' | 'aiInfoGained' | 'infoGained'> {
+  switch (outcome) {
+    case 'victory':
+      return {
+        humanLost: Math.floor(humanCombatants * 0.05),
+        aiRobotsDestroyed: Math.floor(aiRobotsEngaged * 0.9),
+        spoils: { combat: Math.floor(combatResources * 0.1), intelligence: 15 },
+        aiInfoGained: 0,    // popolna zmaga — AI ne dobi nič
+        infoGained: 20,
+      };
+    case 'partial':
+      return {
+        humanLost: Math.floor(humanCombatants * 0.20),
+        aiRobotsDestroyed: Math.floor(aiRobotsEngaged * 0.5),
+        spoils: { combat: Math.floor(combatResources * 0.05), intelligence: 8 },
+        aiInfoGained: 0.05, // preživeli roboti prenesejo malo info
+        infoGained: 10,
+      };
+    case 'defeat':
+      return {
+        humanLost: Math.floor(humanCombatants * 0.55),
+        aiRobotsDestroyed: Math.floor(aiRobotsEngaged * 0.2),
+        spoils: { intelligence: 3 },
+        aiInfoGained: 0.12,
+        infoGained: 3,
+      };
+    case 'annihilation':
+      return {
+        humanLost: humanCombatants,
+        aiRobotsDestroyed: Math.floor(aiRobotsEngaged * 0.05),
+        spoils: {},
+        aiInfoGained: 0.20,
+        infoGained: 0,
+      };
+  }
+}
+
+export function resolveCombat(
+  state: GameState,
+  assignment: Assignment,
+  rng: RNGState,
+  exploitingWeakPoint: boolean = false
+): { result: CombatResult; rng: RNGState } {
+  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase);
+  const aiStr = calcAIStrength(state, state.phase);
+  const weakBonus = exploitingWeakPoint ? AI_WEAK_POINT_EXPLOIT_BONUS : 0;
+  const p = calcSuccessProbability(humanStr, aiStr, weakBonus);
+
+  const mAxis = M_OS[state.phase][assignment.axis];
+  const outcome = determineOutcome(p);
+  const aiRobotsEngaged = Math.floor(state.aiRobots * (1 - state.clanActivity) * 0.3);
+
+  const { humanLost, aiRobotsDestroyed, spoils, aiInfoGained, infoGained } =
+    calcSpoils(outcome, assignment.combatants, aiRobotsEngaged, state.resources.combat);
+
+  return {
+    result: {
+      humanStrength: humanStr,
+      aiStrength: aiStr,
+      successProbability: p,
+      mAxisModifier: mAxis,
+      outcome,
+      humanLost,
+      aiRobotsDestroyed,
+      spoils,
+      aiInfoGained,
+      infoGained,
+    },
+    rng,
+  };
+}

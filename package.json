@@ -1,0 +1,31 @@
+{
+  "name": "ai-vs-humanity",
+  "version": "0.1.0",
+  "description": "AI vs Humanity — persistent evolutionary war, turn-based strategy",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server/index.ts",
+    "build": "tsc && cd client && npm run build",
+    "deploy": "npm run build && cp -r client/dist/. /var/www/ai-vs-humanity/",
+    "start": "node dist/server/index.js",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "mongoose": "^9.6.2",
+    "seedrandom": "^3.0.5"
+  },
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "@types/seedrandom": "^3.0.8",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.2",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  }
+}

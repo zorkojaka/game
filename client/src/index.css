@@ -1,0 +1,238 @@
+/* ─── Reset & Base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Courier New', Courier, monospace;
+  background: #0a0a0a;
+  color: #c8c8c8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+#root { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+
+h1 { color: #ff4444; font-size: 1.4rem; text-transform: uppercase; letter-spacing: .12em; }
+h3 { color: #ff4444; font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px; border-bottom: 1px solid #222; padding-bottom: 4px; }
+
+.dim  { color: #555; }
+.small { font-size: .75rem; }
+b { color: #e0e0e0; }
+
+/* ─── Layout ───────────────────────────────────────────────────────────────── */
+.game { display: flex; flex-direction: column; gap: .75rem; }
+
+.game-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem;
+  align-items: start;
+}
+
+.col-left, .col-right { display: flex; flex-direction: column; gap: .75rem; }
+
+@media (max-width: 700px) {
+  .game-columns { grid-template-columns: 1fr; }
+}
+
+/* ─── Panel ────────────────────────────────────────────────────────────────── */
+.panel {
+  background: #111;
+  border: 1px solid #242424;
+  padding: 12px;
+}
+
+/* ─── Phase header ─────────────────────────────────────────────────────────── */
+.phase-header {
+  background: #0e0e0e;
+  border: 1px solid #2a2a2a;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.phase-title { font-size: 1rem; font-weight: bold; text-transform: uppercase; letter-spacing: .08em; }
+.phase-meta { display: flex; align-items: center; gap: 10px; flex: 1; }
+.progress-track { flex: 1; height: 6px; background: #222; min-width: 80px; }
+.progress-fill  { height: 100%; transition: width .4s ease; }
+
+/* ─── Resource bar ─────────────────────────────────────────────────────────── */
+.resource-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  background: #0e0e0e;
+  border: 1px solid #242424;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 12px;
+  border-right: 1px solid #1e1e1e;
+  min-width: 80px;
+}
+.stat:last-child { border-right: none; }
+.stat-icon  { font-size: 1rem; }
+.stat-label { font-size: .6rem; color: #444; text-transform: uppercase; margin-top: 1px; }
+.stat-val   { font-size: .95rem; font-weight: bold; margin-top: 2px; }
+.res-sep    { flex: 1; background: #1a1a1a; min-width: 2px; max-width: 2px; }
+
+/* ─── AI Tree ──────────────────────────────────────────────────────────────── */
+.tree-phase { margin-bottom: 10px; }
+.tree-phase-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+
+.tree-node {
+  padding: 3px 6px;
+  margin-bottom: 2px;
+  font-size: .8rem;
+  border-left: 2px solid transparent;
+}
+.tree-node.vis-unknown { color: #333; border-left-color: #1e1e1e; }
+.tree-node.vis-partial { color: #666; border-left-color: #444; }
+.tree-node.vis-revealed { color: #c8c8c8; border-left-color: #ff8c42; }
+.tree-node.executed { border-left-color: #ff4444; }
+
+.fog         { color: #222; letter-spacing: .2em; }
+.fog-partial { color: #444; }
+.revealed-mark { color: #ff8c42; }
+.strength   { color: #555; font-size: .72rem; margin-left: 6px; }
+.executed-mark { color: #ff4444; font-size: .7rem; }
+
+/* ─── Weak points ──────────────────────────────────────────────────────────── */
+.wp-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid #1a1a1a;
+  font-size: .82rem;
+}
+.wp-item:last-of-type { border-bottom: none; }
+.wp-icon { font-size: 1rem; width: 18px; }
+.wp-label { flex: 1; }
+.wp-item.discovered .wp-label { color: #ffaa00; }
+.wp-item.exploited  .wp-label { color: #44ff88; text-decoration: line-through; }
+.wp-target-btn {
+  font-size: .7rem; padding: 2px 8px;
+  background: #1a1a1a; border: 1px solid #333; color: #888; cursor: pointer;
+  font-family: inherit;
+}
+.wp-target-btn:hover { border-color: #ffaa00; color: #ffaa00; }
+.wp-target-btn.active { border-color: #ffaa00; color: #ffaa00; background: #1e1800; }
+.wp-done { font-size: .7rem; color: #44ff88; }
+
+/* ─── Assignment panel ─────────────────────────────────────────────────────── */
+.section-label { font-size: .7rem; color: #555; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.axis-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.axis-btn {
+  flex: 1; min-width: 90px; padding: 8px 6px;
+  background: #161616; border: 1px solid #2a2a2a; cursor: pointer;
+  font-family: inherit; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transition: border-color .15s, background .15s;
+}
+.axis-btn:hover { background: #1e1e1e; }
+.axis-btn.selected { background: #1a1500; border-color: #555; }
+.axis-btn.selected.right-axis { background: #001a08; border-color: #44ff88; }
+.axis-name { font-size: .78rem; color: #c8c8c8; }
+.axis-mos  { font-size: 1rem; font-weight: bold; }
+.axis-hint { margin-top: 6px; }
+
+/* ─── Number input ─────────────────────────────────────────────────────────── */
+.num-row {
+  display: flex; align-items: center; gap: 4px; padding: 4px 0;
+  border-bottom: 1px solid #191919;
+}
+.num-label { flex: 0 0 100px; font-size: .8rem; }
+.num-btn {
+  width: 28px; height: 24px; background: #1a1a1a; border: 1px solid #2e2e2e;
+  color: #888; cursor: pointer; font-family: inherit; font-size: .8rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.num-btn:hover { border-color: #ff4444; color: #ff4444; }
+.num-val { width: 34px; text-align: center; font-size: .9rem; color: #e0e0e0; font-weight: bold; }
+.num-yield { flex: 1; font-size: .72rem; text-align: right; }
+
+.people-total {
+  display: flex; align-items: center; gap: 4px; padding: 6px 0;
+  font-size: .78rem; flex-wrap: wrap;
+}
+.people-total.over { background: #1a0000; padding: 4px 6px; }
+
+/* ─── Odds panel ───────────────────────────────────────────────────────────── */
+.odds-bar-wrap { display: flex; align-items: center; gap: 10px; }
+.odds-bar { flex: 1; height: 12px; background: #1e1e1e; }
+.odds-fill { height: 100%; transition: width .3s ease; }
+.odds-pct  { font-size: 1.1rem; font-weight: bold; width: 44px; text-align: right; }
+.odds-details { display: flex; gap: 14px; margin-top: 6px; }
+
+/* ─── Target notice ────────────────────────────────────────────────────────── */
+.target-notice {
+  background: #1e1800; border: 1px solid #ffaa00; padding: 8px 12px;
+  font-size: .82rem; display: flex; align-items: center; gap: 8px;
+}
+.target-notice b { color: #ffaa00; }
+.clear-target {
+  margin-left: auto; background: none; border: none; color: #555; cursor: pointer;
+  font-size: .9rem; font-family: inherit;
+}
+.clear-target:hover { color: #ff4444; }
+
+/* ─── Buttons ──────────────────────────────────────────────────────────────── */
+.execute-btn {
+  width: 100%; padding: 12px; margin-top: 4px;
+  background: #1a0000; border: 2px solid #ff4444; color: #ff4444;
+  font-family: inherit; font-size: 1rem; font-weight: bold;
+  text-transform: uppercase; letter-spacing: .1em; cursor: pointer;
+  transition: background .15s;
+}
+.execute-btn:hover:not(:disabled) { background: #2a0000; }
+.execute-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+.new-game-btn {
+  width: 100%; padding: 8px; margin-top: 6px;
+  background: #111; border: 1px solid #333; color: #555;
+  font-family: inherit; font-size: .8rem; cursor: pointer;
+  letter-spacing: .06em;
+}
+.new-game-btn:hover:not(:disabled) { border-color: #555; color: #888; }
+.new-game-btn.secondary { margin-top: 4px; }
+
+/* ─── Round log ────────────────────────────────────────────────────────────── */
+.round-log {
+  background: #0d0d0d; border: 1px solid #222;
+  border-left: 3px solid #ff4444; padding: 12px;
+}
+.narrative { color: #c8c8c8; font-size: .88rem; margin-bottom: 10px; }
+.log-grid { display: flex; gap: 20px; flex-wrap: wrap; }
+.log-section { }
+.log-title { font-size: .68rem; color: #444; text-transform: uppercase; margin-bottom: 4px; }
+.delta-pos { color: #44ff88; font-size: .82rem; }
+.delta-neg { color: #ff4444; font-size: .82rem; }
+
+/* ─── Start / Game over screens ────────────────────────────────────────────── */
+.start-screen {
+  max-width: 520px; margin: 80px auto; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+}
+.start-legend {
+  background: #111; border: 1px solid #222; padding: 16px 20px;
+  text-align: left; font-size: .82rem; line-height: 1.8; width: 100%;
+}
+.start-screen .new-game-btn {
+  width: auto; padding: 12px 32px;
+  border: 2px solid #ff4444; color: #ff4444; font-size: 1rem; margin-top: 0;
+}
+.start-screen .new-game-btn:hover { background: #1a0000; }
+
+.gameover {
+  max-width: 520px; margin: 80px auto;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  text-align: center;
+}
+.gameover-stats {
+  background: #111; border: 1px solid #222; padding: 16px 24px;
+  text-align: left; font-size: .84rem; line-height: 2; width: 100%;
+}
+.gameover code { color: #888; }
