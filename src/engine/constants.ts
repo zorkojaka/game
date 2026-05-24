@@ -16,6 +16,9 @@ export const INITIAL_INTELLIGENCE = 10; // začetni intel
 export const INITIAL_AI_ROBOTS = 200;
 export const INITIAL_AI_KNOWLEDGE = 0.1; // AI malo ve o nas na začetku
 export const INITIAL_CLAN_ACTIVITY = 0.60; // drugi klani aktivni — 60 % AI-ja je zaseden
+export const INITIAL_MORALE = 68;
+export const INITIAL_EXPOSURE = 0.22;
+export const MAX_OPERATIONS_PER_ROUND = 3;
 
 // ─── Populacijska dinamika ─────────────────────────────────────────────────────
 export const SURVIVAL_PER_PERSON_PER_ROUND = 1;    // vsak človek poje 1 unit/rundo
@@ -86,3 +89,7 @@ export const PREPARED_DAMAGE_REDUCTION = 0.4; // 40 % manj škode
 
 // ─── AI šibke točke ───────────────────────────────────────────────────────────
 export const AI_WEAK_POINT_EXPLOIT_BONUS = 0.25; // +25 % k P(uspeh) pri izkoriščanju šibke točke
+export const BASE_OBJECTIVE_PROGRESS = 12;
+export const EXPOSED_OBJECTIVE_BONUS = 8;
+export const HIDDEN_OBJECTIVE_PENALTY = 5;
+export const DEFENSE_DAMAGE_REDUCTION = 0.45;

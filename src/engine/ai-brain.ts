@@ -2,7 +2,7 @@
 // MVP: en signal (counter player's most common axis)
 // Faza 2: kombinirani signali
 
-import type { AIPhase, HumanAxis, AITreeNode, AIWeakPoint } from './types.js';
+import type { AICampaignObjective, AIPhase, HumanAxis, AITreeNode, AIWeakPoint } from './types.js';
 import type { RNGState } from './rng.js';
 import { rngNext } from './rng.js';
 
@@ -95,6 +95,77 @@ export function generateAIWeakPoints(): AIWeakPoint[] {
       discovered: false,
       exploited: false,
       phase: 'eliminate',
+    },
+  ];
+}
+
+export function generateAICampaignObjectives(): AICampaignObjective[] {
+  return [
+    {
+      id: 'scan_wilderness',
+      title: 'Scan Wilderness',
+      description: 'Drones and passive sensors sweep likely migration routes for heat and movement.',
+      phase: 'find',
+      progress: 18,
+      status: 'active',
+      visibility: 'revealed',
+      threatEffect: 'Raises exposure and unlocks base-location work when completed.',
+      counterOperations: ['hide_movement', 'sabotage_scanners', 'intercept_comms'],
+    },
+    {
+      id: 'analyze_patterns',
+      title: 'Analyze Behavior Patterns',
+      description: 'The AI correlates scavenging, smoke, radio silence, and missing supplies.',
+      phase: 'understand',
+      progress: 0,
+      status: 'locked',
+      visibility: 'partial',
+      threatEffect: 'Accelerates AI knowledge growth and makes hiding less reliable.',
+      counterOperations: ['spread_misinformation', 'intercept_comms', 'hide_movement'],
+    },
+    {
+      id: 'identify_leaders',
+      title: 'Identify Human Leaders',
+      description: 'Captured signals are used to find who coordinates the remaining clans.',
+      phase: 'understand',
+      progress: 0,
+      status: 'locked',
+      visibility: 'unknown',
+      threatEffect: 'Leader strikes damage morale and raise AI knowledge sharply.',
+      counterOperations: ['intercept_comms', 'spread_misinformation', 'fortify_shelters'],
+    },
+    {
+      id: 'build_prediction_model',
+      title: 'Build Prediction Model',
+      description: 'The AI simulates likely clan decisions and prepositions hunter groups.',
+      phase: 'understand',
+      progress: 0,
+      status: 'locked',
+      visibility: 'unknown',
+      threatEffect: 'Makes future objectives progress faster.',
+      counterOperations: ['spread_misinformation', 'intercept_comms', 'raid_logistics'],
+    },
+    {
+      id: 'locate_bases',
+      title: 'Locate Main Bases',
+      description: 'Triangulated patrol data narrows the search to the clan shelter network.',
+      phase: 'eliminate',
+      progress: 0,
+      status: 'locked',
+      visibility: 'unknown',
+      threatEffect: 'Directly threatens population and survival reserves.',
+      counterOperations: ['hide_movement', 'raid_logistics', 'fortify_shelters'],
+    },
+    {
+      id: 'prepare_strike',
+      title: 'Prepare Extermination Strike',
+      description: 'The AI assembles drones, fuel, and target packages for a decisive attack.',
+      phase: 'eliminate',
+      progress: 0,
+      status: 'locked',
+      visibility: 'unknown',
+      threatEffect: 'Completing this objective can end the run if the clan is exposed.',
+      counterOperations: ['fortify_shelters', 'raid_logistics', 'sabotage_scanners'],
     },
   ];
 }

@@ -1,584 +1,563 @@
-import { useState, useEffect } from 'react';
-import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult } from './types';
-import { createGame, getGame, playRound, previewOdds } from './api';
-
-// ─── Konstante ───────────────────────────────────────────────────────────────
-
-const PHASE = {
-  find:       { num: 1, label: 'AI IŠČE',      full: 'FAZA 1 — AI IŠČE',      color: '#e06c30', bestAxis: 'hiding'    as HumanAxis },
-  understand: { num: 2, label: 'AI RAZUME',    full: 'FAZA 2 — AI RAZUME',    color: '#cc3333', bestAxis: 'espionage' as HumanAxis },
-  eliminate:  { num: 3, label: 'AI IZTREBLJA', full: 'FAZA 3 — AI IZTREBLJA', color: '#991111', bestAxis: 'defense'  as HumanAxis },
-};
-
-const AXIS: Record<HumanAxis, { label: string; icon: string; desc: string }> = {
-  hiding:    { label: 'Skrivanje',  icon: '👁‍🗨', desc: 'Zmanjšuje AI nadzor' },
-  espionage: { label: 'Špijonaža', icon: '🕵',  desc: 'Odkriva AI načrte' },
-  defense:   { label: 'Obramba',   icon: '🛡',   desc: 'Zmanjšuje bojne izgube' },
-};
-
-const M_OS: Record<string, Record<HumanAxis, number>> = {
-  find:       { hiding: 1.4, espionage: 1.0, defense: 0.5 },
-  understand: { hiding: 0.8, espionage: 1.5, defense: 0.7 },
-  eliminate:  { hiding: 0.5, espionage: 0.9, defense: 1.4 },
-};
+import { useEffect, useMemo, useState } from 'react';
+import type {
+  AICampaignObjective,
+  GameState,
+  OperationDefinition,
+  OperationId,
+  OperationPreview,
+  OperationPurpose,
+  Resources,
+  RoundLog,
+} from './types';
+import { createGame, getGame, playRound, previewOperations } from './api';
 
 const STORAGE_KEY = 'avh-runId';
+const MAX_OPERATIONS = 3;
 
-// ─── Pomožne funkcije ─────────────────────────────────────────────────────────
+const PHASE_LABEL: Record<GameState['phase'], string> = {
+  find: 'Search Campaign',
+  understand: 'Understanding Campaign',
+  eliminate: 'Extermination Campaign',
+};
 
-const pct = (n: number) => `${Math.round(n * 100)}%`;
-const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
+const PURPOSE_LABEL: Record<OperationPurpose, string> = {
+  hiding: 'Hiding',
+  espionage: 'Espionage',
+  defense: 'Defense',
+  survival: 'Survival',
+  strike: 'Strike',
+};
 
-function barColor(ratio: number) {
-  if (ratio <= 0.2) return '#cc2222';
-  if (ratio <= 0.4) return '#cc7700';
-  return '#22884d';
+const OPERATIONS: OperationDefinition[] = [
+  {
+    id: 'hide_movement',
+    title: 'Hide Population Movement',
+    purpose: 'hiding',
+    description: 'Move families through dark routes, false camps, and silent supply lines.',
+    required: { people: 12, survival: 6 },
+    risk: 'low',
+    expectedEffect: 'Lowers exposure and slows scanner-driven objectives.',
+    affectedObjective: 'scan_wilderness',
+  },
+  {
+    id: 'sabotage_scanners',
+    title: 'Sabotage AI Scanners',
+    purpose: 'strike',
+    description: 'Destroy sensor relays and corrupt local scan telemetry.',
+    required: { people: 18, combat: 8 },
+    risk: 'high',
+    expectedEffect: 'Disrupts scan progress and destroys AI robots.',
+    affectedObjective: 'scan_wilderness',
+  },
+  {
+    id: 'spread_misinformation',
+    title: 'Spread Misinformation',
+    purpose: 'espionage',
+    description: 'Seed fake movement patterns, radio traffic, and survivor trails.',
+    required: { people: 10, intelligence: 12 },
+    risk: 'medium',
+    expectedEffect: 'Pushes analysis and prediction objectives backward.',
+    affectedObjective: 'analyze_patterns',
+  },
+  {
+    id: 'fortify_shelters',
+    title: 'Fortify Shelters',
+    purpose: 'defense',
+    description: 'Harden bunkers, disperse caches, and drill evacuation routes.',
+    required: { people: 16, combat: 5 },
+    risk: 'low',
+    expectedEffect: 'Improves morale and reduces damage from completed threats.',
+    affectedObjective: 'prepare_strike',
+  },
+  {
+    id: 'intercept_comms',
+    title: 'Intercept AI Communications',
+    purpose: 'espionage',
+    description: 'Listen for tasking bursts and infer the next campaign step.',
+    required: { people: 14, intelligence: 6 },
+    risk: 'medium',
+    expectedEffect: 'Reveals objectives and enables future disruption.',
+    affectedObjective: 'identify_leaders',
+  },
+  {
+    id: 'raid_logistics',
+    title: 'Raid AI Logistics',
+    purpose: 'strike',
+    description: 'Hit robot supply convoys before they reinforce the campaign chain.',
+    required: { people: 22, combat: 14 },
+    risk: 'high',
+    expectedEffect: 'Destroys robots and slows later attack preparation.',
+    affectedObjective: 'locate_bases',
+  },
+  {
+    id: 'rescue_survivors',
+    title: 'Rescue Survivors',
+    purpose: 'survival',
+    description: 'Divert scouts to nearby distress signals before AI harvest teams arrive.',
+    required: { people: 14, survival: 8 },
+    risk: 'medium',
+    expectedEffect: 'May grow population and morale, but increases exposure.',
+  },
+  {
+    id: 'gather_supplies',
+    title: 'Gather Supplies',
+    purpose: 'survival',
+    description: 'Scavenge water, batteries, tools, and salvage from abandoned towns.',
+    required: { people: 18 },
+    risk: 'low',
+    expectedEffect: 'Restores survival resources with modest exposure.',
+  },
+];
+
+function pct(value: number) {
+  return `${Math.round(value * 100)}%`;
 }
-function outcomeColor(o: CombatResult['outcome']) {
-  return { victory: '#22cc66', partial: '#ffaa00', defeat: '#ee4444', annihilation: '#991111' }[o];
-}
-function outcomeLabel(o: CombatResult['outcome']) {
-  return { victory: '✓ ZMAGA', partial: '〜 DELNA ZMAGA', defeat: '✗ PORAZ', annihilation: '☠ POKOL' }[o];
+
+function clampPct(value: number) {
+  return `${Math.max(0, Math.min(100, Math.round(value)))}%`;
 }
 
-// ─── Sub-komponente ───────────────────────────────────────────────────────────
+function costText(resources: Partial<Resources>) {
+  const parts = [];
+  if (resources.survival) parts.push(`${resources.survival} survival`);
+  if (resources.combat) parts.push(`${resources.combat} combat`);
+  if (resources.intelligence) parts.push(`${resources.intelligence} intel`);
+  return parts.length > 0 ? parts.join(' / ') : 'no resource cost';
+}
 
-/** Tanka barvna progresivna vrstica */
-function Bar({ ratio, color, height = 6 }: { ratio: number; color?: string; height?: number }) {
-  const c = color ?? barColor(ratio);
+function selectedCost(selected: OperationId[]) {
+  return selected.reduce(
+    (sum, id) => {
+      const op = OPERATIONS.find(operation => operation.id === id);
+      if (!op) return sum;
+      return {
+        people: sum.people + op.required.people,
+        survival: sum.survival + (op.required.survival ?? 0),
+        combat: sum.combat + (op.required.combat ?? 0),
+        intelligence: sum.intelligence + (op.required.intelligence ?? 0),
+      };
+    },
+    { people: 0, survival: 0, combat: 0, intelligence: 0 }
+  );
+}
+
+function canAfford(game: GameState, operation: OperationDefinition, selected: OperationId[]) {
+  if (selected.includes(operation.id)) return true;
+  if (selected.length >= MAX_OPERATIONS) return false;
+  const total = selectedCost([...selected, operation.id]);
+  return total.people <= game.population
+    && total.survival <= game.resources.survival
+    && total.combat <= game.resources.combat
+    && total.intelligence <= game.resources.intelligence;
+}
+
+function StatusTile({ label, value, tone }: { label: string; value: string | number; tone?: string }) {
   return (
-    <div className="bar-track" style={{ height }}>
-      <div className="bar-fill" style={{ width: `${Math.min(100, ratio * 100)}%`, background: c }} />
+    <div className="status-tile">
+      <span>{label}</span>
+      <strong className={tone}>{value}</strong>
     </div>
   );
 }
 
-/** En resurs: ikona + oznaka + vrstica + vrednost */
-function ResStat({ icon, label, value, max, color }: { icon: string; label: string; value: number; max: number; color?: string }) {
-  const ratio = max > 0 ? value / max : 0;
-  const c = color ?? barColor(ratio);
+function TopStatus({ game }: { game: GameState }) {
   return (
-    <div className="res-stat">
-      <div className="res-head">
-        <span className="res-icon">{icon}</span>
-        <span className="res-label">{label}</span>
-        <span className="res-value" style={{ color: c }}>{value}</span>
+    <header className="topbar">
+      <div>
+        <div className="eyebrow">AI vs Humanity</div>
+        <h1>{PHASE_LABEL[game.phase]}</h1>
       </div>
-      <Bar ratio={ratio} color={c} />
-    </div>
-  );
-}
-
-/** Faza header: badge, oznaka, pike za mesece */
-function PhaseHeader({ game }: { game: GameState }) {
-  const p = PHASE[game.phase];
-  return (
-    <header className="phase-header">
-      <div className="ph-badge" style={{ borderColor: p.color, color: p.color }}>{p.num}</div>
-      <div className="ph-body">
-        <div className="ph-label" style={{ color: p.color }}>{p.full}</div>
-        <div className="ph-rounds">
-          {Array.from({ length: 12 }, (_, i) => (
-            <span
-              key={i}
-              className={`round-dot ${i < game.round - 1 ? 'done' : i === game.round - 1 ? 'current' : ''}`}
-              style={i === game.round - 1 ? { borderColor: p.color, background: p.color } : {}}
-            />
-          ))}
-          <span className="ph-total dim">·  {game.totalRounds}/36</span>
-        </div>
-      </div>
-      <div className="ph-ai-know">
-        <div className="pak-label dim">AI ve o nas</div>
-        <div className="pak-value" style={{ color: game.aiKnowledge > 0.6 ? '#cc2222' : '#888' }}>
-          {pct(game.aiKnowledge)}
-        </div>
-        <Bar ratio={game.aiKnowledge} color={game.aiKnowledge > 0.6 ? '#cc2222' : '#444'} height={4} />
+      <div className="status-grid">
+        <StatusTile label="Month" value={game.round} />
+        <StatusTile label="Population" value={game.population} />
+        <StatusTile label="Survival" value={game.resources.survival} />
+        <StatusTile label="Combat" value={game.resources.combat} />
+        <StatusTile label="Intel" value={game.resources.intelligence} />
+        <StatusTile label="Morale" value={game.morale} />
+        <StatusTile label="AI Knowledge" value={pct(game.aiKnowledge)} tone={game.aiKnowledge > 0.7 ? 'danger' : ''} />
       </div>
     </header>
   );
 }
 
-/** Resursna vrstica — dve skupini: človeški / AI */
-function ResourceRow({ game }: { game: GameState }) {
-  const r = game.resources;
-  const popMax = game.maxPopulation;
-  const survMax = Math.max(r.survival, game.population * 8);
-  const combMax = Math.max(r.combat, 100);
-  const intelMax = Math.max(r.intelligence, 200);
-  const robotMax = 200;
+function ClanStatus({ game, selected }: { game: GameState; selected: OperationId[] }) {
+  const cost = selectedCost(selected);
+  const available = game.population - cost.people;
   return (
-    <div className="resource-row">
-      <div className="res-group">
-        <ResStat icon="👥" label="Populacija"  value={game.population} max={popMax} />
-        <ResStat icon="🍞" label="Hrana/Voda"  value={r.survival}      max={survMax} />
-        <ResStat icon="⚔"  label="Orožje"      value={r.combat}        max={combMax} />
-        <ResStat icon="👁"  label="Intel"       value={r.intelligence}  max={intelMax} color="#5588ff" />
-      </div>
-      <div className="res-divider" />
-      <div className="res-group enemy">
-        <ResStat icon="🤖" label="AI roboti"    value={game.aiRobots}          max={robotMax} color="#bb3333" />
-        <ResStat icon="🌍" label="Klani aktiv"  value={Math.round(game.clanActivity * 100)} max={100} />
-      </div>
-    </div>
-  );
-}
-
-/** Kartica posameznega AI vozlišča */
-function NodeCard({ node, flash }: { node: AITreeNode; flash?: boolean }) {
-  if (node.visibility === 'unknown') {
-    return (
-      <div className="node-card unknown">
-        <div className="nc-noise" />
-        <div className="nc-content">
-          <span className="nc-fog-text">░ ??? ░</span>
-        </div>
-      </div>
-    );
-  }
-  if (node.visibility === 'partial') {
-    // Pokaži le prvo besedo + "…" in ocenjen razpon moči
-    const firstWord = node.label.split(' ')[0];
-    const lo = Math.max(1,  Math.floor(node.strength * 0.7));
-    const hi = Math.ceil(node.strength * 1.35);
-    return (
-      <div className="node-card partial">
-        <div className="nc-content">
-          <span className="nc-label-partial">{firstWord}…</span>
-          <div className="nc-partial-row">
-            <span className="nc-badge-partial">DELNO</span>
-            <span className="nc-str-range">~{lo}–{hi}</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  // revealed
-  return (
-    <div className={`node-card revealed ${node.executed ? 'executed' : ''} ${flash ? 'just-revealed' : ''}`}
-         style={{ borderColor: node.executed ? '#cc2222' : PHASE[node.phase].color }}>
-      <div className="nc-content">
-        <span className="nc-label">{node.label}</span>
-        <div className="nc-str-row">
-          <Bar ratio={node.strength / 100} color={node.executed ? '#cc2222' : PHASE[node.phase].color} height={3} />
-          <span className="nc-str-num">{node.strength}</span>
-        </div>
-        {node.executed && <span className="nc-exec-tag">IZVEDEN</span>}
-      </div>
-    </div>
-  );
-}
-
-/** AI drevo — vse faze */
-function AITree({ nodes }: { nodes: AITreeNode[] }) {
-  const phases: Array<keyof typeof PHASE> = ['find', 'understand', 'eliminate'];
-  const revealed = nodes.filter(n => n.visibility === 'revealed').length;
-  return (
-    <div className="panel">
+    <aside className="panel clan-panel">
       <div className="panel-head">
-        <h3>AI NAČRTOVALNO DREVO</h3>
-        <span className="panel-badge">{revealed}/{nodes.length}</span>
-      </div>
-      {phases.map(ph => (
-        <div key={ph} className="tree-section">
-          <div className="tree-ph-label" style={{ color: PHASE[ph].color }}>
-            ▸ {PHASE[ph].full}
-          </div>
-          <div className="node-grid">
-            {nodes.filter(n => n.phase === ph).map(n => <NodeCard key={n.id} node={n} />)}
-          </div>
+        <div>
+          <div className="eyebrow">Player Clan</div>
+          <h2>Last Ember Cell</h2>
         </div>
-      ))}
-    </div>
+        <span className={available < 8 ? 'danger pill' : 'pill'}>{available} free</span>
+      </div>
+      <div className="metric">
+        <span>Hiddenness</span>
+        <strong>{pct(1 - game.exposure)}</strong>
+        <div className="bar"><i style={{ width: pct(1 - game.exposure) }} /></div>
+      </div>
+      <div className="metric">
+        <span>Exposure</span>
+        <strong>{pct(game.exposure)}</strong>
+        <div className="bar hot"><i style={{ width: pct(game.exposure) }} /></div>
+      </div>
+      <div className="metric">
+        <span>Morale</span>
+        <strong>{game.morale}/100</strong>
+        <div className="bar morale"><i style={{ width: clampPct(game.morale) }} /></div>
+      </div>
+      <div className="reserve-list">
+        <div><span>Reserved people</span><b>{cost.people}</b></div>
+        <div><span>Resource plan</span><b>{costText(cost)}</b></div>
+        <div><span>AI robots</span><b>{game.aiRobots}</b></div>
+      </div>
+    </aside>
   );
 }
 
-/** Šibke točke */
-function WeakPoints({ wps, target, onTarget }: { wps: AIWeakPoint[]; target: string; onTarget: (id: string) => void }) {
+function ObjectiveCard({ objective }: { objective: AICampaignObjective }) {
+  const hidden = objective.visibility === 'unknown';
   return (
-    <div className="panel">
+    <article className={`objective ${objective.status} ${hidden ? 'fogged' : ''}`}>
+      <div className="objective-top">
+        <span className="chapter">{objective.phase}</span>
+        <span className="objective-status">{hidden ? 'unknown' : objective.status}</span>
+      </div>
+      <h3>{hidden ? 'Unknown AI package' : objective.title}</h3>
+      <p>{hidden ? 'Intercept communications or disrupt active systems to reveal this objective.' : objective.description}</p>
+      {!hidden && (
+        <>
+          <div className="objective-progress">
+            <div style={{ width: clampPct(objective.progress) }} />
+          </div>
+          <div className="objective-foot">
+            <span>{Math.round(objective.progress)}%</span>
+            <span>{objective.threatEffect}</span>
+          </div>
+        </>
+      )}
+    </article>
+  );
+}
+
+function CampaignPlan({ game }: { game: GameState }) {
+  return (
+    <main className="panel campaign-panel">
       <div className="panel-head">
-        <h3>ŠIBKE TOČKE AI</h3>
-        <span className="panel-badge">{wps.filter(w => w.exploited).length}/{wps.length} uničenih</span>
-      </div>
-      {wps.map(wp => (
-        <div key={wp.id} className={`wp-card ${wp.exploited ? 'exploited' : wp.discovered ? 'discovered' : 'hidden'}`}>
-          <div className="wp-icon">{wp.exploited ? '✓' : wp.discovered ? '◆' : '?'}</div>
-          <div className="wp-body">
-            <div className="wp-name">{wp.discovered ? wp.label : `[ZAKRITO — ${PHASE[wp.phase].label}]`}</div>
-            {wp.discovered && !wp.exploited && (
-              <div className="dim small">{PHASE[wp.phase].full}</div>
-            )}
-          </div>
-          {wp.discovered && !wp.exploited && (
-            <button className={`wp-btn ${target === wp.id ? 'active' : ''}`}
-                    onClick={() => onTarget(target === wp.id ? '' : wp.id)}>
-              {target === wp.id ? '🎯 CILJ' : 'Ciljaj'}
-            </button>
-          )}
-          {wp.exploited && <span className="wp-done-tag">UNIČENO</span>}
+        <div>
+          <div className="eyebrow">AI Campaign Plan</div>
+          <h2>Objective Chain</h2>
         </div>
-      ))}
-    </div>
+        <span className="pill">{game.campaignObjectives.filter(o => o.status === 'completed').length}/{game.campaignObjectives.length} completed</span>
+      </div>
+      <div className="objective-chain">
+        {game.campaignObjectives.map(objective => (
+          <ObjectiveCard key={objective.id} objective={objective} />
+        ))}
+      </div>
+    </main>
   );
 }
 
-/** Vizualna razporeditev populacije */
-function PeopleBar({ pop, combatants, foragers, scouts }: { pop: number; combatants: number; foragers: number; scouts: number }) {
-  const free = Math.max(0, pop - combatants - foragers - scouts);
-  const over = pop - combatants - foragers - scouts < 0;
-  if (pop === 0) return null;
+function ThreatPanel({ game }: { game: GameState }) {
+  const log = game.lastRoundLog;
   return (
-    <div className="people-bar-wrap">
-      <div className={`people-bar ${over ? 'over' : ''}`}>
-        {combatants > 0 && <div className="pb-seg combat" style={{ flex: combatants }} title={`Borci: ${combatants}`} />}
-        {foragers   > 0 && <div className="pb-seg forage" style={{ flex: foragers }}   title={`Nabiralci: ${foragers}`} />}
-        {scouts     > 0 && <div className="pb-seg scout"  style={{ flex: scouts }}     title={`Izvidniki: ${scouts}`} />}
-        {free       > 0 && <div className="pb-seg free"   style={{ flex: free }}       title={`Prosti: ${free}`} />}
-      </div>
-      <div className="pb-legend">
-        <span className="pbl combat">⚔ {combatants}</span>
-        <span className="pbl forage">🌾 {foragers}</span>
-        <span className="pbl scout">🔭 {scouts}</span>
-        <span className={`pbl free ${over ? 'danger' : ''}`}>{over ? `⚠ +${-free}` : `prosti ${free}`}</span>
-      </div>
-    </div>
-  );
-}
-
-/** En slider za razporejanje */
-function SliderRow({ icon, label, val, onChange, max, yieldText }: {
-  icon: string; label: string; val: number; onChange: (n: number) => void;
-  max: number; yieldText: string;
-}) {
-  const pctFill = max > 0 ? (val / max * 100).toFixed(1) : '0';
-  return (
-    <div className="slider-row">
-      <div className="sr-head">
-        <span>{icon} {label}</span>
-        <span className="sr-val">{val}</span>
-        <span className="sr-yield dim">{yieldText}</span>
-      </div>
-      <input
-        type="range" min={0} max={max} value={val} step={1}
-        onChange={e => onChange(+e.target.value)}
-        style={{ '--pct': `${pctFill}%` } as React.CSSProperties}
-      />
-    </div>
-  );
-}
-
-/** Os: 3 gumbi z M_os */
-function AxisSelector({ phase, selected, onSelect }: { phase: keyof typeof PHASE; selected: HumanAxis; onSelect: (a: HumanAxis) => void }) {
-  const bestAxis = PHASE[phase].bestAxis;
-  return (
-    <div className="axis-group">
-      {(Object.keys(AXIS) as HumanAxis[]).map(a => {
-        const m = M_OS[phase][a];
-        const isRight = bestAxis === a;
-        const mColor = isRight ? '#22cc66' : m < 0.8 ? '#cc3333' : '#cc8800';
-        return (
-          <button key={a} className={`axis-btn ${selected === a ? 'sel' : ''} ${isRight ? 'right' : ''}`} onClick={() => onSelect(a)}>
-            <span className="ab-icon">{AXIS[a].icon}</span>
-            <span className="ab-label">{AXIS[a].label}</span>
-            <span className="ab-mos" style={{ color: mColor }}>×{m}</span>
-            {isRight && <span className="ab-right-tag">IDEALNA</span>}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Odds: visuals */
-function OddsDisplay({ odds, combatants }: { odds: OddsPreview | null; combatants: number }) {
-  if (combatants === 0) {
-    return (
-      <div className="odds-panel no-combat">
-        <span className="dim">Brez spopada — nastavi borce za bojni obet</span>
-      </div>
-    );
-  }
-  if (!odds) return <div className="odds-panel no-combat dim">Računam obet…</div>;
-
-  const p = odds.successProbability;
-  const c = p >= 0.65 ? '#22cc66' : p >= 0.45 ? '#ffaa00' : '#cc3333';
-  const label = p >= 0.65 ? 'ZMAGA VERJETNA' : p >= 0.45 ? 'NEGOTOV IZID' : p >= 0.2 ? 'PORAZ VERJETEN' : 'KATASTROFA';
-
-  return (
-    <div className="odds-panel">
-      <div className="odds-body">
-        <div className="odds-gauge">
-          <OddsArc p={p} color={c} />
-        </div>
-        <div className="odds-details">
-          <div className="odds-label" style={{ color: c }}>{label}</div>
-          <div className="odds-row dim small"><span>Naši:</span><span style={{ color: '#e0e0e0' }}>{odds.humanStrength.toFixed(1)}</span></div>
-          <div className="odds-row dim small"><span>AI:</span><span style={{ color: '#cc3333' }}>{odds.aiStrength.toFixed(1)}</span></div>
-          <div className="odds-row dim small"><span>M_os:</span><span style={{ color: '#888' }}>×{odds.mAxisModifier}</span></div>
+    <aside className="panel threat-panel">
+      <div className="panel-head">
+        <div>
+          <div className="eyebrow">Threat Analysis</div>
+          <h2>Latest Events</h2>
         </div>
       </div>
-      {/* Dual bar: nasi vs AI */}
-      <div className="odds-vs-bar">
-        <div className="ovb-human" style={{ flex: odds.humanStrength, background: c }} />
-        <div className="ovb-ai"    style={{ flex: odds.aiStrength, background: '#441111' }} />
-      </div>
-      <div className="odds-vs-labels small dim">
-        <span>ČLOVEŠKA MOČ</span><span>AI MOČ</span>
-      </div>
-    </div>
-  );
-}
-
-/** SVG polkrožni gauge za odds */
-function OddsArc({ p, color }: { p: number; color: string }) {
-  const r = 40;
-  const circ = Math.PI * r; // ~125.7
-  const filled = p * circ;
-  return (
-    <svg viewBox="0 0 100 56" className="odds-svg">
-      {/* BG arc */}
-      <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#1e1e1e" strokeWidth="10" strokeLinecap="butt"/>
-      {/* Fill arc */}
-      <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke={color} strokeWidth="10"
-            strokeDasharray={`${filled} ${circ}`} strokeLinecap="butt"/>
-      {/* Pct text */}
-      <text x="50" y="46" textAnchor="middle" fill={color}
-            fontSize="17" fontFamily="'Courier New', monospace" fontWeight="bold">
-        {Math.round(p * 100)}%
-      </text>
-    </svg>
-  );
-}
-
-/** Log zadnjega meseca */
-function RoundLog({ log }: { log: RoundLog }) {
-  const c = log.combat;
-  return (
-    <div className="round-log">
-      <div className="rl-head">
-        <h3>MESEC {log.round} · {PHASE[log.phase].full}</h3>
-      </div>
-      <p className="rl-narrative">{log.narrative}</p>
-      <div className="rl-cols">
-        {c && (
-          <div className="rl-section">
-            <div className="rl-sec-title">Spopad</div>
-            <div className="rl-outcome" style={{ color: outcomeColor(c.outcome) }}>
-              {outcomeLabel(c.outcome)}
+      {!log && <p className="muted">No campaign contact yet. Select operations and execute the first month.</p>}
+      {log && (
+        <div className="event-stack">
+          <p className="summary">{log.narrative}</p>
+          {log.objectiveProgress.map(change => (
+            <div key={change.objectiveId} className="event-line">
+              <span>{change.title}</span>
+              <b className={change.delta >= 0 ? 'danger' : 'good'}>{change.delta >= 0 ? '+' : ''}{change.delta}%</b>
             </div>
-            <div className="rl-odds dim small">{Math.round(c.successProbability * 100)}% uspešnost</div>
-            {c.humanLost > 0       && <div className="rl-neg">− {c.humanLost} borcev</div>}
-            {c.aiRobotsDestroyed>0  && <div className="rl-pos">− {c.aiRobotsDestroyed} AI robotov</div>}
-            {c.infoGained > 0      && <div className="rl-pos">+ {c.infoGained} intel</div>}
-          </div>
-        )}
-        <div className="rl-section">
-          <div className="rl-sec-title">Resursi</div>
-          {log.populationDelta !== 0 && <div className={log.populationDelta > 0 ? 'rl-pos' : 'rl-neg'}>{sign(log.populationDelta)} populacija</div>}
-          {(log.resourceDelta.survival    ?? 0) !== 0 && <div className={(log.resourceDelta.survival    ?? 0) > 0 ? 'rl-pos' : 'rl-neg'}>{sign(log.resourceDelta.survival    ?? 0)} hrana</div>}
-          {(log.resourceDelta.combat      ?? 0) !== 0 && <div className={(log.resourceDelta.combat      ?? 0) > 0 ? 'rl-pos' : 'rl-neg'}>{sign(log.resourceDelta.combat      ?? 0)} orožje</div>}
-          {(log.resourceDelta.intelligence?? 0) !== 0 && <div className="rl-pos">{sign(log.resourceDelta.intelligence ?? 0)} intel</div>}
+          ))}
+          {log.operationOutcomes.map(outcome => (
+            <div key={`${log.round}-${outcome.operationId}`} className="event-card">
+              <b>{outcome.title}</b>
+              <span className={outcome.success ? 'good' : 'danger'}>{outcome.success ? 'Primary effect' : 'Compromised'}</span>
+              <p>{outcome.summary}</p>
+            </div>
+          ))}
+          {log.nextThreat && <div className="next-threat">{log.nextThreat}</div>}
         </div>
-        {(log.revealedNodes.length > 0 || log.aiKnowledgeDelta !== 0) && (
-          <div className="rl-section">
-            <div className="rl-sec-title">Intel</div>
-            {log.revealedNodes.length > 0 && <div className="rl-pos">+ {log.revealedNodes.length} AI vozlišč odkritih</div>}
-            {log.aiKnowledgeDelta !== 0 && <div className="rl-neg">AI izve: +{Math.round(log.aiKnowledgeDelta * 100)}%</div>}
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+    </aside>
   );
 }
 
-/** Start screen */
+function OperationCard({
+  operation,
+  game,
+  selected,
+  previews,
+  onToggle,
+}: {
+  operation: OperationDefinition;
+  game: GameState;
+  selected: OperationId[];
+  previews: OperationPreview[];
+  onToggle: (id: OperationId) => void;
+}) {
+  const active = selected.includes(operation.id);
+  const affordable = canAfford(game, operation, selected);
+  const preview = previews.find(item => item.operationId === operation.id);
+  const objective = operation.affectedObjective
+    ? game.campaignObjectives.find(item => item.id === operation.affectedObjective)
+    : undefined;
+
+  return (
+    <button
+      type="button"
+      className={`operation-card ${active ? 'selected' : ''}`}
+      disabled={!active && !affordable}
+      onClick={() => onToggle(operation.id)}
+    >
+      <div className="operation-top">
+        <span className={`purpose ${operation.purpose}`}>{PURPOSE_LABEL[operation.purpose]}</span>
+        <span className={`risk ${operation.risk}`}>{operation.risk} risk</span>
+      </div>
+      <h3>{operation.title}</h3>
+      <p>{operation.description}</p>
+      <div className="operation-meta">
+        <span>{operation.required.people} people</span>
+        <span>{costText(operation.required)}</span>
+      </div>
+      <div className="effect">{preview?.expectedEffect ?? operation.expectedEffect}</div>
+      {objective && <div className="target">Target: {objective.visibility === 'unknown' ? 'unknown objective' : objective.title}</div>}
+      {!active && !affordable && <div className="blocked">Insufficient capacity or resources</div>}
+    </button>
+  );
+}
+
+function OperationPlanner({
+  game,
+  selected,
+  previews,
+  loading,
+  error,
+  onToggle,
+  onExecute,
+  onNew,
+}: {
+  game: GameState;
+  selected: OperationId[];
+  previews: OperationPreview[];
+  loading: boolean;
+  error: string;
+  onToggle: (id: OperationId) => void;
+  onExecute: () => void;
+  onNew: () => void;
+}) {
+  const cost = selectedCost(selected);
+  const remaining = game.population - cost.people;
+  const canExecute = selected.length > 0 && remaining >= 0 && !loading;
+
+  return (
+    <section className="panel planner">
+      <div className="panel-head planner-head">
+        <div>
+          <div className="eyebrow">Operation Planning</div>
+          <h2>Select 1-3 operations</h2>
+        </div>
+        <div className="planner-status">
+          <span>{selected.length}/{MAX_OPERATIONS} selected</span>
+          <b className={remaining < 0 ? 'danger' : ''}>{remaining} people remaining</b>
+        </div>
+      </div>
+      <div className="operation-grid">
+        {OPERATIONS.map(operation => (
+          <OperationCard
+            key={operation.id}
+            operation={operation}
+            game={game}
+            selected={selected}
+            previews={previews}
+            onToggle={onToggle}
+          />
+        ))}
+      </div>
+      {error && <div className="error">{error}</div>}
+      <div className="planner-actions">
+        <button className="execute-btn" disabled={!canExecute} onClick={onExecute}>
+          {loading ? 'Executing...' : 'Execute Campaign Month'}
+        </button>
+        <button className="secondary-btn" disabled={loading} onClick={onNew}>New Campaign</button>
+      </div>
+    </section>
+  );
+}
+
+function ResultPanel({ log }: { log: RoundLog | null }) {
+  if (!log) return null;
+  return (
+    <section className="panel result-panel">
+      <div className="panel-head">
+        <div>
+          <div className="eyebrow">Round Result</div>
+          <h2>Month {log.round} Debrief</h2>
+        </div>
+      </div>
+      <p className="summary">{log.narrative}</p>
+      <div className="result-grid">
+        <div><span>Population</span><b>{log.populationDelta >= 0 ? '+' : ''}{log.populationDelta}</b></div>
+        <div><span>Survival</span><b>{log.resourceDelta.survival ?? 0}</b></div>
+        <div><span>Combat</span><b>{log.resourceDelta.combat ?? 0}</b></div>
+        <div><span>Intel</span><b>{log.resourceDelta.intelligence ?? 0}</b></div>
+        <div><span>Morale</span><b>{log.moraleDelta >= 0 ? '+' : ''}{Math.round(log.moraleDelta)}</b></div>
+        <div><span>Exposure</span><b>{log.exposureDelta >= 0 ? '+' : ''}{Math.round(log.exposureDelta * 100)}%</b></div>
+      </div>
+    </section>
+  );
+}
+
 function StartScreen({ onNew, loading }: { onNew: () => void; loading: boolean }) {
   return (
     <div className="start">
       <div className="start-inner">
-        <div className="start-logo">
-          <span className="start-ai">AI</span>
-          <span className="start-vs">vs</span>
-          <span className="start-h">HUMANITY</span>
-        </div>
-        <p className="start-sub">AI je prevzel Zemljo. Ti vodiš zadnji klan. Preberi AI-jev skrivni načrt — ali izumri.</p>
-        <div className="start-phases">
-          {[
-            { num: '01', title: 'AI IŠČE', desc: 'Droni, sateliti, senzorji. Skrij se.', color: '#e06c30' },
-            { num: '02', title: 'AI RAZUME', desc: 'Analiza vzorcev, predikcija. Špijoniraj.', color: '#cc3333' },
-            { num: '03', title: 'AI IZTREBLJA', desc: 'Udar na preživetvene stebre. Brani se.', color: '#991111' },
-          ].map(ph => (
-            <div key={ph.num} className="start-phase" style={{ borderColor: ph.color }}>
-              <span className="sp-num" style={{ color: ph.color }}>{ph.num}</span>
-              <span className="sp-title" style={{ color: ph.color }}>{ph.title}</span>
-              <span className="sp-desc dim">{ph.desc}</span>
-            </div>
-          ))}
-        </div>
-        <div className="start-legend dim small">
-          12 mesecev na fazo · 36 skupaj · Vsaka odločitev šteje · Izumrli ne vstanejo
-        </div>
-        <button className="start-btn" onClick={onNew} disabled={loading}>
-          {loading ? '⟳ Nalagam…' : '▶  ZAČNI IGRO'}
+        <div className="eyebrow">AI Campaign War Room</div>
+        <h1>AI vs Humanity</h1>
+        <p>The machine is not waiting for a phase timer. It is completing objectives. Pick operations, reveal its plan, and keep the clan alive.</p>
+        <button className="execute-btn" onClick={onNew} disabled={loading}>
+          {loading ? 'Creating...' : 'Begin Campaign'}
         </button>
       </div>
     </div>
   );
 }
 
-/** Game over screen */
-function GameOverScreen({ game, onNew, loading }: { game: GameState; onNew: () => void; loading: boolean }) {
+function GameOver({ game, onNew, loading }: { game: GameState; onNew: () => void; loading: boolean }) {
   const won = game.status === 'victory';
-  const exploited = game.aiWeakPoints.filter(w => w.exploited).length;
-  const revealed  = game.aiTree.filter(n => n.visibility === 'revealed').length;
-  const c = won ? '#22cc66' : '#cc3333';
   return (
-    <div className="gameover">
-      <div className="go-header" style={{ borderColor: c }}>
-        <div className="go-status" style={{ color: c }}>
-          {won ? '✓ ZMAGA' : '✗ LINIJA ZAKLJUČENA'}
-        </div>
-        <p className="go-reason dim">
-          {game.status === 'defeat_extinction'   && 'Populacija je padla na nič. Klan je izumrl.'}
-          {game.status === 'defeat_overwhelmed'  && 'AI je pridobil popolno sliko o klanu.'}
-          {won && 'Klan je ustavil AI. Človeštvo preživi.'}
-        </p>
+    <div className="start">
+      <div className="start-inner game-over">
+        <div className={won ? 'good eyebrow' : 'danger eyebrow'}>{won ? 'Victory' : 'Campaign Failed'}</div>
+        <h1>{won ? 'Humanity Survives' : 'The Clan Falls'}</h1>
+        <p>{won ? 'The AI campaign chain was broken.' : 'AI pressure overwhelmed the remaining human network.'}</p>
+        <button className="execute-btn" onClick={onNew} disabled={loading}>Start New Campaign</button>
       </div>
-      <div className="go-stats">
-        {[
-          ['Trajanje',         `${game.totalRounds} / 36 rund`],
-          ['Zadnja faza',      PHASE[game.phase].full],
-          ['Preživeli',        `${game.population} / ${game.maxPopulation}`],
-          ['AI načrt odkrit',  `${revealed} / ${game.aiTree.length} vozlišč`],
-          ['Šibke točke',      `${exploited} / ${game.aiWeakPoints.length} uničenih`],
-          ['Replay seed',      `${game.rngSeed}`],
-        ].map(([k, v]) => (
-          <div key={k} className="go-stat">
-            <span className="go-k dim">{k}</span>
-            <span className="go-v">{v}</span>
-          </div>
-        ))}
-      </div>
-      <button className="start-btn go-btn" onClick={onNew} disabled={loading}>
-        {loading ? '⟳' : '↺  NOVA LINIJA'}
-      </button>
     </div>
   );
 }
 
-// ─── Glavna komponenta ────────────────────────────────────────────────────────
-
 export default function App() {
-  const [game,       setGame]       = useState<GameState | null>(null);
-  const [loading,    setLoading]    = useState(false);
-  const [axis,       setAxis]       = useState<HumanAxis>('hiding');
-  const [combatants, setCombatants] = useState(0);
-  const [foragers,   setForagers]   = useState(20);
-  const [scouts,     setScouts]     = useState(15);
-  const [targetWP,   setTargetWP]   = useState('');
-  const [odds,       setOdds]       = useState<OddsPreview | null>(null);
+  const [game, setGame] = useState<GameState | null>(null);
+  const [selected, setSelected] = useState<OperationId[]>([]);
+  const [previews, setPreviews] = useState<OperationPreview[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const id = localStorage.getItem(STORAGE_KEY);
-    if (id) getGame(id).then(setGame).catch(() => localStorage.removeItem(STORAGE_KEY));
+    if (id) {
+      getGame(id)
+        .then(state => {
+          if (!state.campaignObjectives) {
+            localStorage.removeItem(STORAGE_KEY);
+            return;
+          }
+          setGame(state);
+        })
+        .catch(() => localStorage.removeItem(STORAGE_KEY));
+    }
   }, []);
 
   useEffect(() => {
-    if (!game || game.status !== 'active') return;
-    const t = setTimeout(() => {
-      previewOdds(game.runId, { axis, combatants, foragers, scouts }).then(setOdds).catch(() => setOdds(null));
-    }, 250);
-    return () => clearTimeout(t);
-  }, [game?.runId, axis, combatants, foragers, scouts]);
+    if (!game || selected.length === 0) {
+      setPreviews([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      previewOperations(game.runId, selected).then(setPreviews).catch(() => setPreviews([]));
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [game?.runId, selected]);
+
+  const activeObjective = useMemo(
+    () => game?.campaignObjectives.find(objective => objective.status === 'active' || objective.status === 'disrupted'),
+    [game]
+  );
 
   const handleNew = async () => {
     setLoading(true);
+    setError('');
     try {
-      const g = await createGame();
-      setGame(g);
-      localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('hiding'); setCombatants(0); setForagers(20); setScouts(15); setTargetWP('');
-    } finally { setLoading(false); }
+      const next = await createGame();
+      setGame(next);
+      setSelected([]);
+      localStorage.setItem(STORAGE_KEY, next.runId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to create campaign');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRound = async () => {
-    if (!game || loading) return;
+  const toggleOperation = (id: OperationId) => {
+    if (!game) return;
+    setError('');
+    setSelected(current => {
+      if (current.includes(id)) return current.filter(item => item !== id);
+      const next = [...current, id];
+      const operation = OPERATIONS.find(item => item.id === id);
+      if (!operation || !canAfford(game, operation, current) || next.length > MAX_OPERATIONS) return current;
+      return next;
+    });
+  };
+
+  const execute = async () => {
+    if (!game || selected.length === 0) return;
     setLoading(true);
+    setError('');
     try {
-      const { state } = await playRound(game.runId, {
-        assignment: { axis, combatants, foragers, scouts },
-        targetWeakPoint: targetWP || undefined,
-      });
-      setGame(state);
-      setOdds(null);
-    } finally { setLoading(false); }
+      const result = await playRound(game.runId, { operationIds: selected });
+      setGame(result.state);
+      setSelected([]);
+      setPreviews([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Round failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const pop      = game?.population ?? 0;
-  const assigned = combatants + foragers + scouts;
-  const over     = assigned > pop;
-
-  if (!game && !loading) return <StartScreen onNew={handleNew} loading={false} />;
-  if (!game && loading)  return <StartScreen onNew={handleNew} loading={true}  />;
-  if (!game) return null;
-  if (game.status !== 'active') return <GameOverScreen game={game} onNew={handleNew} loading={loading} />;
-
-  const survBalance = foragers * 4 - game.population;
+  if (!game) return <StartScreen onNew={handleNew} loading={loading} />;
+  if (game.status !== 'active') return <GameOver game={game} onNew={handleNew} loading={loading} />;
 
   return (
-    <div className="hud">
-      <PhaseHeader game={game} />
-      <ResourceRow game={game} />
-
-      <div className="hud-cols">
-        {/* ── Levo: AI intel ── */}
-        <div className="hud-left">
-          <AITree nodes={game.aiTree} />
-          <WeakPoints wps={game.aiWeakPoints} target={targetWP} onTarget={setTargetWP} />
+    <div className="war-room">
+      <TopStatus game={game} />
+      {activeObjective && (
+        <div className="active-banner">
+          <span>Active AI objective</span>
+          <b>{activeObjective.title}</b>
+          <i>{Math.round(activeObjective.progress)}% complete</i>
         </div>
-
-        {/* ── Desno: Ukazi ── */}
-        <div className="hud-right">
-          <div className="panel command-panel">
-            <h3>RAZPOREDI ENOTE</h3>
-
-            <div className="cmd-section">
-              <div className="cmd-label">Strategijska os tega meseca</div>
-              <AxisSelector phase={game.phase} selected={axis} onSelect={setAxis} />
-              <div className="dim small" style={{ marginTop: 6 }}>
-                {AXIS[axis].desc}
-                {PHASE[game.phase].bestAxis !== axis &&
-                  <span style={{ color: '#cc8800' }}> · Idealna os: {AXIS[PHASE[game.phase].bestAxis].label}</span>}
-              </div>
-            </div>
-
-            <div className="cmd-section">
-              <div className="cmd-label">Razporedi {pop} ljudi</div>
-              <SliderRow icon="⚔" label="Borci"      val={combatants} onChange={setCombatants} max={pop} yieldText={`→ +${(combatants * 1.2).toFixed(0)} moč`} />
-              <SliderRow icon="🌾" label="Nabiralci"  val={foragers}   onChange={setForagers}   max={pop} yieldText={`→ ${survBalance >= 0 ? '+' : ''}${survBalance} hrana`} />
-              <SliderRow icon="🔭" label="Izvidniki"  val={scouts}     onChange={setScouts}     max={pop} yieldText={`→ +${scouts * 8} intel`} />
-              <PeopleBar pop={pop} combatants={combatants} foragers={foragers} scouts={scouts} />
-            </div>
-
-            {targetWP && (
-              <div className="target-chip">
-                🎯 Ciljaš: <b>{game.aiWeakPoints.find(w => w.id === targetWP)?.label}</b>
-                <button className="tc-clear" onClick={() => setTargetWP('')}>✕</button>
-              </div>
-            )}
-          </div>
-
-          <OddsDisplay odds={odds} combatants={combatants} />
-
-          <button className="exec-btn" onClick={handleRound} disabled={loading || over}>
-            {loading ? '⟳  Izvajam…' : over ? '⚠  Preveč ljudi razporejenih' : '▶  IZVEDI MESEC'}
-          </button>
-          <button className="newgame-btn" onClick={handleNew} disabled={loading}>↺ Nova igra</button>
-        </div>
+      )}
+      <div className="dashboard">
+        <ClanStatus game={game} selected={selected} />
+        <CampaignPlan game={game} />
+        <ThreatPanel game={game} />
       </div>
-
-      {game.lastRoundLog && <RoundLog log={game.lastRoundLog} />}
+      <OperationPlanner
+        game={game}
+        selected={selected}
+        previews={previews}
+        loading={loading}
+        error={error}
+        onToggle={toggleOperation}
+        onExecute={execute}
+        onNew={handleNew}
+      />
+      <ResultPanel log={game.lastRoundLog} />
     </div>
   );
 }

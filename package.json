@@ -8,7 +8,7 @@
     "build": "tsc && cd client && npm run build",
     "deploy": "npm run build && cp -r client/dist/. /var/www/ai-vs-humanity/",
     "start": "node dist/server/index.js",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+    "test": "jest"
   },
   "dependencies": {
     "cors": "^2.8.5",

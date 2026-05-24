@@ -27,6 +27,18 @@ const aiWeakPointSchema = new Schema({
   phase: String,
 }, { _id: false });
 
+const campaignObjectiveSchema = new Schema({
+  id: String,
+  title: String,
+  description: String,
+  phase: String,
+  progress: Number,
+  status: String,
+  visibility: String,
+  threatEffect: String,
+  counterOperations: [String],
+}, { _id: false });
+
 const gameSessionSchema = new Schema({
   runId: { type: String, required: true, unique: true, index: true },
   status: { type: String, required: true },
@@ -35,12 +47,15 @@ const gameSessionSchema = new Schema({
   totalRounds: Number,
   population: Number,
   maxPopulation: Number,
+  morale: Number,
+  exposure: Number,
   resources: resourcesSchema,
   aiPhaseProgress: Number,
   aiRobots: Number,
   aiKnowledge: Number,
   aiTree: [aiTreeNodeSchema],
   aiWeakPoints: [aiWeakPointSchema],
+  campaignObjectives: [campaignObjectiveSchema],
   clanActivity: Number,
   rngSeed: Number,
   rngCallCount: Number,

@@ -1,128 +1,191 @@
-// ─── Core enums ───────────────────────────────────────────────────────────────
-
 export type AIPhase = 'find' | 'understand' | 'eliminate';
-// Faza 1: Najti | Faza 2: Razumeti | Faza 3: Iztrebiti
 
 export type HumanAxis = 'hiding' | 'espionage' | 'defense';
-// Skrivanje | Špijonaža | Obramba
+export const HUMAN_AXES = ['hiding', 'espionage', 'defense'] as const;
 
 export type Visibility = 'unknown' | 'partial' | 'revealed';
-// Megla: neznano | delno | odkrito
-
-// ─── AI tree ──────────────────────────────────────────────────────────────────
 
 export interface AITreeNode {
   id: string;
   phase: AIPhase;
   label: string;
   visibility: Visibility;
-  strength: number; // 0–100, how strong this node is
+  strength: number;
   executed: boolean;
 }
 
-// Fiksne šibke točke AI (endgame cilji)
 export interface AIWeakPoint {
   id: string;
   label: string;
   discovered: boolean;
   exploited: boolean;
-  phase: AIPhase; // v kateri fazi postane relevantna
+  phase: AIPhase;
 }
-
-// ─── Resources ────────────────────────────────────────────────────────────────
 
 export interface Resources {
-  survival: number;    // voda + hrana — hranijo populacijo
-  combat: number;      // orožje + material — moč v spopadu
-  intelligence: number; // info iz raziskav — odgrinja meglo
+  survival: number;
+  combat: number;
+  intelligence: number;
 }
-
-// ─── Assignment — kako razporediš populacijo ta mesec ─────────────────────────
 
 export interface Assignment {
-  axis: HumanAxis;          // kateri osi daš fokus
-  combatants: number;       // koliko jih pošlješ v spopad/akcijo
-  foragers: number;         // iščejo preživetvene vire
-  scouts: number;           // špijonaža / research (info vir)
+  axis: HumanAxis;
+  combatants: number;
+  foragers: number;
+  scouts: number;
 }
-
-// ─── Combat result ────────────────────────────────────────────────────────────
 
 export interface CombatResult {
   humanStrength: number;
   aiStrength: number;
-  successProbability: number; // P(human wins) = humanStr / (humanStr + aiStr)
-  mAxisModifier: number;      // M_os za izbrano os v tej fazi
+  successProbability: number;
+  mAxisModifier: number;
   outcome: 'victory' | 'partial' | 'defeat' | 'annihilation';
   humanLost: number;
   aiRobotsDestroyed: number;
-  spoils: Partial<Resources>;  // plen sorazmeren z marginom zmage
-  aiInfoGained: number;        // koliko AI izve o nas iz tega spopada
-  infoGained: number;          // koliko mi izvemo o AI
+  spoils: Partial<Resources>;
+  aiInfoGained: number;
+  infoGained: number;
 }
-
-// ─── Phase transition event ───────────────────────────────────────────────────
 
 export interface PhaseEvent {
   phase: AIPhase;
-  label: string;         // npr. "AI požge Zemljo"
-  narrative: string;     // zgodbovni opis prehoda
+  label: string;
+  narrative: string;
   impact: Partial<Resources & { population: number }>;
 }
 
-// ─── Full game state (deterministic) ─────────────────────────────────────────
+export type ObjectiveStatus = 'locked' | 'active' | 'disrupted' | 'completed';
+
+export interface AICampaignObjective {
+  id: string;
+  title: string;
+  description: string;
+  phase: AIPhase;
+  progress: number;
+  status: ObjectiveStatus;
+  visibility: Visibility;
+  threatEffect: string;
+  counterOperations: OperationId[];
+}
+
+export type OperationId =
+  | 'hide_movement'
+  | 'sabotage_scanners'
+  | 'spread_misinformation'
+  | 'fortify_shelters'
+  | 'intercept_comms'
+  | 'raid_logistics'
+  | 'rescue_survivors'
+  | 'gather_supplies';
+
+export type OperationPurpose = 'hiding' | 'espionage' | 'defense' | 'survival' | 'strike';
+export type RiskLevel = 'low' | 'medium' | 'high';
+
+export interface OperationCost {
+  people: number;
+  survival?: number;
+  combat?: number;
+  intelligence?: number;
+}
+
+export interface OperationDefinition {
+  id: OperationId;
+  title: string;
+  purpose: OperationPurpose;
+  description: string;
+  required: OperationCost;
+  risk: RiskLevel;
+  expectedEffect: string;
+  affectedObjective?: string;
+}
+
+export interface OperationOutcome {
+  operationId: OperationId;
+  title: string;
+  success: boolean;
+  summary: string;
+  objectiveId?: string;
+  objectiveDelta?: number;
+  resourceDelta: Partial<Resources>;
+  populationDelta: number;
+  moraleDelta: number;
+  exposureDelta: number;
+  aiKnowledgeDelta: number;
+  revealedObjectiveIds: string[];
+}
+
+export interface ObjectiveProgressChange {
+  objectiveId: string;
+  title: string;
+  before: number;
+  after: number;
+  delta: number;
+  status: ObjectiveStatus;
+}
 
 export interface GameState {
-  // Čas
-  round: number;       // 1–12 znotraj faze
+  round: number;
   phase: AIPhase;
-  totalRounds: number; // globalni štetec (1–36)
+  totalRounds: number;
 
-  // Populacija
   population: number;
   maxPopulation: number;
+  morale: number;
+  exposure: number;
 
-  // Resursi
   resources: Resources;
 
-  // AI
-  aiPhaseProgress: number;  // 0–12, koliko rund je AI v tej fazi porabil
+  aiPhaseProgress: number;
   aiRobots: number;
-  aiKnowledge: number;      // [0,1] koliko AI ve o nas
+  aiKnowledge: number;
   aiTree: AITreeNode[];
   aiWeakPoints: AIWeakPoint[];
+  campaignObjectives: AICampaignObjective[];
 
-  // Drugi klani (abstraktirano)
-  clanActivity: number; // [0,1] — davek na AI silo
+  clanActivity: number;
 
-  // RNG (determinizem)
   rngSeed: number;
   rngCallCount: number;
 
-  // Log zadnje runde
   lastRoundLog: RoundLog | null;
 
-  // Ali je igra končana
   status: 'active' | 'victory' | 'defeat_extinction' | 'defeat_overwhelmed';
-  runId: string;  // unikatni ID za to linijo igre
+  runId: string;
 }
 
 export interface RoundLog {
   round: number;
   phase: AIPhase;
-  assignment: Assignment;
+  assignment?: Assignment;
+  operationIds: OperationId[];
+  operationOutcomes: OperationOutcome[];
   combat: CombatResult | null;
   resourceDelta: Partial<Resources>;
   populationDelta: number;
+  moraleDelta: number;
+  exposureDelta: number;
   clanActivityDelta: number;
   aiKnowledgeDelta: number;
-  revealedNodes: string[];  // ID-ji odkritih AI vozlišč
+  revealedNodes: string[];
+  revealedObjectives: string[];
+  objectiveProgress: ObjectiveProgressChange[];
+  nextThreat: string | null;
   narrative: string;
 }
 
-// ─── Player action ────────────────────────────────────────────────────────────
-
 export interface PlayerAction {
-  assignment: Assignment;
-  targetWeakPoint?: string; // če hočeš ciljati specifično šibko točko
+  operationIds: OperationId[];
+  targetWeakPoint?: string;
+}
+
+export interface OperationPreview {
+  operationId: OperationId;
+  title: string;
+  canRun: boolean;
+  reason?: string;
+  expectedEffect: string;
+  affectedObjective?: string;
+  required: OperationCost;
+  risk: RiskLevel;
 }
