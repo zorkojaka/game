@@ -815,7 +815,28 @@ function OddsArc({ p, color }: { p: number; color: string }) {
 }
 
 /** Kronološki dnevnik dogodkov ob mapi (frontend-only akumulacija) */
-interface EventEntry { round: number; phase: AIPhase; narrative: string; ts: number; }
+interface LedgerItem { icon: string; label: string; value: number; }
+interface EventEntry {
+  round: number;
+  phase: AIPhase;
+  narrative: string;
+  ledger: LedgerItem[];
+  ts: number;
+}
+
+function LedgerChip({ item }: { item: LedgerItem }) {
+  const positive = item.value > 0;
+  const negative = item.value < 0;
+  const color = positive ? '#22cc88' : negative ? '#cc4444' : '#666';
+  const sign = positive ? '+' : '';
+  return (
+    <span className="ledger-chip" style={{ borderColor: color, color }}>
+      <span className="lc-icon">{item.icon}</span>
+      <span className="lc-val">{sign}{item.value}</span>
+      <span className="lc-label dim">{item.label}</span>
+    </span>
+  );
+}
 
 function EventLog({ entries }: { entries: EventEntry[] }) {
   return (
@@ -838,6 +859,11 @@ function EventLog({ entries }: { entries: EventEntry[] }) {
               {i === 0 && <span className="ee-latest">NOVO</span>}
             </div>
             <p className="ee-text">{e.narrative}</p>
+            {e.ledger.length > 0 && (
+              <div className="ee-ledger">
+                {e.ledger.map((item, idx) => <LedgerChip key={idx} item={item} />)}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -1377,14 +1403,38 @@ export default function App() {
     }
   }, [scoutObj, game?.mapTiles]);
 
-  // Akumuliraj log dogodkov — vsak nov mesec doda vnos
+  // Akumuliraj log dogodkov — vsak nov mesec doda vnos z dogodki + poračunom
   useEffect(() => {
     if (!game?.lastRoundLog) return;
     const log = game.lastRoundLog;
     setEventLog(prev => {
-      // Prepreči duplikat (isti round + phase)
       if (prev[0] && prev[0].round === log.round && prev[0].phase === log.phase) return prev;
-      const entry: EventEntry = { round: log.round, phase: log.phase, narrative: log.narrative, ts: Date.now() };
+      const ledger: LedgerItem[] = [];
+      if (log.populationDelta !== 0)
+        ledger.push({ icon: '👥', label: 'populacija', value: log.populationDelta });
+      const dS = log.resourceDelta?.survival     ?? 0;
+      const dC = log.resourceDelta?.combat       ?? 0;
+      const dI = log.resourceDelta?.intelligence ?? 0;
+      if (dS !== 0) ledger.push({ icon: '🍞', label: 'hrana',  value: dS });
+      if (dC !== 0) ledger.push({ icon: '⚔',  label: 'orožje', value: dC });
+      if (dI !== 0) ledger.push({ icon: '👁',  label: 'intel',  value: dI });
+      if (log.combat?.aiRobotsDestroyed)
+        ledger.push({ icon: '🤖', label: 'AI roboti', value: -log.combat.aiRobotsDestroyed });
+      if (log.raid?.aiRobotsDestroyed)
+        ledger.push({ icon: '🤖', label: 'AI roboti', value: -log.raid.aiRobotsDestroyed });
+      if (log.raid?.weaponsDestroyed)
+        ledger.push({ icon: '💥', label: 'uničeno orožje', value: -log.raid.weaponsDestroyed });
+      if (log.revealedNodes?.length)
+        ledger.push({ icon: '🔍', label: 'AI vozlišča', value: log.revealedNodes.length });
+      if (log.aiKnowledgeDelta && Math.round(log.aiKnowledgeDelta * 100) !== 0)
+        ledger.push({ icon: '🕵', label: 'AI ve o nas %', value: Math.round(log.aiKnowledgeDelta * 100) });
+      if (log.clanActivityDelta && Math.round(log.clanActivityDelta * 100) !== 0)
+        ledger.push({ icon: '🌍', label: 'klani %', value: Math.round(log.clanActivityDelta * 100) });
+      const entry: EventEntry = {
+        round: log.round, phase: log.phase,
+        narrative: log.narrative, ledger,
+        ts: Date.now(),
+      };
       return [entry, ...prev].slice(0, 50);
     });
   }, [game?.totalRounds]);

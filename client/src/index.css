@@ -998,3 +998,20 @@ input[type=range]::-moz-range-thumb {
 .ep-row { display: flex; justify-content: space-between; padding: 2px 0; }
 .ep-row b { color: var(--text); }
 .ep-events { margin-top: 6px; padding-top: 4px; border-top: 1px dashed var(--border2); line-height: 1.5; }
+
+/* ─── Ledger v event log entry ───────────────────────────────────────────── */
+.ee-ledger {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: 6px; padding-top: 6px;
+  border-top: 1px dashed var(--border2);
+}
+.ledger-chip {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  padding: 2px 6px;
+  background: var(--bg2);
+  border: 1px solid;
+  font-size: .7rem; line-height: 1.2;
+}
+.lc-icon  { font-size: .85rem; }
+.lc-val   { font-weight: bold; }
+.lc-label { font-size: .62rem; }
