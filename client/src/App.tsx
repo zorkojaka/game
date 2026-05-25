@@ -518,6 +518,7 @@ type AllocRole = {
   yieldText?: string;
   probLabel?: string;
   prob?: number;
+  extraLabel?: React.ReactNode;   // dodatne komponente v naslovni vrstici (npr. day/night split slider)
 };
 
 function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer }: {
@@ -578,6 +579,7 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
                 <span style={{ color: probColor(r.prob) }}>{Math.round(r.prob * 100)}%</span>
               </span>
             )}
+            {r.extraLabel}
           </div>
         ))}
       </div>
@@ -1783,7 +1785,28 @@ export default function App() {
                 probLabel: combatants > 0 ? 'Zmaga' : undefined, prob: combatants > 0 ? odds?.successProbability : undefined },
               { key: 'd', label: 'Obramba',   icon: '🛡', color: '#66aabb', count: defenseTotal,
                 yieldText: `${defenseTotal} stražarjev · ${defenseTotal} orožja`,
-                probLabel: 'Odbije napad', prob: odds?.raidRepelProbability },
+                extraLabel: defenseTotal > 0 ? (
+                  <div className="defense-split inline">
+                    <div className="ds-prob-row">
+                      <span className="ds-prob-day small">
+                        🌞 dan <b>{dayGuard}</b>
+                        <span style={{ color: probColor(odds?.raidRepelProbabilityDay ?? 0), marginLeft: 4 }}>
+                          {odds ? Math.round(odds.raidRepelProbabilityDay * 100) : 0}%
+                        </span>
+                      </span>
+                      <span className="ds-prob-night small">
+                        <span style={{ color: probColor(odds?.raidRepelProbabilityNight ?? 0), marginRight: 4 }}>
+                          {odds ? Math.round(odds.raidRepelProbabilityNight * 100) : 0}%
+                        </span>
+                        <b>{nightGuard}</b> noč 🌜
+                      </span>
+                    </div>
+                    <input type="range" min={0} max={defenseTotal} value={dayGuard} step={1}
+                      onChange={e => setDayGuard(Math.max(0, Math.min(defenseTotal, +e.target.value)))}
+                      className="ds-slider"
+                      style={{ ['--pct' as never]: `${defenseTotal > 0 ? (dayGuard / defenseTotal * 100).toFixed(1) : 0}%` } as React.CSSProperties} />
+                  </div>
+                ) : undefined },
               { key: 'f', label: 'Nabiralci', icon: '🌾', color: '#6aa630', count: foragers,
                 yieldText: `${survBalance >= 0 ? '+' : ''}${survBalance} hrana`,
                 probLabel: 'Brez izgub', prob: odds?.forageSafetyProbability },
@@ -1805,20 +1828,6 @@ export default function App() {
             }}
           />
 
-          {/* Day/night sub-split (samo če imamo obrambo) */}
-          {defenseTotal > 0 && (
-            <div className="defense-split">
-              <div className="ds-head">
-                <span>🌞 Dnevna: <b>{dayGuard}</b></span>
-                <span className="dim small">razdeli stražo dan/noč</span>
-                <span>🌜 Nočna: <b>{nightGuard}</b></span>
-              </div>
-              <input type="range" min={0} max={defenseTotal} value={dayGuard} step={1}
-                onChange={e => setDayGuard(Math.max(0, Math.min(defenseTotal, +e.target.value)))}
-                className="ds-slider"
-                style={{ ['--pct' as never]: `${defenseTotal > 0 ? (dayGuard / defenseTotal * 100).toFixed(1) : 0}%` } as React.CSSProperties} />
-            </div>
-          )}
 
           {over && (
             <button className="autofit-btn" onClick={autoFitAllocation}>

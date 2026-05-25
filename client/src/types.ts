@@ -161,6 +161,8 @@ export interface OddsPreview {
   aiStrength: number;
   raidProbability: number;
   raidRepelProbability: number;
+  raidRepelProbabilityDay: number;
+  raidRepelProbabilityNight: number;
   scoutSuccessProbability: number;
   scoutCaptureProbability: number;
   forageSafetyProbability: number;

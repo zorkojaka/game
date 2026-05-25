@@ -781,6 +781,8 @@ export function previewOdds(state: GameState, assignment: Assignment) {
     aiStrength: aiStr,
     raidProbability: raidProbability(state, assignment.axis),
     raidRepelProbability: (raidRepelProbability(state, assignment, 'day') + raidRepelProbability(state, assignment, 'night')) / 2,
+    raidRepelProbabilityDay:   raidRepelProbability(state, assignment, 'day'),
+    raidRepelProbabilityNight: raidRepelProbability(state, assignment, 'night'),
     scoutSuccessProbability: scoutSuccessProbability(state, assignment),
     scoutCaptureProbability: scoutCaptureProbability(state, assignment),
     forageSafetyProbability: forageSafetyProbability(state, assignment),

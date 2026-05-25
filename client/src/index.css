@@ -1015,3 +1015,22 @@ input[type=range]::-moz-range-thumb {
 .lc-icon  { font-size: .85rem; }
 .lc-val   { font-weight: bold; }
 .lc-label { font-size: .62rem; }
+
+/* ─── Day/night split znotraj obramba segmenta ─────────────────────────── */
+.defense-split.inline {
+  margin: 4px 0 0 0; padding: 4px 6px;
+  background: rgba(102,170,187,.08);
+  border-left: none;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.ds-prob-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 6px;
+}
+.ds-prob-day, .ds-prob-night {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  color: var(--text);
+}
+.defense-split.inline .ds-slider {
+  height: 6px;
+}
