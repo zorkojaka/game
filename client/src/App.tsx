@@ -697,6 +697,70 @@ function OddsArc({ p, color }: { p: number; color: string }) {
   );
 }
 
+/** Kronološki dnevnik dogodkov ob mapi (frontend-only akumulacija) */
+interface EventEntry { round: number; phase: AIPhase; narrative: string; ts: number; }
+
+function EventLog({ entries }: { entries: EventEntry[] }) {
+  return (
+    <div className="panel event-log-panel">
+      <div className="panel-head">
+        <h3>DNEVNIK DOGODKOV</h3>
+        <span className="panel-badge">{entries.length}</span>
+      </div>
+      <div className="event-log-scroll">
+        {entries.length === 0 && (
+          <div className="dim small" style={{ padding: 12 }}>
+            Mesec še ni minil. Razporedi ekipe in izvedi mesec.
+          </div>
+        )}
+        {entries.map((e, i) => (
+          <div key={e.ts} className="event-entry">
+            <div className="ee-head">
+              <span className="ee-round" style={{ color: PHASE[e.phase].color }}>M{e.round}</span>
+              <span className="ee-phase dim small">{PHASE[e.phase].label}</span>
+              {i === 0 && <span className="ee-latest">NOVO</span>}
+            </div>
+            <p className="ee-text">{e.narrative}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Človeške misije — NOV BLOK (placeholder). TODO: engine logika prihaja kasneje. */
+function HumanMissionsPlaceholder() {
+  // TODO: nadomesti s pravo engine logiko ko bo na voljo
+  const placeholder = [
+    { id: 'm1', title: 'Iskanje zaveznikov',     desc: 'Pošlji 5 izvidnikov, da najdejo sosednji klan.',     status: 'available', months: 3, color: '#22aa88' },
+    { id: 'm2', title: 'Obnova zatočišča',       desc: 'Zgradi bunker. Potrebnih 10 ljudi + 30 materiala.',  status: 'available', months: 4, color: '#cc8800' },
+    { id: 'm3', title: 'Sabotaža AI postaje',    desc: 'Skupina 8 borcev udari AI senzorsko postajo.',       status: 'locked',    months: 5, color: '#cc3333' },
+  ];
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <h3>MISIJE ČLOVEŠTVA</h3>
+        <span className="panel-badge teal">{placeholder.filter(m => m.status === 'available').length} na voljo</span>
+      </div>
+      <div className="dim small" style={{ marginBottom: 8, fontStyle: 'italic' }}>
+        ⚠ Placeholder — logika misij prihaja v naslednjem koraku
+      </div>
+      {placeholder.map(m => (
+        <div key={m.id} className={`hm-card ${m.status}`} style={{ borderLeftColor: m.color }}>
+          <div className="hm-head">
+            <span className="hm-title" style={{ color: m.color }}>{m.title}</span>
+            <span className="hm-months dim small">{m.months}m</span>
+          </div>
+          <div className="hm-desc dim small">{m.desc}</div>
+          <button className="hm-btn" disabled style={{ borderColor: m.color, color: m.status === 'locked' ? '#444' : m.color }}>
+            {m.status === 'locked' ? '🔒 Zaklenjeno' : 'Začni odpravo'}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Log zadnjega meseca */
 function RoundLog({ log }: { log: RoundLog }) {
   const c = log.combat;
@@ -1030,6 +1094,7 @@ export default function App() {
   const [missionR,     setMissionR]     = useState<Record<string, number>>({});
   const [scoutObj,     setScoutObj]     = useState<ScoutObjective>('ai_weakpoints');
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
+  const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
 
   const nightGuard = Math.max(0, defenseTotal - dayGuard);
   const [targetWP,   setTargetWP]   = useState('');
@@ -1065,6 +1130,18 @@ export default function App() {
     prevPhaseRef.current = game.phase;
   }, [game?.phase]);
 
+  // Akumuliraj log dogodkov — vsak nov mesec doda vnos
+  useEffect(() => {
+    if (!game?.lastRoundLog) return;
+    const log = game.lastRoundLog;
+    setEventLog(prev => {
+      // Prepreči duplikat (isti round + phase)
+      if (prev[0] && prev[0].round === log.round && prev[0].phase === log.phase) return prev;
+      const entry: EventEntry = { round: log.round, phase: log.phase, narrative: log.narrative, ts: Date.now() };
+      return [entry, ...prev].slice(0, 50);
+    });
+  }, [game?.totalRounds]);
+
   // Preview odds — game?.totalRounds zagotovi ponoven klic po vsaki rundi
   useEffect(() => {
     if (!game || game.status !== 'active') return;
@@ -1083,7 +1160,7 @@ export default function App() {
       const g = await createGame();
       setGame(g);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('hiding'); setCombatants(0); setDefenseTotal(15); setDayGuard(8); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('ai_weakpoints'); setScoutTargets(new Set());
+      setAxis('hiding'); setCombatants(0); setDefenseTotal(15); setDayGuard(8); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('ai_weakpoints'); setScoutTargets(new Set()); setEventLog([]);
     } finally { setLoading(false); }
   };
 
@@ -1209,92 +1286,93 @@ export default function App() {
           onClose={() => setPhaseTrans(null)}
         />
       )}
+      {/* ─── PAS 1: Humanity vs AI score ─── */}
       <PhaseHeader game={game} />
+
+      {/* ─── PAS 2: Resursi klan ─── */}
       <ResourceRow game={game} />
 
-      {/* ── Arena: Človek vs AI drevesi ── */}
-      <div className="hud-arena">
-        <HumanTree axisHistory={game.axisHistory} currentAxis={axis} onFocusChange={setAxis} />
-        <AITree nodes={game.aiTree} justRevealed={justRevealed} />
-      </div>
-
-      {/* ── HEKSA MAPA + cilji izvidnikov ── */}
-      <div className="panel map-panel">
-        <div className="panel-head">
-          <h3>OPERATIVNA MAPA</h3>
-          <span className="panel-badge">
-            {(game.mapTiles ?? []).filter(t => t.visibility === 'revealed').length} / {(game.mapTiles ?? []).length} razkritih
-          </span>
-        </div>
-        <div className="map-layout">
-          <HexMap tiles={game.mapTiles ?? []} targets={scoutTargets}
-            onToggleTarget={toggleScoutTarget} objective={scoutObj} wps={game.aiWeakPoints} />
-          <div className="map-side">
-            <div className="cmd-label">Cilj izvidnikov ta mesec ({scouts} izvidnikov)</div>
-            <ScoutObjectiveSelector value={scoutObj} onChange={setScoutObj} />
-            {scoutObj === 'map' && (
-              <div className="map-hint">
-                {scoutTargets.size === 0
-                  ? 'Klikni neraziskan heks na mapi za označitev tarč.'
-                  : `Označenih ${scoutTargets.size} heksov za razkrivanje.`}
+      {/* ─── PAS 3: Mapa + Log dogajanja ─── */}
+      <div className="band band-map-log">
+        <div className="panel map-panel">
+          <div className="panel-head">
+            <h3>OPERATIVNA MAPA</h3>
+            <span className="panel-badge">
+              {(game.mapTiles ?? []).filter(t => t.visibility === 'revealed').length} / {(game.mapTiles ?? []).length} razkritih
+            </span>
+          </div>
+          <div className="map-layout">
+            <HexMap tiles={game.mapTiles ?? []} targets={scoutTargets}
+              onToggleTarget={toggleScoutTarget} objective={scoutObj} wps={game.aiWeakPoints} />
+            <div className="map-side">
+              <div className="cmd-label">Cilj izvidnikov ta mesec ({scouts} izvidnikov)</div>
+              <ScoutObjectiveSelector value={scoutObj} onChange={setScoutObj} />
+              {scoutObj === 'map' && (
+                <div className="map-hint">
+                  {scoutTargets.size === 0
+                    ? 'Klikni neraziskan heks na mapi za označitev tarč.'
+                    : `Označenih ${scoutTargets.size} heksov za razkrivanje.`}
+                </div>
+              )}
+              <div className="map-legend dim small">
+                <div><span style={{ color: '#66ccaa' }}>⌂</span> klan · <span style={{ color: '#cc3333' }}>☣</span> AI jedro</div>
+                <div><span style={{ color: '#cc8800' }}>◆</span> šibka točka razkrita · <span style={{ color: '#886600' }}>◌</span> namig</div>
+                <div>rdeča šrafura = neraziskan · siva = delno · prazen teal = razkrit</div>
               </div>
-            )}
-            <div className="map-legend dim small">
-              <div><span style={{ color: '#66ccaa' }}>⌂</span> klan · <span style={{ color: '#cc3333' }}>☣</span> AI jedro</div>
-              <div><span style={{ color: '#cc8800' }}>◆</span> šibka točka razkrita · <span style={{ color: '#886600' }}>◌</span> namig</div>
-              <div>rdeča šrafura = neraziskan · siva = delno · prazen teal = razkrit</div>
             </div>
           </div>
         </div>
+        <EventLog entries={eventLog} />
       </div>
 
-      <div className="hud-cols">
-        {/* ── Levo: Misije ── */}
-        <div className="hud-left">
-          <Missions wps={game.aiWeakPoints} aiTree={game.aiTree}
-            active={game.activeMissions ?? []} plan={missions} planR={missionR}
-            onPlanChange={setMissionAssignment} onRationsChange={setMissionRations}
-            odds={odds} availablePop={availablePop} />
+      {/* ─── PAS 4: Razporedi ljudi ─── */}
+      <div className="panel command-panel">
+        <div className="panel-head">
+          <h3>RAZPOREDI ENOTE</h3>
+          <span className="dim small">
+            {availablePop} razpoložljivih
+            {inMissions > 0 && ` · ${inMissions} v aktivnih misijah`}
+          </span>
         </div>
 
-        {/* ── Desno: Ukazi ── */}
-        <div className="hud-right">
-          <div className="panel command-panel">
-            <h3>RAZPOREDI ENOTE</h3>
+        <div className="cmd-section">
+          <div className="cmd-label">Obroki · določajo porabo hrane, moč ljudi in rast populacije</div>
+          <RationsSelector value={rations} onChange={setRations} pop={pop} />
+        </div>
 
-            <div className="cmd-section">
-              <div className="cmd-label">Obroki · določajo porabo hrane, moč ljudi in rast populacije</div>
-              <RationsSelector value={rations} onChange={setRations} pop={pop} />
-            </div>
-
-            <div className="cmd-section">
-              <div className="cmd-label">
-                Razporedi {availablePop} razpoložljivih ljudi
-                {inMissions > 0 && <span className="dim small"> · {inMissions} v aktivnih misijah</span>}
+        <div className="cmd-section">
+          {odds && (
+            <div className="status-row">
+              <div className="raid-warning" style={{ borderColor: probColor(1 - odds.raidProbability) }}>
+                <span>⚠ Verjetnost napada AI:</span>
+                <span className="raid-prob" style={{ color: probColor(1 - odds.raidProbability) }}>
+                  {Math.round(odds.raidProbability * 100)}%
+                </span>
               </div>
-              {odds && (
-                <div className="status-row">
-                  <div className="raid-warning" style={{ borderColor: probColor(1 - odds.raidProbability) }}>
-                    <span>⚠ Verjetnost napada AI:</span>
-                    <span className="raid-prob" style={{ color: probColor(1 - odds.raidProbability) }}>
-                      {Math.round(odds.raidProbability * 100)}%
-                    </span>
-                  </div>
-                  <div className="intel-bonus">
-                    <span className="dim small">Intel bonus v vseh bojih:</span>
-                    <span style={{ color: '#3388cc' }}>+{Math.round(odds.intelBonus * 100)}%</span>
-                  </div>
-                </div>
-              )}
-              {overArmed && (
-                <div className="weapon-warning">
-                  ⚠ Premalo orožja: imaš {weaponCap}, v boju {armedTotal} (napad+obramba). Brez orožja jih engine skrči.
-                </div>
-              )}
-              <SliderRow icon="⚔" label="Napad" color="#cc4433"
-                val={combatants} onChange={v => setSliderClamped('c', v)} max={availablePop}
-                yieldText={`→ +${(combatants * 1.2 * rTier.strengthMult).toFixed(0)} moč · porabi ${combatants} orožja`}
-                probLabel="Zmaga v napadu" prob={combatants > 0 ? odds?.successProbability : undefined} />
+              <div className="intel-bonus">
+                <span className="dim small">Intel bonus v vseh bojih:</span>
+                <span style={{ color: '#3388cc' }}>+{Math.round(odds.intelBonus * 100)}%</span>
+              </div>
+            </div>
+          )}
+          {overArmed && (
+            <div className="weapon-warning">
+              ⚠ Premalo orožja: imaš {weaponCap}, v boju {armedTotal} (napad+obramba). Engine skrči.
+            </div>
+          )}
+
+          {/* Sliderji v dveh stolpcih za boljšo izrabo polno-širinskega pasu */}
+          <div className="sliders-grid">
+            <SliderRow icon="⚔" label="Napad" color="#cc4433"
+              val={combatants} onChange={v => setSliderClamped('c', v)} max={availablePop}
+              yieldText={`→ +${(combatants * 1.2 * rTier.strengthMult).toFixed(0)} moč · porabi ${combatants} orožja`}
+              probLabel="Zmaga v napadu" prob={combatants > 0 ? odds?.successProbability : undefined} />
+            <SliderRow icon="🌾" label="Nabiralci" color="#6aa630"
+              val={foragers} onChange={v => setSliderClamped('f', v)} max={availablePop}
+              yieldText={`→ ${survBalance >= 0 ? '+' : ''}${survBalance} hrana`}
+              probLabel="Brez izgub" prob={odds?.forageSafetyProbability} />
+
+            <div className="slider-block">
               <SliderRow icon="🛡" label="Obramba (skupaj)" color="#66aabb"
                 val={defenseTotal} onChange={v => setSliderClamped('d', v)} max={availablePop}
                 yieldText={`→ ${defenseTotal} stražarjev · porabi ${defenseTotal} orožja`}
@@ -1312,35 +1390,76 @@ export default function App() {
                     style={{ ['--pct' as never]: `${defenseTotal > 0 ? (dayGuard / defenseTotal * 100).toFixed(1) : 0}%` } as React.CSSProperties} />
                 </div>
               )}
-              <SliderRow icon="🌾" label="Nabiralci" color="#6aa630"
-                val={foragers} onChange={v => setSliderClamped('f', v)} max={availablePop}
-                yieldText={`→ ${survBalance >= 0 ? '+' : ''}${survBalance} hrana`}
-                probLabel="Brez izgub" prob={odds?.forageSafetyProbability} />
-              <SliderRow icon="🔭" label="Izvidniki" color="#3377cc"
-                val={scouts} onChange={v => setSliderClamped('s', v)} max={availablePop}
-                yieldText={`→ +${scoutIntel} intel`}
-                probLabel={`Uspeh / ujeti ${odds ? Math.round(odds.scoutCaptureProbability * 100) : 0}%`}
-                prob={scouts > 0 ? odds?.scoutSuccessProbability : undefined} />
-              <PeopleBar pop={pop} combatants={combatants} dayGuard={dayGuard} nightGuard={nightGuard}
-                foragers={foragers} scouts={scouts} inMissions={inMissions} newMission={newMissionPeople} />
-              {over && (
-                <button className="autofit-btn" onClick={autoFitAllocation}>
-                  ✓ Avto-popravi razporeditev
-                </button>
-              )}
             </div>
+
+            <SliderRow icon="🔭" label="Izvidniki" color="#3377cc"
+              val={scouts} onChange={v => setSliderClamped('s', v)} max={availablePop}
+              yieldText={`→ +${scoutIntel} intel`}
+              probLabel={`Uspeh / ujeti ${odds ? Math.round(odds.scoutCaptureProbability * 100) : 0}%`}
+              prob={scouts > 0 ? odds?.scoutSuccessProbability : undefined} />
           </div>
 
-          <OddsDisplay odds={odds} combatants={combatants} />
-
-          <button className="exec-btn" onClick={handleRound} disabled={loading || over}>
-            {loading ? '⟳  Izvajam…' : over ? '⚠  Preveč ljudi razporejenih' : '▶  IZVEDI MESEC'}
-          </button>
-          <button className="newgame-btn" onClick={handleNew} disabled={loading}>↺ Nova igra</button>
+          <PeopleBar pop={pop} combatants={combatants} dayGuard={dayGuard} nightGuard={nightGuard}
+            foragers={foragers} scouts={scouts} inMissions={inMissions} newMission={newMissionPeople} />
+          {over && (
+            <button className="autofit-btn" onClick={autoFitAllocation}>
+              ✓ Avto-popravi razporeditev
+            </button>
+          )}
         </div>
+
+        {/* Podvrstica: hrana/preživetje pregled */}
+        <div className="cmd-section food-summary">
+          <div className="cmd-label">Hrana / preživetje — projekcija po tem mesecu</div>
+          <div className="fs-row">
+            <div className="fs-cell">
+              <span className="dim small">Trenutno</span>
+              <span className="fs-val">{game.resources.survival}</span>
+            </div>
+            <span className="fs-arrow">→</span>
+            <div className="fs-cell">
+              <span className="dim small">Po mesecu</span>
+              <span className="fs-val" style={{ color: (game.resources.survival + survBalance) <= 0 ? '#cc2222' : '#22cc88' }}>
+                {game.resources.survival + survBalance}
+              </span>
+            </div>
+            <div className="fs-cell">
+              <span className="dim small">Δ na mesec</span>
+              <span className="fs-val" style={{ color: survBalance >= 0 ? '#22cc88' : '#cc2222' }}>
+                {survBalance >= 0 ? '+' : ''}{survBalance}
+              </span>
+            </div>
+            <div className="fs-cell fs-warn">
+              <span className="dim small">Lakota streak</span>
+              <span className="fs-val" style={{ color: (game.consecutiveStarvationMonths ?? 0) > 0 ? '#cc2222' : '#666' }}>
+                {game.consecutiveStarvationMonths ?? 0}m
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <OddsDisplay odds={odds} combatants={combatants} />
+
+        <button className="exec-btn" onClick={handleRound} disabled={loading || over}>
+          {loading ? '⟳  Izvajam…' : over ? '⚠  Preveč ljudi razporejenih' : '▶  IZVEDI MESEC'}
+        </button>
+        <button className="newgame-btn" onClick={handleNew} disabled={loading}>↺ Nova igra</button>
       </div>
 
-      {game.lastRoundLog && <RoundLog log={game.lastRoundLog} />}
+      {/* ─── PAS 5: Skill drevesi ─── */}
+      <div className="band band-trees">
+        <HumanTree axisHistory={game.axisHistory} currentAxis={axis} onFocusChange={setAxis} />
+        <AITree nodes={game.aiTree} justRevealed={justRevealed} />
+      </div>
+
+      {/* ─── PAS 6: Misije človeštva + Šibke točke AI ─── */}
+      <div className="band band-missions">
+        <HumanMissionsPlaceholder />
+        <Missions wps={game.aiWeakPoints} aiTree={game.aiTree}
+          active={game.activeMissions ?? []} plan={missions} planR={missionR}
+          onPlanChange={setMissionAssignment} onRationsChange={setMissionRations}
+          odds={odds} availablePop={availablePop} />
+      </div>
     </div>
   );
 }

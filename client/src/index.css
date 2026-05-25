@@ -749,3 +749,97 @@ input[type=range]::-moz-range-thumb {
   color: #66bbcc; font-size: .76rem;
 }
 .map-legend { display: flex; flex-direction: column; gap: 3px; padding-top: 4px; border-top: 1px solid var(--border); }
+
+/* ─── Široka postavitev za polno-širinske pasove ─────────────────────────── */
+#root { max-width: 1400px; }
+
+/* ─── Bande (vertikalni pasovi) ──────────────────────────────────────────── */
+.band {
+  display: grid;
+  gap: .75rem;
+  align-items: start;
+}
+.band-map-log  { grid-template-columns: 7fr 3fr; }
+.band-trees    { grid-template-columns: 1fr 1fr; }
+.band-missions { grid-template-columns: 1fr 1fr; }
+
+@media (max-width: 900px) {
+  .band-map-log, .band-trees, .band-missions { grid-template-columns: 1fr; }
+}
+
+/* ─── Sliderji v 2-stolpčni mreži pri polno-širinskem pasu ──────────────── */
+.sliders-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 20px;
+  margin-top: 10px;
+}
+@media (max-width: 720px) {
+  .sliders-grid { grid-template-columns: 1fr; }
+}
+
+/* ─── Event log ─────────────────────────────────────────────────────────── */
+.event-log-panel { display: flex; flex-direction: column; min-height: 0; }
+.event-log-scroll {
+  flex: 1; overflow-y: auto; max-height: 480px;
+  display: flex; flex-direction: column; gap: 8px;
+  padding-right: 4px;
+}
+.event-log-scroll::-webkit-scrollbar { width: 6px; }
+.event-log-scroll::-webkit-scrollbar-thumb { background: #2a2a2a; }
+.event-log-scroll::-webkit-scrollbar-track { background: #0a0a0a; }
+
+.event-entry {
+  padding: 8px 10px; background: var(--bg2);
+  border-left: 2px solid #2a2a2a;
+  font-size: .8rem;
+}
+.event-entry:first-child { border-left-color: #cc8800; background: #14110a; }
+
+.ee-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.ee-round { font-weight: bold; font-size: .82rem; }
+.ee-phase { letter-spacing: .04em; }
+.ee-latest {
+  font-size: .58rem; color: #000; background: #cc8800; padding: 1px 5px;
+  letter-spacing: .08em; margin-left: auto;
+}
+.ee-text { font-size: .78rem; line-height: 1.55; color: var(--text); }
+
+/* ─── Food summary subrow ───────────────────────────────────────────────── */
+.food-summary { padding-top: 10px; }
+.fs-row {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  padding: 8px 12px; background: var(--bg2); border-left: 2px solid #6aa630;
+}
+.fs-cell { display: flex; flex-direction: column; min-width: 80px; }
+.fs-val  { font-size: .95rem; font-weight: bold; color: var(--text); }
+.fs-arrow { color: var(--dim); font-size: 1rem; }
+.fs-warn { margin-left: auto; }
+
+/* ─── Human missions placeholder ────────────────────────────────────────── */
+.hm-card {
+  padding: 8px 12px; margin-bottom: 8px;
+  background: var(--bg2); border-left: 3px solid;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.hm-card.locked { opacity: .55; }
+.hm-head { display: flex; align-items: baseline; justify-content: space-between; }
+.hm-title { font-weight: bold; font-size: .82rem; letter-spacing: .04em; }
+.hm-months { font-size: .68rem; }
+.hm-desc { font-size: .76rem; line-height: 1.4; }
+.hm-btn {
+  margin-top: 4px; padding: 5px 10px;
+  background: transparent; border: 1px solid;
+  font-family: var(--font); font-size: .72rem; cursor: pointer;
+  letter-spacing: .04em; align-self: flex-start;
+}
+.hm-btn:disabled { cursor: not-allowed; opacity: .7; }
+
+/* ─── Command panel je zdaj polno-širinski ──────────────────────────────── */
+.command-panel { padding: 14px; }
+.slider-block { display: contents; }
+@media (min-width: 721px) {
+  .slider-block { display: block; }
+}
+
+/* Stari hud-arena / hud-cols razredi niso več v rabi — še delujejo če kje ostanejo */
