@@ -991,6 +991,9 @@ function HexMap({ tiles, draftPath, onPathClick, expeditions, wps, drawingMode }
   wps: AIWeakPoint[];
   drawingMode: boolean;
 }) {
+  const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
+  const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
+  const popExpId = selectedExpId ?? hoveredExpId;
   const SIZE = 36;
   const pts = tiles.map(t => hexToPixel(t.q, t.r, SIZE));
   const minX = Math.min(...pts.map(p => p.x)) - SIZE;
@@ -1105,22 +1108,75 @@ function HexMap({ tiles, draftPath, onPathClick, expeditions, wps, drawingMode }
           );
         })}
 
-        {/* Aktivne odprave kot ikone */}
+        {/* Aktivne odprave kot ikone — hover + klik za info */}
         {expPositions.map(({ exp, tile }) => {
           if (!tile) return null;
           const p = shift(hexToPixel(tile.q, tile.r, SIZE));
           const color = exp.kind === 'mission' ? '#cc8800' : '#22ccff';
+          const isActive = popExpId === exp.id;
           return (
-            <g key={exp.id} className="exp-marker">
-              <circle cx={p.x} cy={p.y + SIZE * 0.45} r="11" fill={color} stroke="#000" strokeWidth="1.5" />
+            <g key={exp.id} className="exp-marker"
+               onMouseEnter={() => setHoveredExpId(exp.id)}
+               onMouseLeave={() => setHoveredExpId(null)}
+               onClick={(e) => { e.stopPropagation(); setSelectedExpId(selectedExpId === exp.id ? null : exp.id); }}>
+              <circle cx={p.x} cy={p.y + SIZE * 0.45} r={isActive ? 14 : 11}
+                fill={color} stroke={isActive ? '#fff' : '#000'} strokeWidth="1.5" />
               <text x={p.x} y={p.y + SIZE * 0.45 + 4} textAnchor="middle"
-                fontSize="10" fill="#000" fontWeight="bold" fontFamily="'Courier New', monospace">
+                fontSize="10" fill="#000" fontWeight="bold" fontFamily="'Courier New', monospace"
+                style={{ pointerEvents: 'none' }}>
                 {exp.assigned}
               </text>
             </g>
           );
         })}
       </svg>
+
+      {/* Popup za izbrano/hovered odpravo */}
+      {popExpId && (() => {
+        const exp = expeditions.find(e => e.id === popExpId);
+        if (!exp) return null;
+        const tile = exp.path[exp.currentIndex];
+        const target = exp.path[exp.path.length - 1];
+        const stepsLeft = exp.path.length - 1 - exp.currentIndex;
+        const monthsLeft = Math.ceil(stepsLeft / 2);
+        const color = exp.kind === 'mission' ? '#cc8800' : '#22ccff';
+        // Pozicija popupa: nad heksom kjer je odprava
+        const p = shift(hexToPixel(tile.q, tile.r, SIZE));
+        const popLeft = (p.x / W) * 100;
+        const popTop  = (p.y / H) * 100;
+        return (
+          <div className="exp-popup" style={{ left: `${popLeft}%`, top: `${popTop}%`, borderColor: color }}
+               onClick={e => e.stopPropagation()}>
+            <div className="ep-head" style={{ color }}>
+              <span>{exp.kind === 'mission' ? '🎯 MISIJA' : '🔭 IZVIDNICA'}</span>
+              {selectedExpId === exp.id && (
+                <button className="ep-close" onClick={() => setSelectedExpId(null)}>✕</button>
+              )}
+            </div>
+            <div className="ep-row"><span className="dim small">Ljudi:</span><b>{exp.assigned}</b></div>
+            <div className="ep-row"><span className="dim small">Lokacija:</span><b>({tile.q},{tile.r})</b></div>
+            <div className="ep-row"><span className="dim small">Cilj:</span><b>({target.q},{target.r})</b></div>
+            <div className="ep-row"><span className="dim small">Napredek:</span>
+              <b>{exp.currentIndex} / {exp.path.length - 1} korakov</b>
+            </div>
+            <div className="ep-row"><span className="dim small">Vrnitev v:</span>
+              <b style={{ color: '#cc8800' }}>{monthsLeft} mesec(ev)</b>
+            </div>
+            <div className="ep-row"><span className="dim small">Mesecev na poti:</span><b>{exp.monthsElapsed}</b></div>
+            <div className="ep-row"><span className="dim small">Obroki:</span>
+              <b>{RATIONS[exp.rations]?.emoji ?? '🍽'} {RATIONS[exp.rations]?.label ?? 'Normalno'}</b>
+            </div>
+            {exp.encountersLog.length > 0 && (
+              <div className="ep-events">
+                <div className="dim small" style={{ marginTop: 4, marginBottom: 3 }}>Zadnji dogodki:</div>
+                {exp.encountersLog.slice(-3).map((ev, i) => (
+                  <div key={i} className="small">{ev}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1379,8 +1435,9 @@ export default function App() {
   };
 
   const pop = game?.population ?? 0;
-  // Ljudje že v aktivnih misijah (engine drži)
-  const inMissions = (game?.activeMissions ?? []).reduce((s, m) => s + m.assigned, 0);
+  // Ljudje v aktivnih misijah + odpravah (engine drži)
+  const inMissions = (game?.activeMissions ?? []).reduce((s, m) => s + m.assigned, 0)
+                   + (game?.expeditions ?? []).reduce((s, e) => s + e.assigned, 0);
   // Pa še novi razporedi v misije ta mesec
   const newMissionPeople = Object.values(missions).reduce((s, v) => s + v, 0);
   const assignedHome = combatants + defenseTotal + foragers + scouts;

@@ -957,3 +957,44 @@ input[type=range]::-moz-range-thumb {
   .pa-person { width: 14px; height: 14px; font-size: 8px; }
   .pa-handle { width: 24px; }     /* večje za prst */
 }
+
+/* ─── Map: popup ob hover/klik na odpravo ────────────────────────────────── */
+.hex-map { position: relative; }
+.exp-marker { cursor: pointer; }
+.exp-marker:hover circle { filter: drop-shadow(0 0 4px currentColor); }
+
+.exp-popup {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 8px));
+  background: var(--bg1);
+  border: 2px solid;
+  padding: 10px 12px;
+  min-width: 200px; max-width: 260px;
+  font-size: .76rem;
+  z-index: 20;
+  box-shadow: 0 4px 18px rgba(0,0,0,.6);
+  pointer-events: auto;
+}
+.exp-popup::after {
+  content: '';
+  position: absolute;
+  bottom: -8px; left: 50%; transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 8px solid currentColor;
+  color: inherit;
+}
+.ep-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px; font-weight: bold; letter-spacing: .06em;
+  border-bottom: 1px solid var(--border); padding-bottom: 4px;
+}
+.ep-close {
+  background: none; border: none; color: var(--dim); cursor: pointer;
+  font-family: var(--font); padding: 0 4px; font-size: .9rem;
+}
+.ep-close:hover { color: var(--red); }
+.ep-row { display: flex; justify-content: space-between; padding: 2px 0; }
+.ep-row b { color: var(--text); }
+.ep-events { margin-top: 6px; padding-top: 4px; border-top: 1px dashed var(--border2); line-height: 1.5; }

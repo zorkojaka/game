@@ -434,19 +434,29 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   const oldCompletedExps = state.completedExpeditions ?? [];
   const tickedExps: Expedition[] = [];
   const finishedExps: Expedition[] = [];
+  const expeditionEvents: string[] = [];
 
   for (const e of oldExps) {
     const r = tickExpedition(e, mapTiles, aiKnowledge, rng);
     rng = r.rng;
     mapTiles = r.tiles;
+
+    // Dogodki med potjo (srečanja)
+    for (const ev of r.events) expeditionEvents.push(`🔭 ${ev}`);
+
     if (r.exp.status === 'completed' || r.exp.status === 'lost') {
       if (r.exp.status === 'completed') {
         if (r.exp.kind === 'mission' && r.exp.weakPointId) {
           const idx = aiWeakPoints.findIndex(wp => wp.id === r.exp.weakPointId);
           if (idx >= 0) aiWeakPoints[idx] = { ...aiWeakPoints[idx], exploited: true, discovered: true };
+          expeditionEvents.push(`🎯 Misija na ${r.exp.weakPointId} uspela — ${r.exp.assigned} se vrača v kamp.`);
+        } else {
+          const target = r.exp.path[r.exp.path.length - 1];
+          expeditionEvents.push(`✓ Izvidniška odprava dospela na (${target.q},${target.r}) — ${r.exp.assigned} se vrača v kamp.`);
         }
-        // Preživeli se vrnejo v populacijo
         population += r.exp.assigned;
+      } else {
+        expeditionEvents.push(`☠ Odprava izgubljena — vsi člani so padli.`);
       }
       finishedExps.push(r.exp);
     } else {
@@ -639,7 +649,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     clanActivityDelta: clanActivity - state.clanActivity,
     aiKnowledgeDelta: finalAiKnowledge - state.aiKnowledge,
     revealedNodes: revealed,
-    narrative: buildNarrative(assignment, combatLog, raidLog, scoutResult, revealed, phaseComplete, state.phase),
+    narrative: buildNarrative(assignment, combatLog, raidLog, scoutResult, revealed, phaseComplete, state.phase, expeditionEvents),
   };
 
   return {
@@ -692,7 +702,8 @@ function buildNarrative(
   scout: ScoutResult | null,
   revealed: string[],
   phaseComplete: boolean,
-  phase: AIPhase
+  phase: AIPhase,
+  expeditionEvents: string[] = []
 ): string {
   const parts: string[] = [];
 
@@ -721,7 +732,8 @@ function buildNarrative(
   if (revealed.length > 0) {
     parts.push(`Špijoni so razkrili ${revealed.length} novo(e) vozlišče(a) v AI načrtu.`);
   }
-  // (Razkriti heksi se izrišejo na mapi — narativa jih ne podvaja)
+  // Dogodki odprav (vrnitve, izgube, srečanja)
+  for (const ev of expeditionEvents) parts.push(ev);
 
   if (phaseComplete) {
     const phaseLabels: Record<AIPhase, string> = {
