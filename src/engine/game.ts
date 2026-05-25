@@ -6,8 +6,10 @@ import type { RNGState } from './rng.js';
 import { createRNG, rngBool, rngInt, rngNext, seedFromString } from './rng.js';
 import { resolveCombat } from './combat.js';
 import { spendIntelOnFog, revealNodeRetroactive } from './fog.js';
-import { generateMap, spendScoutsOnMap } from './map.js';
+import { generateMap, spendScoutsOnMap, visibilityFromProgress } from './map.js';
+import { tickExpedition } from './expedition.js';
 import { tileId } from './types.js';
+import type { Expedition } from './types.js';
 import { calcAISurveillanceGain, adaptGenome, generateAITree, generateAIWeakPoints, DEFAULT_GENOME } from './ai-brain.js';
 import {
   INITIAL_POPULATION, INITIAL_SURVIVAL, INITIAL_COMBAT, INITIAL_INTELLIGENCE,
@@ -231,6 +233,8 @@ export function newGame(seed?: number): GameState {
     completedMissions: [],
     consecutiveStarvationMonths: 0,
     mapTiles: generateMap(),
+    expeditions: [],
+    completedExpeditions: [],
     rngSeed,
     rngCallCount: 0,
     lastRoundLog: null,
@@ -336,7 +340,6 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     revealedTileIds = m.revealed;
   } else if (scoutObjective === 'ai_robots') {
     // Recon na AI robote — dodaj intel (bonus k bojem skozi intel coef)
-    // Vsa moč izvidnikov gre v intel (poleg že prištetega)
     intelligence += Math.floor(totalScoutBudget * 0.6);
   }
 
@@ -424,6 +427,62 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
 
   // 6c. Pop loss od ujetih izvidnikov
   population -= scoutsKilled;
+
+  // 6c2. ODPRAVE NA POTI (scout + mission s path) — tick + sprejem novih
+  const incomingExps = assignment.newExpeditions ?? [];
+  const oldExps = state.expeditions ?? [];
+  const oldCompletedExps = state.completedExpeditions ?? [];
+  const tickedExps: Expedition[] = [];
+  const finishedExps: Expedition[] = [];
+
+  for (const e of oldExps) {
+    const r = tickExpedition(e, mapTiles, aiKnowledge, rng);
+    rng = r.rng;
+    mapTiles = r.tiles;
+    if (r.exp.status === 'completed' || r.exp.status === 'lost') {
+      if (r.exp.status === 'completed') {
+        if (r.exp.kind === 'mission' && r.exp.weakPointId) {
+          const idx = aiWeakPoints.findIndex(wp => wp.id === r.exp.weakPointId);
+          if (idx >= 0) aiWeakPoints[idx] = { ...aiWeakPoints[idx], exploited: true, discovered: true };
+        }
+        // Preživeli se vrnejo v populacijo
+        population += r.exp.assigned;
+      }
+      finishedExps.push(r.exp);
+    } else {
+      tickedExps.push(r.exp);
+    }
+  }
+
+  // Sprejmi nove odprave — pop se zmanjša, ker gredo na pot
+  for (const inp of incomingExps) {
+    if (!inp.path || inp.path.length < 2) continue;
+    if (inp.assigned < 1) continue;
+    const [idRoll, rngId] = rngInt(rng, 1000, 9999); rng = rngId;
+    population -= inp.assigned;
+    tickedExps.push({
+      id: `exp_${state.totalRounds}_${idRoll}`,
+      kind: inp.kind,
+      weakPointId: inp.weakPointId,
+      path: inp.path,
+      currentIndex: 0,
+      assigned: inp.assigned,
+      rations: inp.rations,
+      status: 'traveling',
+      monthsElapsed: 0,
+      encountersLog: [],
+    });
+  }
+
+  // Avtomatsko razkrivanje šibkih točk: če je heks z wp dosegel >= 0.50 raziskanost, je discovered
+  for (let i = 0; i < aiWeakPoints.length; i++) {
+    const wp = aiWeakPoints[i];
+    if (wp.discovered) continue;
+    const tile = mapTiles.find(t => t.hidesWeakPointId === wp.id);
+    if (tile && tile.researchProgress >= 0.50) {
+      aiWeakPoints[i] = { ...wp, discovered: true };
+    }
+  }
 
   // 6d. MISIJE — tikni aktivne misije + obravnavaj nove razporeditve
   const oldMissions = state.activeMissions ?? [];
@@ -605,6 +664,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     completedMissions: [...oldCompleted, ...newlyCompleted],
     consecutiveStarvationMonths: newStarvStreak,
     mapTiles,
+    expeditions: tickedExps,
+    completedExpeditions: [...oldCompletedExps, ...finishedExps],
     rngCallCount: rng.calls,
     lastRoundLog: log,
     status,

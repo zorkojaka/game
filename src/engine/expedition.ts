@@ -1,0 +1,122 @@
+// Odprave (Expedition): scout in mission s potjo
+// Vsak mesec se vsaka aktivna odprava premakne za TILES_PER_MONTH polj po poti.
+// Za vsako vstopljeno polje:
+//   - doda se researchProgress (visit)
+//   - sproži se encounter roll (z multiplikatorjem terena)
+//   - ob srečanju lahko izgubimo nekaj članov
+
+import type { Expedition, HexTile, GameState, Assignment, AIWeakPoint } from './types.js';
+import type { RNGState } from './rng.js';
+import { rngNext, rngInt } from './rng.js';
+import { tileId } from './types.js';
+import {
+  visibilityFromProgress, tileEncounterMultiplier, researchPerVisit, hexDistance,
+} from './map.js';
+import {
+  SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_AI_KNOWLEDGE_BONUS,
+  SCOUT_CAPTURED_LOSS_MIN, SCOUT_CAPTURED_LOSS_MAX,
+} from './constants.js';
+
+export const TILES_PER_MONTH = 2;  // konstantna hitrost; oddaljenost določa skupno trajanje
+
+const CLAN_POS = { q: 0, r: 4 };
+
+/** Verjetnost srečanja na enem polju, glede na opremo izvidnikov + teren. */
+export function tileEncounterProbability(tile: HexTile, assigned: number, aiKnowledge: number): number {
+  const distFromCamp = hexDistance({ q: tile.q, r: tile.r }, CLAN_POS);
+  const base = SCOUT_CAPTURE_BASE
+    + SCOUT_CAPTURE_PER_SCOUT * assigned
+    + SCOUT_AI_KNOWLEDGE_BONUS * aiKnowledge;
+  return Math.max(0, Math.min(0.85, base * tileEncounterMultiplier(tile.researchProgress, distFromCamp)));
+}
+
+/** Kumulativna verjetnost srečanja na celotni poti — za UI prikaz vnaprej. */
+export function pathEncounterProbability(
+  path: Array<{ q: number; r: number }>,
+  tiles: HexTile[],
+  assigned: number,
+  aiKnowledge: number,
+): number {
+  let pNo = 1;
+  for (const step of path.slice(1)) {  // izpusti startno polje (kamp)
+    const tile = tiles.find(t => t.q === step.q && t.r === step.r);
+    if (!tile) continue;
+    const pTile = tileEncounterProbability(tile, assigned, aiKnowledge);
+    pNo *= (1 - pTile);
+  }
+  return 1 - pNo;
+}
+
+/** Mesecev potrebnih za izvedbo poti (one-way). */
+export function pathMonths(path: Array<{ q: number; r: number }>): number {
+  const steps = Math.max(0, path.length - 1);  // brez kampa
+  return Math.ceil(steps / TILES_PER_MONTH);
+}
+
+/** Premakni eno odpravo za en mesec. Vrne posodobljeno + nova stanja heksov + RNG. */
+export function tickExpedition(
+  exp: Expedition,
+  tiles: HexTile[],
+  aiKnowledge: number,
+  rng: RNGState,
+): { exp: Expedition; tiles: HexTile[]; rng: RNGState; populationDelta: number; events: string[] } {
+  if (exp.status !== 'traveling') return { exp, tiles, rng, populationDelta: 0, events: [] };
+
+  let newTiles = [...tiles];
+  let popLoss = 0;
+  let lostAll = false;
+  const events: string[] = [];
+  let curIdx = exp.currentIndex;
+  let assignedNow = exp.assigned;
+
+  for (let stepsThisMonth = 0; stepsThisMonth < TILES_PER_MONTH; stepsThisMonth++) {
+    if (curIdx >= exp.path.length - 1) break;  // na cilju
+    const nextStep = exp.path[curIdx + 1];
+    const tIdx = newTiles.findIndex(t => t.q === nextStep.q && t.r === nextStep.r);
+    if (tIdx < 0) break;
+    const tile = newTiles[tIdx];
+
+    // Premik
+    curIdx++;
+
+    // Razkrije polje
+    const addProg = researchPerVisit(assignedNow);
+    const newProg = Math.min(1, tile.researchProgress + addProg);
+    newTiles[tIdx] = { ...tile, researchProgress: newProg, visibility: visibilityFromProgress(newProg) };
+
+    // Srečanje
+    const pEnc = tileEncounterProbability(newTiles[tIdx], assignedNow, aiKnowledge);
+    const [encRoll, rng2] = rngNext(rng); rng = rng2;
+    if (encRoll < pEnc) {
+      const [pctRoll, rng3] = rngInt(rng, SCOUT_CAPTURED_LOSS_MIN * 100, SCOUT_CAPTURED_LOSS_MAX * 100);
+      rng = rng3;
+      const lost = Math.max(1, Math.floor(assignedNow * pctRoll / 100));
+      assignedNow = Math.max(0, assignedNow - lost);
+      popLoss += lost;
+      events.push(`Srečanje na (${tile.q},${tile.r}): ${lost} izgub`);
+      if (assignedNow < 1) {
+        lostAll = true;
+        break;
+      }
+    }
+  }
+
+  let newStatus: Expedition['status'] = exp.status;
+  if (lostAll) newStatus = 'lost';
+  else if (curIdx >= exp.path.length - 1) newStatus = 'completed';
+
+  return {
+    exp: {
+      ...exp,
+      currentIndex: curIdx,
+      assigned: assignedNow,
+      monthsElapsed: exp.monthsElapsed + 1,
+      status: newStatus,
+      encountersLog: [...exp.encountersLog, ...events],
+    },
+    tiles: newTiles,
+    rng,
+    populationDelta: -popLoss,
+    events,
+  };
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, ScoutObjective } from './types';
+import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, ScoutObjective, Expedition, NewExpeditionInput } from './types';
 import { tileId } from './types';
 import { createGame, getGame, playRound, previewOdds } from './api';
 
@@ -849,16 +849,32 @@ function hexPath(cx: number, cy: number, size: number): string {
   return `M ${pts[0]} L ${pts.slice(1).join(' L ')} Z`;
 }
 
-/** Heksa mapa — pointy-top, klik za označevanje raziskovalnih tarč */
-function HexMap({ tiles, targets, onToggleTarget, objective, wps }: {
+/** Heks barvanje glede na researchProgress. */
+function hexColorByProgress(p: number): { fill: string; stroke: string; labelColor: string } {
+  if (p < 0.25)      return { fill: 'url(#hatch-red)',     stroke: '#3a1818', labelColor: '#5a2020' };
+  if (p < 0.50)      return { fill: 'url(#hatch-redlt)',   stroke: '#5a2828', labelColor: '#7a3838' };
+  if (p < 1.00)      return { fill: '#1a2024',             stroke: '#4a6080', labelColor: '#8aa4c0' };
+  return                     { fill: '#0c1a30',            stroke: '#3377cc', labelColor: '#5aa0e0' };
+}
+
+const PATH_NEIGHBOR_DIRS = [
+  { q: +1, r:  0 }, { q: +1, r: -1 }, { q:  0, r: -1 },
+  { q: -1, r:  0 }, { q: -1, r: +1 }, { q:  0, r: +1 },
+];
+function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }): boolean {
+  return PATH_NEIGHBOR_DIRS.some(d => a.q + d.q === b.q && a.r + d.r === b.r);
+}
+
+/** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
+function HexMap({ tiles, draftPath, onPathClick, expeditions, wps, drawingMode }: {
   tiles: HexTile[];
-  targets: Set<string>;
-  onToggleTarget: (id: string) => void;
-  objective: ScoutObjective;
+  draftPath: Array<{ q: number; r: number }>;
+  onPathClick: (tile: { q: number; r: number }) => void;
+  expeditions: Expedition[];
   wps: AIWeakPoint[];
+  drawingMode: boolean;
 }) {
   const SIZE = 36;
-  // Ovojnica izrisa
   const pts = tiles.map(t => hexToPixel(t.q, t.r, SIZE));
   const minX = Math.min(...pts.map(p => p.x)) - SIZE;
   const maxX = Math.max(...pts.map(p => p.x)) + SIZE;
@@ -870,75 +886,120 @@ function HexMap({ tiles, targets, onToggleTarget, objective, wps }: {
   const wpById: Record<string, AIWeakPoint> = {};
   for (const w of wps) wpById[w.id] = w;
 
-  const mapModeActive = objective === 'map';
+  const inDraft = (t: HexTile) => draftPath.some(s => s.q === t.q && s.r === t.r);
+  const draftIdx = (t: HexTile) => draftPath.findIndex(s => s.q === t.q && s.r === t.r);
+  const lastStep = draftPath[draftPath.length - 1];
+
+  // Trenutno pozicije aktivnih odprav (currentIndex tile)
+  const expPositions = expeditions.filter(e => e.status === 'traveling')
+    .map(e => ({ exp: e, tile: e.path[e.currentIndex] }));
 
   return (
-    <div className={`hex-map ${mapModeActive ? 'active' : 'dimmed'}`}>
+    <div className="hex-map">
       <svg viewBox={`0 0 ${W} ${H}`} className="hex-svg">
         <defs>
           <pattern id="hatch-red" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
             <rect width="6" height="6" fill="#1a0808" />
             <line x1="0" y1="0" x2="0" y2="6" stroke="#3a1818" strokeWidth="2" />
           </pattern>
-          <pattern id="hatch-partial" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-            <rect width="6" height="6" fill="#0e0e0e" />
-            <line x1="0" y1="0" x2="0" y2="6" stroke="#222" strokeWidth="1" />
+          <pattern id="hatch-redlt" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+            <rect width="6" height="6" fill="#1a1010" />
+            <line x1="0" y1="0" x2="0" y2="6" stroke="#553030" strokeWidth="1.5" />
           </pattern>
         </defs>
+
+        {/* Path lines */}
+        {draftPath.length > 1 && (
+          <g className="path-lines">
+            {draftPath.slice(0, -1).map((s, i) => {
+              const a = shift(hexToPixel(s.q, s.r, SIZE));
+              const b = shift(hexToPixel(draftPath[i + 1].q, draftPath[i + 1].r, SIZE));
+              return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#22ccff" strokeWidth="2" strokeDasharray="4 3" />;
+            })}
+          </g>
+        )}
+
         {tiles.map(t => {
           const id = tileId(t);
-          const isTarget = targets.has(id);
           const p = shift(hexToPixel(t.q, t.r, SIZE));
           const wp = t.hidesWeakPointId ? wpById[t.hidesWeakPointId] : undefined;
-          const wpVisible = wp && t.visibility === 'revealed';
-          const wpHinted  = wp && t.visibility === 'partial';
+          const wpVisible = wp && t.researchProgress >= 0.50;
 
-          let fill = 'url(#hatch-red)';
-          let stroke = '#3a1818';
-          let label = '?';
-          let labelColor = '#5a2020';
+          let { fill, stroke, labelColor } = hexColorByProgress(t.researchProgress);
+          let label = '';
 
           if (t.isClanCamp) {
             fill = '#0a2018'; stroke = '#22aa88'; label = '⌂'; labelColor = '#66ccaa';
           } else if (t.isAICore) {
             fill = '#220606'; stroke = '#cc2222'; label = '☣'; labelColor = '#cc3333';
-          } else if (t.visibility === 'revealed') {
-            fill = '#0a1816'; stroke = '#225a4a'; label = ''; labelColor = '#3a8a78';
-            if (wpVisible) { label = '◆'; labelColor = '#cc8800'; stroke = '#cc8800'; fill = '#1a1400'; }
-          } else if (t.visibility === 'partial') {
-            fill = 'url(#hatch-partial)'; stroke = '#444'; label = '·'; labelColor = '#555';
-            if (wpHinted) { label = '◌'; labelColor = '#886600'; }
+          } else if (t.researchProgress < 0.25) {
+            label = '?';
+          } else if (t.researchProgress < 0.50) {
+            label = '·';
+          } else {
+            // raziskan
+            label = wpVisible ? '◆' : '';
+            if (wpVisible) { labelColor = '#cc8800'; stroke = '#cc8800'; }
           }
 
-          if (isTarget && mapModeActive && t.visibility !== 'revealed') {
-            stroke = '#22ccff';
-          }
+          const isInDraft = inDraft(t);
+          const isLast = lastStep && lastStep.q === t.q && lastStep.r === t.r;
+          if (isInDraft) stroke = '#22ccff';
 
-          const canClick = mapModeActive && !t.isClanCamp && !t.isAICore && t.visibility !== 'revealed';
+          const canClickDraw = drawingMode && !t.isClanCamp && (
+            // Lahko klikneš heks, ki je sosednji zadnjemu v poti
+            (lastStep && areNeighbors(lastStep, t)) ||
+            // Ali odznačiš heks v poti (klik na zadnjega)
+            isLast
+          );
 
           return (
             <g key={id}
-               className={`hex-tile ${canClick ? 'clickable' : ''} ${isTarget ? 'targeted' : ''}`}
-               onClick={canClick ? () => onToggleTarget(id) : undefined}>
-              <path d={hexPath(p.x, p.y, SIZE)} fill={fill} stroke={stroke} strokeWidth={isTarget ? 2.5 : 1} />
+               className={`hex-tile ${canClickDraw ? 'clickable' : ''} ${isInDraft ? 'in-draft' : ''}`}
+               onClick={canClickDraw ? () => onPathClick({ q: t.q, r: t.r }) : undefined}>
+              <path d={hexPath(p.x, p.y, SIZE)} fill={fill} stroke={stroke}
+                strokeWidth={isInDraft ? 2.5 : 1} />
               {label && (
                 <text x={p.x} y={p.y + 4} textAnchor="middle"
-                  fontSize={t.isClanCamp || t.isAICore ? 22 : 18}
+                  fontSize={t.isClanCamp || t.isAICore || wpVisible ? 22 : 18}
                   fill={labelColor} fontFamily="'Courier New', monospace"
                   fontWeight={t.isClanCamp || t.isAICore || wpVisible ? 'bold' : 'normal'}>
                   {label}
                 </text>
               )}
-              {/* Megla opacity overlay glede na fogDensity */}
-              {!t.isClanCamp && !t.isAICore && t.visibility !== 'revealed' && (
-                <path d={hexPath(p.x, p.y, SIZE)}
-                  fill="#000" opacity={t.fogDensity * 0.45} pointerEvents="none" />
+              {/* Progress overlay: za delno raziskane prikaže koliko je raziskano */}
+              {!t.isClanCamp && !t.isAICore && t.researchProgress > 0 && t.researchProgress < 1 && (
+                <text x={p.x} y={p.y - SIZE * 0.45} textAnchor="middle"
+                  fontSize="9" fill="#66aacc" fontFamily="'Courier New', monospace">
+                  {Math.round(t.researchProgress * 100)}%
+                </text>
               )}
-              {isTarget && mapModeActive && (
-                <circle cx={p.x} cy={p.y - SIZE * 0.55} r="4" fill="#22ccff">
-                  <animate attributeName="opacity" values="1;0.3;1" dur="1.2s" repeatCount="indefinite" />
-                </circle>
+              {/* Številka koraka v draft poti */}
+              {isInDraft && draftIdx(t) > 0 && (
+                <circle cx={p.x + SIZE * 0.55} cy={p.y - SIZE * 0.5} r="9" fill="#22ccff" />
               )}
+              {isInDraft && draftIdx(t) > 0 && (
+                <text x={p.x + SIZE * 0.55} y={p.y - SIZE * 0.5 + 3} textAnchor="middle"
+                  fontSize="10" fill="#000" fontWeight="bold" fontFamily="'Courier New', monospace">
+                  {draftIdx(t)}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Aktivne odprave kot ikone */}
+        {expPositions.map(({ exp, tile }) => {
+          if (!tile) return null;
+          const p = shift(hexToPixel(tile.q, tile.r, SIZE));
+          const color = exp.kind === 'mission' ? '#cc8800' : '#22ccff';
+          return (
+            <g key={exp.id} className="exp-marker">
+              <circle cx={p.x} cy={p.y + SIZE * 0.45} r="11" fill={color} stroke="#000" strokeWidth="1.5" />
+              <text x={p.x} y={p.y + SIZE * 0.45 + 4} textAnchor="middle"
+                fontSize="10" fill="#000" fontWeight="bold" fontFamily="'Courier New', monospace">
+                {exp.assigned}
+              </text>
             </g>
           );
         })}
@@ -1095,6 +1156,7 @@ export default function App() {
   const [scoutObj,     setScoutObj]     = useState<ScoutObjective>('ai_weakpoints');
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
+  const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
 
   const nightGuard = Math.max(0, defenseTotal - dayGuard);
   const [targetWP,   setTargetWP]   = useState('');
@@ -1130,6 +1192,18 @@ export default function App() {
     prevPhaseRef.current = game.phase;
   }, [game?.phase]);
 
+  // Pri map mode poti vedno začni iz klanovega kampa
+  useEffect(() => {
+    if (!game) return;
+    if (scoutObj === 'map' && draftPath.length === 0) {
+      const clan = game.mapTiles?.find(t => t.isClanCamp);
+      if (clan) setDraftPath([{ q: clan.q, r: clan.r }]);
+    }
+    if (scoutObj !== 'map' && draftPath.length > 0) {
+      setDraftPath([]);
+    }
+  }, [scoutObj, game?.mapTiles]);
+
   // Akumuliraj log dogodkov — vsak nov mesec doda vnos
   useEffect(() => {
     if (!game?.lastRoundLog) return;
@@ -1160,7 +1234,7 @@ export default function App() {
       const g = await createGame();
       setGame(g);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('hiding'); setCombatants(0); setDefenseTotal(15); setDayGuard(8); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('ai_weakpoints'); setScoutTargets(new Set()); setEventLog([]);
+      setAxis('hiding'); setCombatants(0); setDefenseTotal(15); setDayGuard(8); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('ai_weakpoints'); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]);
     } finally { setLoading(false); }
   };
 
@@ -1168,14 +1242,20 @@ export default function App() {
     if (!game || loading) return;
     setLoading(true);
     try {
+      const newExpeditions: NewExpeditionInput[] = [];
+      if (scoutObj === 'map' && draftPath.length >= 2 && scouts > 0) {
+        newExpeditions.push({ kind: 'scout', path: draftPath, assigned: scouts, rations });
+      }
       const { state } = await playRound(game.runId, {
         assignment: { axis, combatants, dayGuard, nightGuard, foragers, scouts, rations,
           missionAssignments: missions, missionRations: missionR,
-          scoutPlan: { objective: scoutObj, targetTileIds: Array.from(scoutTargets) } },
+          scoutPlan: { objective: scoutObj, targetTileIds: Array.from(scoutTargets) },
+          newExpeditions: newExpeditions.length > 0 ? newExpeditions : undefined },
         targetWeakPoint: targetWP || undefined,
       });
       setMissions({});
       setScoutTargets(new Set());
+      setDraftPath([]);
       setGame(state);
       setOdds(null);
     } finally { setLoading(false); }
@@ -1236,6 +1316,51 @@ export default function App() {
     if (next.has(id)) next.delete(id); else next.add(id);
     setScoutTargets(next);
   }
+
+  function handlePathClick(tile: { q: number; r: number }) {
+    const last = draftPath[draftPath.length - 1];
+    if (!last) return;
+    // Če je klik na zadnjega heksa, odznači (razen kamp)
+    if (last.q === tile.q && last.r === tile.r) {
+      if (draftPath.length > 1) setDraftPath(draftPath.slice(0, -1));
+      return;
+    }
+    // Sicer dodaj sosednjega
+    setDraftPath([...draftPath, tile]);
+  }
+
+  // Statistike za draft pot (mesecev + tveganje)
+  const TILES_PER_MONTH_FE = 2;
+  const draftPathMonths = Math.max(0, Math.ceil((draftPath.length - 1) / TILES_PER_MONTH_FE));
+  function tileEncounterMultFE(p: number, distFromCamp: number): number {
+    let m = p < 0.25 ? 1.5 : p < 0.50 ? 1.2 : p < 1.0 ? 0.7 : 0.3;
+    if (distFromCamp <= 1) m *= 0.5;
+    else if (distFromCamp <= 2) m *= 0.8;
+    return m;
+  }
+  function hexDistFE(a: { q: number; r: number }, b: { q: number; r: number }): number {
+    const as_ = -a.q - a.r, bs_ = -b.q - b.r;
+    return (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(as_ - bs_)) / 2;
+  }
+  const draftRisk = (() => {
+    if (!game || draftPath.length < 2) return 0;
+    const clan = game.mapTiles?.find(t => t.isClanCamp);
+    if (!clan) return 0;
+    const SCOUT_CAPTURE_BASE_FE = 0.05;
+    const SCOUT_CAPTURE_PER_SCOUT_FE = 0.004;
+    const AI_KNOW_BONUS_FE = 0.20;
+    let pNo = 1;
+    for (const step of draftPath.slice(1)) {
+      const tile = game.mapTiles?.find(t => t.q === step.q && t.r === step.r);
+      if (!tile) continue;
+      const distFromCamp = hexDistFE({ q: tile.q, r: tile.r }, { q: clan.q, r: clan.r });
+      const base = SCOUT_CAPTURE_BASE_FE + SCOUT_CAPTURE_PER_SCOUT_FE * scouts + AI_KNOW_BONUS_FE * game.aiKnowledge;
+      const p = Math.max(0, Math.min(0.85, base * tileEncounterMultFE(tile.researchProgress, distFromCamp)));
+      pNo *= (1 - p);
+    }
+    return 1 - pNo;
+  })();
+  const canStartExpedition = scoutObj === 'map' && draftPath.length >= 2 && scouts > 0;
 
   function setMissionAssignment(wpId: string, n: number) {
     const v = Math.max(0, Math.floor(n));
@@ -1298,29 +1423,91 @@ export default function App() {
           <div className="panel-head">
             <h3>OPERATIVNA MAPA</h3>
             <span className="panel-badge">
-              {(game.mapTiles ?? []).filter(t => t.visibility === 'revealed').length} / {(game.mapTiles ?? []).length} razkritih
+              {(game.mapTiles ?? []).filter(t => t.researchProgress >= 0.50).length} / {(game.mapTiles ?? []).length} raziskanih
             </span>
           </div>
           <div className="map-layout">
-            <HexMap tiles={game.mapTiles ?? []} targets={scoutTargets}
-              onToggleTarget={toggleScoutTarget} objective={scoutObj} wps={game.aiWeakPoints} />
+            <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
+              onPathClick={handlePathClick} expeditions={game.expeditions ?? []}
+              wps={game.aiWeakPoints} drawingMode={scoutObj === 'map'} />
             <div className="map-side">
               <div className="cmd-label">Cilj izvidnikov ta mesec ({scouts} izvidnikov)</div>
               <ScoutObjectiveSelector value={scoutObj} onChange={setScoutObj} />
               {scoutObj === 'map' && (
-                <div className="map-hint">
-                  {scoutTargets.size === 0
-                    ? 'Klikni neraziskan heks na mapi za označitev tarč.'
-                    : `Označenih ${scoutTargets.size} heksov za razkrivanje.`}
+                <div className="path-builder">
+                  <div className="pb-instr dim small">
+                    Klikni sosednji heks, da gradiš pot. Klik na zadnji heks = odznači.
+                  </div>
+                  {draftPath.length < 2 && (
+                    <div className="map-hint">Pot je prazna. Prvi heks je kamp ⌂ — klikni sosednjega.</div>
+                  )}
+                  {draftPath.length >= 2 && (
+                    <div className="path-stats">
+                      <div className="ps-row">
+                        <span className="dim small">Korakov:</span>
+                        <b>{draftPath.length - 1}</b>
+                      </div>
+                      <div className="ps-row">
+                        <span className="dim small">Trajanje:</span>
+                        <b style={{ color: '#cc8800' }}>{draftPathMonths} mesec(ev)</b>
+                      </div>
+                      <div className="ps-row">
+                        <span className="dim small">Skupno tveganje srečanja:</span>
+                        <b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b>
+                      </div>
+                      <div className="ps-row">
+                        <span className="dim small">Izvidnikov:</span>
+                        <b style={{ color: '#3377cc' }}>{scouts}</b>
+                      </div>
+                    </div>
+                  )}
+                  <button className="autofit-btn" disabled={!canStartExpedition}
+                    onClick={() => { /* odprava se odda ob izvedbi meseca; tukaj samo info */ }}>
+                    {canStartExpedition ? '▶ Odprava se odda ob izvedbi meseca' : 'Najprej nariši pot in določi izvidnike'}
+                  </button>
                 </div>
               )}
               <div className="map-legend dim small">
                 <div><span style={{ color: '#66ccaa' }}>⌂</span> klan · <span style={{ color: '#cc3333' }}>☣</span> AI jedro</div>
-                <div><span style={{ color: '#cc8800' }}>◆</span> šibka točka razkrita · <span style={{ color: '#886600' }}>◌</span> namig</div>
-                <div>rdeča šrafura = neraziskan · siva = delno · prazen teal = razkrit</div>
+                <div><span style={{ color: '#cc8800' }}>◆</span> šibka točka · <span style={{ color: '#3377cc' }}>●</span> aktivna odprava</div>
+                <div>rdeč = neraziskan (&lt;50%) · moder = raziskan · sij = domač (100%)</div>
               </div>
             </div>
           </div>
+
+          {/* Aktivne odprave */}
+          {(game.expeditions ?? []).length > 0 && (
+            <div className="active-expeditions">
+              <div className="cmd-label" style={{ marginTop: 12, marginBottom: 6 }}>Aktivne odprave</div>
+              {game.expeditions.map(e => {
+                const steps = e.path.length - 1;
+                const done = e.currentIndex;
+                const target = e.path[e.path.length - 1];
+                return (
+                  <div key={e.id} className="exp-card">
+                    <div className="exp-head">
+                      <span className="exp-kind" style={{ color: e.kind === 'mission' ? '#cc8800' : '#22ccff' }}>
+                        {e.kind === 'mission' ? '🎯' : '🔭'} {e.assigned} ljudi
+                      </span>
+                      <span className="dim small">cilj: ({target?.q},{target?.r})</span>
+                    </div>
+                    <div className="exp-progress">
+                      <div className="ep-track">
+                        <div className="ep-fill" style={{ width: `${(done / Math.max(1, steps)) * 100}%`,
+                          background: e.kind === 'mission' ? '#cc8800' : '#22ccff' }} />
+                      </div>
+                      <span className="dim small">{done} / {steps}</span>
+                    </div>
+                    {e.encountersLog.length > 0 && (
+                      <div className="exp-events dim small">
+                        {e.encountersLog.slice(-2).join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         <EventLog entries={eventLog} />
       </div>
@@ -1406,36 +1593,6 @@ export default function App() {
               ✓ Avto-popravi razporeditev
             </button>
           )}
-        </div>
-
-        {/* Podvrstica: hrana/preživetje pregled */}
-        <div className="cmd-section food-summary">
-          <div className="cmd-label">Hrana / preživetje — projekcija po tem mesecu</div>
-          <div className="fs-row">
-            <div className="fs-cell">
-              <span className="dim small">Trenutno</span>
-              <span className="fs-val">{game.resources.survival}</span>
-            </div>
-            <span className="fs-arrow">→</span>
-            <div className="fs-cell">
-              <span className="dim small">Po mesecu</span>
-              <span className="fs-val" style={{ color: (game.resources.survival + survBalance) <= 0 ? '#cc2222' : '#22cc88' }}>
-                {game.resources.survival + survBalance}
-              </span>
-            </div>
-            <div className="fs-cell">
-              <span className="dim small">Δ na mesec</span>
-              <span className="fs-val" style={{ color: survBalance >= 0 ? '#22cc88' : '#cc2222' }}>
-                {survBalance >= 0 ? '+' : ''}{survBalance}
-              </span>
-            </div>
-            <div className="fs-cell fs-warn">
-              <span className="dim small">Lakota streak</span>
-              <span className="fs-val" style={{ color: (game.consecutiveStarvationMonths ?? 0) > 0 ? '#cc2222' : '#666' }}>
-                {game.consecutiveStarvationMonths ?? 0}m
-              </span>
-            </div>
-          </div>
         </div>
 
         <OddsDisplay odds={odds} combatants={combatants} />

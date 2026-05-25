@@ -29,11 +29,36 @@ export interface HexTile {
   q: number;
   r: number;
   visibility: Visibility;
+  researchProgress: number;     // 0–1
   fogDensity: number;
   distanceToCore: number;
   isClanCamp: boolean;
   isAICore: boolean;
   hidesWeakPointId?: string;
+}
+
+export type ExpeditionKind = 'scout' | 'mission';
+export type ExpeditionStatus = 'traveling' | 'completed' | 'lost' | 'returning';
+
+export interface Expedition {
+  id: string;
+  kind: ExpeditionKind;
+  weakPointId?: string;
+  path: Array<{ q: number; r: number }>;
+  currentIndex: number;
+  assigned: number;
+  rations: number;
+  status: ExpeditionStatus;
+  monthsElapsed: number;
+  encountersLog: string[];
+}
+
+export interface NewExpeditionInput {
+  kind: ExpeditionKind;
+  weakPointId?: string;
+  path: Array<{ q: number; r: number }>;
+  assigned: number;
+  rations: number;
 }
 
 export type ScoutObjective = 'map' | 'ai_robots' | 'ai_weakpoints';
@@ -58,6 +83,7 @@ export interface Assignment {
   missionAssignments?: Record<string, number>;
   missionRations?: Record<string, number>;
   scoutPlan?: ScoutPlan;
+  newExpeditions?: NewExpeditionInput[];
 }
 
 export interface Mission {
@@ -121,6 +147,8 @@ export interface GameState {
   completedMissions: Mission[];
   consecutiveStarvationMonths: number;
   mapTiles: HexTile[];
+  expeditions: Expedition[];
+  completedExpeditions: Expedition[];
   rngSeed: number;
   status: 'active' | 'victory' | 'defeat_extinction' | 'defeat_overwhelmed';
   lastRoundLog: RoundLog | null;

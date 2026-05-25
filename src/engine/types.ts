@@ -44,12 +44,37 @@ export interface Resources {
 export interface HexTile {
   q: number;
   r: number;
-  visibility: Visibility;
-  fogDensity: number;          // 0–1, raste proti AI jedru
+  visibility: Visibility;        // izpeljana iz researchProgress (za backward compat)
+  researchProgress: number;       // 0–1, kontinuirano stanje raziskanosti
+  fogDensity: number;
   distanceToCore: number;
   isClanCamp: boolean;
   isAICore: boolean;
   hidesWeakPointId?: string;
+}
+
+export type ExpeditionKind = 'scout' | 'mission';
+export type ExpeditionStatus = 'traveling' | 'completed' | 'lost' | 'returning';
+
+export interface Expedition {
+  id: string;
+  kind: ExpeditionKind;
+  weakPointId?: string;
+  path: Array<{ q: number; r: number }>;
+  currentIndex: number;
+  assigned: number;
+  rations: number;
+  status: ExpeditionStatus;
+  monthsElapsed: number;
+  encountersLog: string[];        // kratki opisi srečanj/dogodkov med potjo
+}
+
+export interface NewExpeditionInput {
+  kind: ExpeditionKind;
+  weakPointId?: string;
+  path: Array<{ q: number; r: number }>;
+  assigned: number;
+  rations: number;
 }
 
 export type ScoutObjective = 'map' | 'ai_robots' | 'ai_weakpoints';
@@ -78,6 +103,8 @@ export interface Assignment {
   missionRations?: Record<string, number>;
   // Kam gredo izvidniki (default = ai_weakpoints za backward compat)
   scoutPlan?: ScoutPlan;
+  // Nove odprave, ki jih igralec sproži ta mesec (scout/mission s potjo)
+  newExpeditions?: NewExpeditionInput[];
 }
 
 export interface Mission {
@@ -173,6 +200,10 @@ export interface GameState {
 
   // Heksa mapa
   mapTiles: HexTile[];
+
+  // Odprave (izvidniki in misije s potjo)
+  expeditions: Expedition[];
+  completedExpeditions: Expedition[];
 
   // RNG (determinizem)
   rngSeed: number;

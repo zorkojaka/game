@@ -843,3 +843,34 @@ input[type=range]::-moz-range-thumb {
 }
 
 /* Stari hud-arena / hud-cols razredi niso več v rabi — še delujejo če kje ostanejo */
+
+/* ─── Path builder + aktivne odprave ─────────────────────────────────────── */
+.path-builder { display: flex; flex-direction: column; gap: 8px; }
+.pb-instr { line-height: 1.4; }
+.path-stats {
+  background: var(--bg2); border-left: 2px solid #22ccff;
+  padding: 6px 10px;
+}
+.ps-row { display: flex; justify-content: space-between; align-items: baseline; padding: 2px 0; font-size: .78rem; }
+.ps-row b { color: var(--text); }
+
+.active-expeditions {
+  margin-top: 8px; padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.exp-card {
+  background: var(--bg2); padding: 8px 10px;
+  border-left: 2px solid #2a4a6a;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.exp-head { display: flex; justify-content: space-between; align-items: baseline; }
+.exp-kind { font-size: .82rem; font-weight: bold; letter-spacing: .04em; }
+.exp-progress { display: flex; align-items: center; gap: 8px; }
+.ep-track { flex: 1; height: 4px; background: #151515; overflow: hidden; }
+.ep-fill  { height: 100%; transition: width .4s ease; }
+.exp-events { line-height: 1.4; }
+
+/* Path lines + odprava markerji */
+.hex-tile.in-draft path:first-child { stroke-width: 2.5px; }
+.exp-marker { pointer-events: none; }
