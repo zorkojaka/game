@@ -564,24 +564,49 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
 
   return (
     <div className="people-allocator">
-      {/* Naslovi vrstic */}
+      {/* Naslovi vrstic + +/− gumbi */}
       <div className="pa-labels">
-        {roles.map(r => (
-          <div key={r.key} className="pa-label" style={{ flex: Math.max(0.6, r.count / total), color: r.color }}>
-            <div className="pa-label-head">
-              <span>{r.icon} <b style={{ color: r.color }}>{r.label}</b></span>
-              <b className="pa-count">{r.count}</b>
+        {roles.map((r, ri) => {
+          const freeIdx = roles.findIndex(x => x.key === '_');
+          const isFree = r.key === '_';
+          const canPlus  = !isFree && (freeIdx >= 0 ? roles[freeIdx].count > 0 : false);
+          const canMinus = r.count > 0;
+          const step = (delta: number) => {
+            const nc = roles.map(x => x.count);
+            if (delta > 0 && canPlus) {
+              nc[ri] += 1;
+              nc[freeIdx] -= 1;
+            } else if (delta < 0 && canMinus) {
+              nc[ri] -= 1;
+              if (freeIdx >= 0) nc[freeIdx] += 1;
+            }
+            onTransfer(nc);
+          };
+          return (
+            <div key={r.key} className="pa-label" style={{ flex: Math.max(0.6, r.count / total), color: r.color }}>
+              <div className="pa-label-head">
+                <span>{r.icon} <b style={{ color: r.color }}>{r.label}</b></span>
+                <span className="pa-pm">
+                  {!isFree && (
+                    <button className="pa-btn" disabled={!canMinus} onClick={() => step(-1)}>−</button>
+                  )}
+                  <b className="pa-count">{r.count}</b>
+                  {!isFree && (
+                    <button className="pa-btn" disabled={!canPlus} onClick={() => step(+1)}>+</button>
+                  )}
+                </span>
+              </div>
+              {r.yieldText && <span className="pa-yield dim small">{r.yieldText}</span>}
+              {r.prob !== undefined && r.probLabel && (
+                <span className="pa-prob small">
+                  <span className="dim">{r.probLabel}:</span>
+                  <span style={{ color: probColor(r.prob) }}>{Math.round(r.prob * 100)}%</span>
+                </span>
+              )}
+              {r.extraLabel}
             </div>
-            {r.yieldText && <span className="pa-yield dim small">{r.yieldText}</span>}
-            {r.prob !== undefined && r.probLabel && (
-              <span className="pa-prob small">
-                <span className="dim">{r.probLabel}:</span>
-                <span style={{ color: probColor(r.prob) }}>{Math.round(r.prob * 100)}%</span>
-              </span>
-            )}
-            {r.extraLabel}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Glavna razdelilna palica z ljudmi */}

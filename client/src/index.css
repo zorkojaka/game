@@ -1034,3 +1034,30 @@ input[type=range]::-moz-range-thumb {
 .defense-split.inline .ds-slider {
   height: 6px;
 }
+
+/* ─── PeopleAllocator: +/− gumbi v naslovih ─────────────────────────────── */
+.pa-pm { display: inline-flex; align-items: center; gap: 4px; }
+.pa-btn {
+  width: 22px; height: 22px;
+  background: var(--bg2); border: 1px solid currentColor;
+  color: inherit; cursor: pointer; font-family: var(--font);
+  font-size: .95rem; font-weight: bold; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; opacity: .85;
+  transition: background .12s, opacity .12s;
+}
+.pa-btn:hover:not(:disabled) { background: rgba(255,255,255,.06); opacity: 1; }
+.pa-btn:active:not(:disabled) { background: rgba(255,255,255,.12); }
+.pa-btn:disabled { opacity: .25; cursor: not-allowed; }
+
+/* ─── Posvetljen "dim" tekst — bolj berljiv ────────────────────────────── */
+:root {
+  --dim:  #8a8a8a;   /* bilo #484848 — sedaj posvetljeno */
+  --text: #d8d8d8;   /* nekoliko svetlejši ozadne barve */
+}
+.small        { font-size: .76rem; }   /* malo večje */
+.dim          { color: var(--dim); }
+.dim.small    { color: #9a9a9a; }      /* dim + small posebej svetlejši */
+.ee-text      { color: #c8c8c8; }      /* log narrative */
+.fs-arrow,
+.ph-total     { color: #8a8a8a; }
