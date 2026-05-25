@@ -874,3 +874,86 @@ input[type=range]::-moz-range-thumb {
 /* Path lines + odprava markerji */
 .hex-tile.in-draft path:first-child { stroke-width: 2.5px; }
 .exp-marker { pointer-events: none; }
+
+/* ─── PeopleAllocator — vizualni segmentni razdelilnik ──────────────────── */
+.people-allocator {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 8px;
+}
+
+.pa-labels { display: flex; gap: 2px; align-items: stretch; }
+.pa-label {
+  padding: 6px 10px; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+  border-top: 2px solid; border-color: inherit;
+}
+.pa-label-head { display: flex; align-items: baseline; justify-content: space-between; font-size: .8rem; }
+.pa-count { font-size: 1rem; }
+.pa-yield { font-size: .68rem; line-height: 1.3; }
+.pa-prob  { font-size: .68rem; display: flex; gap: 3px; align-items: baseline; }
+
+.pa-bar {
+  position: relative;
+  display: flex; gap: 2px; min-height: 60px;
+  background: #050505; padding: 5px 0;
+  user-select: none; touch-action: none;
+}
+.pa-seg {
+  flex: 1; min-width: 24px; overflow: hidden;
+  border-top: 2px solid; padding: 5px 4px;
+  transition: flex .15s ease, background .2s ease;
+}
+.pa-people {
+  display: flex; flex-wrap: wrap; gap: 2px;
+  align-content: flex-start;
+}
+.pa-person {
+  width: 18px; height: 18px;
+  border: 1px solid; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: bold;
+  flex-shrink: 0;
+  transition: background .15s, border-color .15s, color .15s;
+}
+
+/* Vlečne meje med segmenti */
+.pa-handle {
+  position: absolute; top: 0; bottom: 0;
+  width: 18px; transform: translateX(-50%);
+  cursor: ew-resize; touch-action: none;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 5;
+}
+.pa-handle-bar {
+  position: absolute; top: 0; bottom: 0; left: 50%;
+  width: 2px; background: #cccccc; transform: translateX(-50%);
+  transition: width .15s, background .15s;
+}
+.pa-handle-grip {
+  position: relative; z-index: 6;
+  background: #cccccc; color: #000;
+  font-size: 9px; padding: 2px 4px;
+  border-radius: 2px; font-weight: bold;
+  font-family: var(--font);
+  opacity: .85;
+  pointer-events: none;
+}
+.pa-handle:hover .pa-handle-bar,
+.pa-handle.dragging .pa-handle-bar {
+  width: 3px; background: #ffaa44;
+}
+.pa-handle.dragging .pa-handle-grip {
+  background: #ffaa44; transform: scale(1.15);
+}
+
+.pa-mission-note {
+  padding: 4px 10px; background: var(--bg2);
+  border-left: 2px solid #aa4488;
+  font-style: italic;
+}
+
+@media (max-width: 720px) {
+  .pa-labels { display: none; }   /* na ozkih zaslonih skrij naslove, fokus na bar */
+  .pa-person { width: 14px; height: 14px; font-size: 8px; }
+  .pa-handle { width: 24px; }     /* večje za prst */
+}

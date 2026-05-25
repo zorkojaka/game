@@ -508,6 +508,123 @@ function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsCha
   );
 }
 
+/** Vizualni razdelilnik ljudi — segmenti z vlečnimi mejami, posameznikovi ikoni se obarvajo po vlogi */
+type AllocRole = {
+  key: 'c' | 'd' | 'f' | 's' | '_';
+  label: string;
+  icon: string;
+  color: string;
+  count: number;
+  yieldText?: string;
+  probLabel?: string;
+  prob?: number;
+};
+
+function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer }: {
+  roles: AllocRole[];
+  available: number;
+  inMissions: number;
+  newMission: number;
+  onTransfer: (newCounts: number[]) => void;
+}) {
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const [drag, setDrag] = useState<{ handleIdx: number; startX: number; startCounts: number[]; barWidth: number } | null>(null);
+
+  function startDrag(handleIdx: number, e: React.PointerEvent) {
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const w = barRef.current?.getBoundingClientRect().width ?? 1;
+    setDrag({ handleIdx, startX: e.clientX, startCounts: roles.map(r => r.count), barWidth: w });
+  }
+  function moveDrag(e: React.PointerEvent) {
+    if (!drag) return;
+    const delta = Math.round((e.clientX - drag.startX) * available / drag.barWidth);
+    const newCounts = [...drag.startCounts];
+    const i = drag.handleIdx;
+    if (delta > 0) {
+      const give = Math.min(delta, newCounts[i + 1]);
+      newCounts[i + 1] -= give;
+      newCounts[i] += give;
+    } else if (delta < 0) {
+      const give = Math.min(-delta, newCounts[i]);
+      newCounts[i] -= give;
+      newCounts[i + 1] += give;
+    }
+    onTransfer(newCounts);
+  }
+  function endDrag(e: React.PointerEvent) {
+    if (!drag) return;
+    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    setDrag(null);
+  }
+
+  // Skupna populacija za prikaz = available (vključen "prosti" segment v vsoti)
+  const total = Math.max(1, available);
+
+  return (
+    <div className="people-allocator">
+      {/* Naslovi vrstic */}
+      <div className="pa-labels">
+        {roles.map(r => (
+          <div key={r.key} className="pa-label" style={{ flex: Math.max(0.6, r.count / total), color: r.color }}>
+            <div className="pa-label-head">
+              <span>{r.icon} <b style={{ color: r.color }}>{r.label}</b></span>
+              <b className="pa-count">{r.count}</b>
+            </div>
+            {r.yieldText && <span className="pa-yield dim small">{r.yieldText}</span>}
+            {r.prob !== undefined && r.probLabel && (
+              <span className="pa-prob small">
+                <span className="dim">{r.probLabel}:</span>
+                <span style={{ color: probColor(r.prob) }}>{Math.round(r.prob * 100)}%</span>
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Glavna razdelilna palica z ljudmi */}
+      <div className="pa-bar" ref={barRef}>
+        {roles.map((r, i) => (
+          <div key={r.key} className={`pa-seg pa-${r.key}`}
+            style={{ flex: Math.max(0.6, r.count / total), background: r.color + '14', borderTopColor: r.color }}>
+            <div className="pa-people">
+              {Array.from({ length: r.count }, (_, idx) => (
+                <div key={idx} className="pa-person" style={{ background: r.color + '40', borderColor: r.color, color: r.color }}>
+                  {r.icon}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        {/* Vlečne meje */}
+        {roles.slice(0, -1).map((_, i) => {
+          // pozicija meje = vsota count[0..i] / total
+          const before = roles.slice(0, i + 1).reduce((s, r) => s + Math.max(0.6, r.count / total), 0);
+          const totalFlex = roles.reduce((s, r) => s + Math.max(0.6, r.count / total), 0);
+          const leftPct = before / totalFlex * 100;
+          return (
+            <div key={i} className={`pa-handle ${drag?.handleIdx === i ? 'dragging' : ''}`}
+              style={{ left: `${leftPct}%` }}
+              onPointerDown={e => startDrag(i, e)}
+              onPointerMove={moveDrag}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}>
+              <div className="pa-handle-bar" />
+              <div className="pa-handle-grip">⇔</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {(inMissions + newMission > 0) && (
+        <div className="pa-mission-note dim small">
+          🎯 {inMissions + newMission} ljudi v misijah/odpravah (niso na voljo).
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Vizualna razporeditev populacije */
 function PeopleBar({ pop, combatants, dayGuard, nightGuard, foragers, scouts, inMissions, newMission }: {
   pop: number; combatants: number; dayGuard: number; nightGuard: number;
@@ -1548,46 +1665,54 @@ export default function App() {
             </div>
           )}
 
-          {/* Sliderji v dveh stolpcih za boljšo izrabo polno-širinskega pasu */}
-          <div className="sliders-grid">
-            <SliderRow icon="⚔" label="Napad" color="#cc4433"
-              val={combatants} onChange={v => setSliderClamped('c', v)} max={availablePop}
-              yieldText={`→ +${(combatants * 1.2 * rTier.strengthMult).toFixed(0)} moč · porabi ${combatants} orožja`}
-              probLabel="Zmaga v napadu" prob={combatants > 0 ? odds?.successProbability : undefined} />
-            <SliderRow icon="🌾" label="Nabiralci" color="#6aa630"
-              val={foragers} onChange={v => setSliderClamped('f', v)} max={availablePop}
-              yieldText={`→ ${survBalance >= 0 ? '+' : ''}${survBalance} hrana`}
-              probLabel="Brez izgub" prob={odds?.forageSafetyProbability} />
+          {/* Vizualni razdelilnik ljudi po vlogah */}
+          <PeopleAllocator
+            available={availablePop}
+            inMissions={inMissions}
+            newMission={newMissionPeople}
+            roles={[
+              { key: 'c', label: 'Napad',     icon: '⚔', color: '#cc4433', count: combatants,
+                yieldText: `+${(combatants * 1.2 * rTier.strengthMult).toFixed(0)} moč · ${combatants} orožja`,
+                probLabel: combatants > 0 ? 'Zmaga' : undefined, prob: combatants > 0 ? odds?.successProbability : undefined },
+              { key: 'd', label: 'Obramba',   icon: '🛡', color: '#66aabb', count: defenseTotal,
+                yieldText: `${defenseTotal} stražarjev · ${defenseTotal} orožja`,
+                probLabel: 'Odbije napad', prob: odds?.raidRepelProbability },
+              { key: 'f', label: 'Nabiralci', icon: '🌾', color: '#6aa630', count: foragers,
+                yieldText: `${survBalance >= 0 ? '+' : ''}${survBalance} hrana`,
+                probLabel: 'Brez izgub', prob: odds?.forageSafetyProbability },
+              { key: 's', label: 'Izvidniki', icon: '🔭', color: '#3377cc', count: scouts,
+                yieldText: `+${scoutIntel} intel`,
+                probLabel: scouts > 0 ? 'Uspeh' : undefined, prob: scouts > 0 ? odds?.scoutSuccessProbability : undefined },
+              { key: '_', label: 'Prosti',    icon: '·', color: '#666666', count: Math.max(0, availablePop - combatants - defenseTotal - foragers - scouts) },
+            ]}
+            onTransfer={(nc) => {
+              const [nC, nD, nF, nS] = nc;
+              // Ohrani day/night razmerje pri spremembi obrambe
+              if (nD !== defenseTotal && defenseTotal > 0) {
+                const ratio = dayGuard / defenseTotal;
+                setDayGuard(Math.round(nD * ratio));
+              } else if (nD !== defenseTotal && defenseTotal === 0) {
+                setDayGuard(Math.floor(nD / 2));
+              }
+              setCombatants(nC); setDefenseTotal(nD); setForagers(nF); setScouts(nS);
+            }}
+          />
 
-            <div className="slider-block">
-              <SliderRow icon="🛡" label="Obramba (skupaj)" color="#66aabb"
-                val={defenseTotal} onChange={v => setSliderClamped('d', v)} max={availablePop}
-                yieldText={`→ ${defenseTotal} stražarjev · porabi ${defenseTotal} orožja`}
-                probLabel="Uspešna obramba" prob={odds?.raidRepelProbability} />
-              {defenseTotal > 0 && (
-                <div className="defense-split">
-                  <div className="ds-head">
-                    <span>🌞 Dnevna: <b>{dayGuard}</b></span>
-                    <span className="dim small">razdeli stražo</span>
-                    <span>🌜 Nočna: <b>{nightGuard}</b></span>
-                  </div>
-                  <input type="range" min={0} max={defenseTotal} value={dayGuard} step={1}
-                    onChange={e => setDayGuard(Math.max(0, Math.min(defenseTotal, +e.target.value)))}
-                    className="ds-slider"
-                    style={{ ['--pct' as never]: `${defenseTotal > 0 ? (dayGuard / defenseTotal * 100).toFixed(1) : 0}%` } as React.CSSProperties} />
-                </div>
-              )}
+          {/* Day/night sub-split (samo če imamo obrambo) */}
+          {defenseTotal > 0 && (
+            <div className="defense-split">
+              <div className="ds-head">
+                <span>🌞 Dnevna: <b>{dayGuard}</b></span>
+                <span className="dim small">razdeli stražo dan/noč</span>
+                <span>🌜 Nočna: <b>{nightGuard}</b></span>
+              </div>
+              <input type="range" min={0} max={defenseTotal} value={dayGuard} step={1}
+                onChange={e => setDayGuard(Math.max(0, Math.min(defenseTotal, +e.target.value)))}
+                className="ds-slider"
+                style={{ ['--pct' as never]: `${defenseTotal > 0 ? (dayGuard / defenseTotal * 100).toFixed(1) : 0}%` } as React.CSSProperties} />
             </div>
+          )}
 
-            <SliderRow icon="🔭" label="Izvidniki" color="#3377cc"
-              val={scouts} onChange={v => setSliderClamped('s', v)} max={availablePop}
-              yieldText={`→ +${scoutIntel} intel`}
-              probLabel={`Uspeh / ujeti ${odds ? Math.round(odds.scoutCaptureProbability * 100) : 0}%`}
-              prob={scouts > 0 ? odds?.scoutSuccessProbability : undefined} />
-          </div>
-
-          <PeopleBar pop={pop} combatants={combatants} dayGuard={dayGuard} nightGuard={nightGuard}
-            foragers={foragers} scouts={scouts} inMissions={inMissions} newMission={newMissionPeople} />
           {over && (
             <button className="autofit-btn" onClick={autoFitAllocation}>
               ✓ Avto-popravi razporeditev
