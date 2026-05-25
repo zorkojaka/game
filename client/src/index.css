@@ -48,6 +48,11 @@ b      { color: var(--text); }
   80%  { background-position: 5px -8px; }
   100% { background-position: 0 0; }
 }
+@keyframes reveal-flash {
+  0%   { background: #1a3a1a; box-shadow: 0 0 14px rgba(34,204,102,.6); }
+  60%  { background: #0f1f0f; box-shadow: 0 0 6px  rgba(34,204,102,.2); }
+  100% { background: #0e0e0e; box-shadow: none; }
+}
 
 /* ─── Shared panel ─────────────────────────────────────────────────────────── */
 .panel {
@@ -95,9 +100,33 @@ b      { color: var(--text); }
 .round-dot.done    { background: #2a2a2a; border-color: #2a2a2a; }
 .round-dot.current { animation: pulse 1.4s ease-in-out infinite; }
 
-.ph-ai-know { min-width: 90px; text-align: right; }
-.pak-label  { font-size: .65rem; margin-bottom: 2px; }
-.pak-value  { font-size: 1rem; font-weight: bold; margin-bottom: 4px; }
+/* ─── Dual knowledge meter ─────────────────────────────────────────────────── */
+.dual-knowledge {
+  display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0;
+}
+.dk-meter {
+  display: flex; flex-direction: column; gap: 3px;
+  min-width: 76px;
+}
+.dk-meter-right { align-items: flex-end; }
+.dk-label  { font-size: .6rem; text-transform: uppercase; letter-spacing: .06em; }
+.dk-val    { font-size: .95rem; font-weight: bold; line-height: 1; }
+.dk-bar-track {
+  width: 76px; height: 4px; background: #151515; overflow: hidden;
+}
+.dk-bar-fill  { height: 100%; transition: width .4s ease, background .4s ease; }
+.dk-bar-right { margin-left: auto; }
+.dk-divider {
+  font-size: .58rem; color: #2a2a2a; letter-spacing: .04em;
+  padding: 0 2px; align-self: center; margin-top: 10px;
+}
+@keyframes danger-blink { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+.dk-danger-blink {
+  font-size: .6rem; color: #cc2222;
+  animation: danger-blink .7s ease-in-out infinite;
+  letter-spacing: .04em;
+}
 
 /* ─── Resource row ─────────────────────────────────────────────────────────── */
 .resource-row {
@@ -117,6 +146,22 @@ b      { color: var(--text); }
 /* ─── HUD layout ───────────────────────────────────────────────────────────── */
 .hud { display: flex; flex-direction: column; gap: .75rem; }
 
+.hud-arena {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem;
+  align-items: start;
+  position: relative;
+}
+.hud-arena::after {
+  content: 'VS';
+  position: absolute; left: 50%; top: 18px; transform: translateX(-50%);
+  font-size: .62rem; color: #2a2a2a; letter-spacing: .15em;
+  background: var(--bg); padding: 2px 5px;
+  border: 1px solid #1a1a1a;
+  z-index: 2;
+}
+
 .hud-cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -126,8 +171,43 @@ b      { color: var(--text); }
 .hud-left, .hud-right { display: flex; flex-direction: column; gap: .75rem; }
 
 @media (max-width: 720px) {
-  .hud-cols { grid-template-columns: 1fr; }
+  .hud-arena, .hud-cols { grid-template-columns: 1fr; }
+  .hud-arena::after { display: none; }
 }
+
+.ai-tree    { border-right: 2px solid var(--red); }
+
+/* ─── Človekovo drevo (teal) ───────────────────────────────────────────────── */
+.human-tree { border-left: 2px solid #22aa88; }
+.panel-badge.teal { color: #66ccaa; border-color: #1a4030; background: #061410; }
+
+.ht-branches { display: flex; flex-direction: column; gap: 10px; }
+.ht-branch   { padding: 6px 0; }
+.ht-branch.ht-current .ht-br-label { text-shadow: 0 0 6px currentColor; }
+
+.ht-br-head  { display: flex; align-items: center; gap: 7px; font-size: .72rem;
+  text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+.ht-br-icon  { font-size: .9rem; }
+.ht-br-label { font-weight: bold; flex: 1; }
+.ht-br-count { font-size: .7rem; color: var(--dim); }
+
+.ht-nodes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+.ht-node  {
+  border: 1px solid var(--border); background: var(--bg2);
+  padding: 6px 7px; min-height: 56px;
+  display: flex; flex-direction: column; gap: 3px;
+  transition: border-color .2s, background .2s;
+}
+.ht-node.unlocked { background: #061612; }
+.ht-node.locked   { opacity: .82; }
+
+.ht-node-head  { display: flex; align-items: baseline; gap: 5px; }
+.ht-node-lvl   { font-size: .72rem; font-weight: bold; min-width: 22px; }
+.ht-node-label { font-size: .72rem; line-height: 1.15; flex: 1; }
+.ht-node-eff   { font-size: .62rem; line-height: 1.25; }
+
+.ht-node-track { height: 2px; background: #131313; margin-top: 3px; overflow: hidden; }
+.ht-node-fill  { height: 100%; transition: width .4s ease; }
 
 /* ─── AI Tree ──────────────────────────────────────────────────────────────── */
 .tree-section   { margin-bottom: 12px; }
@@ -157,9 +237,13 @@ b      { color: var(--text); }
 .nc-phase-tag { font-size: .6rem; color: #1e1e1e; display: block; text-align: center; margin-top: 3px; }
 
 .node-card.partial { background: #0d0d0d; }
-.nc-label-partial  { font-size: .8rem; color: #404040; display: block; }
-.nc-badge-partial  { font-size: .6rem; color: #3a3a3a; display: inline-block; margin-top: 4px;
+.nc-label-partial  { font-size: .8rem; color: #555; display: block; margin-bottom: 5px; }
+.nc-partial-row    { display: flex; align-items: center; gap: 6px; }
+.nc-badge-partial  { font-size: .6rem; color: #3a3a3a; display: inline-block;
   border: 1px solid #2a2a2a; padding: 1px 5px; }
+.nc-str-range      { font-size: .68rem; color: #3d3d3d; font-style: italic; }
+
+.node-card.just-revealed { animation: reveal-flash 1.6s ease-out forwards; }
 
 .node-card.revealed { background: #0e0e0e; border-left-width: 2px; }
 .nc-label   { font-size: .8rem; color: var(--text); display: block; margin-bottom: 6px; }
@@ -182,12 +266,14 @@ b      { color: var(--text); }
   display: flex; align-items: center; justify-content: center;
   font-size: .9rem; flex-shrink: 0; background: var(--bg2);
 }
+.wp-card.suspected  .wp-icon { border-color: #555; color: #888; }
 .wp-card.discovered .wp-icon { border-color: var(--yellow); color: var(--yellow); }
 .wp-card.exploited  .wp-icon { border-color: var(--green);  color: var(--green);  }
 
 .wp-body  { flex: 1; }
 .wp-name  { font-size: .82rem; }
 .wp-card.hidden   .wp-name { color: #333; }
+.wp-card.suspected .wp-name { color: #888; font-style: italic; }
 .wp-card.discovered .wp-name { color: var(--yellow); }
 .wp-card.exploited  .wp-name { color: var(--green); text-decoration: line-through; }
 
@@ -407,3 +493,259 @@ input[type=range]::-moz-range-thumb {
 .go-k      { }
 .go-v      { color: var(--text); }
 .go-btn    { width: 280px; }
+
+/* ─── Auto-fit allocation button ──────────────────────────────────────────── */
+.autofit-btn {
+  width: 100%; margin-top: 8px; padding: 7px;
+  background: #1a1400; border: 1px dashed var(--yellow); color: var(--yellow);
+  font-family: var(--font); font-size: .76rem; cursor: pointer;
+  letter-spacing: .06em; text-transform: uppercase;
+  transition: background .15s;
+}
+.autofit-btn:hover { background: #2a2200; }
+
+/* ─── Phase transition banner ─────────────────────────────────────────────── */
+@keyframes ptb-fade-in  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes ptb-scale-in { from { transform: scale(.85); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+
+.ptb-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.78);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 1rem;
+  animation: ptb-fade-in .25s ease-out;
+  backdrop-filter: blur(2px);
+}
+.ptb-card {
+  background: var(--bg1); border: 2px solid;
+  padding: 24px 28px; max-width: 540px; width: 100%;
+  animation: ptb-scale-in .35s cubic-bezier(.2,.8,.3,1.2);
+  box-shadow: 0 0 40px rgba(204,51,51,.25);
+}
+.ptb-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.ptb-tag  { font-size: .68rem; letter-spacing: .15em; text-transform: uppercase; }
+.ptb-close {
+  background: none; border: none; color: var(--dim); font-size: 1.1rem;
+  font-family: var(--font); cursor: pointer; padding: 2px 8px;
+}
+.ptb-close:hover { color: var(--red); }
+
+.ptb-flow { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }
+.ptb-side { flex: 1; text-align: center; }
+.ptb-num  {
+  width: 56px; height: 56px; margin: 0 auto 8px;
+  border: 2px solid; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem; font-weight: bold;
+}
+.ptb-label { font-size: .78rem; font-weight: bold; letter-spacing: .08em; }
+.ptb-state { font-size: .66rem; margin-top: 4px; letter-spacing: .08em; }
+.ptb-arrow {
+  font-size: 1.4rem; letter-spacing: -.06em; flex-shrink: 0;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.ptb-narrative {
+  font-size: .88rem; color: var(--text); line-height: 1.7;
+  padding: 14px 18px; background: var(--bg2);
+  border-left: 2px solid var(--border2); margin-bottom: 18px;
+}
+.ptb-continue {
+  width: 100%; padding: 11px;
+  background: transparent; border: 2px solid; cursor: pointer;
+  font-family: var(--font); font-size: .92rem; font-weight: bold;
+  letter-spacing: .12em; text-transform: uppercase;
+  transition: background .15s;
+}
+.ptb-continue:hover { background: rgba(255,255,255,.04); }
+
+/* ─── Rations selector ─────────────────────────────────────────────────────── */
+.rations-block { display: flex; flex-direction: column; gap: 8px; }
+.rations-row   { display: flex; gap: 5px; }
+.rations-btn {
+  flex: 1; padding: 8px 4px;
+  background: var(--bg2); border: 1px solid var(--border2);
+  cursor: pointer; font-family: var(--font);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transition: background .15s, border-color .15s;
+  color: var(--dim);
+}
+.rations-btn:hover { background: #181818; }
+.rations-btn.sel   { background: #0e0e0e; }
+.rb-emoji { font-size: 1.1rem; line-height: 1; }
+.rb-num   { font-size: .68rem; font-weight: bold; letter-spacing: .04em; }
+
+.rations-info {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 6px 8px; background: var(--bg2);
+  border: 1px solid var(--border);
+  font-size: .76rem;
+}
+.ri-label { font-weight: bold; letter-spacing: .08em; text-transform: uppercase; }
+.ri-stats { flex: 1; text-align: right; }
+
+/* ─── Slider probability badge ────────────────────────────────────────────── */
+.slider-row { transition: border-color .15s; }
+.sr-prob {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-top: 4px; font-size: .72rem;
+}
+.sr-prob-val { font-weight: bold; }
+
+/* ─── Raid warning banner ─────────────────────────────────────────────────── */
+.raid-warning {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; margin-bottom: 10px;
+  background: #1a0e08; border: 1px solid;
+  font-size: .76rem; letter-spacing: .04em;
+}
+.raid-prob { font-size: .95rem; font-weight: bold; }
+
+/* ─── People bar — defenders segment ──────────────────────────────────────── */
+.pb-seg.defense { background: #4080a0; }
+.pbl.defense    { color: #66aabb; }
+
+/* ─── Mission cards ──────────────────────────────────────────────────────── */
+.mission-card { padding: 10px 0; }
+.mission-card .wp-body { gap: 4px; display: flex; flex-direction: column; }
+
+.mission-timer { margin-top: 6px; }
+.mt-bar-track {
+  width: 100%; height: 6px; background: #1a1a1a; overflow: hidden;
+  border: 1px solid #2a2a2a;
+}
+.mt-bar-fill {
+  height: 100%; background: linear-gradient(90deg, #cc8800, #cc4400);
+  transition: width .4s ease;
+}
+.mt-stats { margin-top: 4px; }
+
+.mission-setup {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 6px; padding: 6px 8px; background: var(--bg2);
+  border: 1px solid var(--border);
+}
+.mission-input {
+  width: 50px; padding: 3px 5px;
+  background: #0a0a0a; border: 1px solid var(--border2);
+  color: var(--text); font-family: var(--font); font-size: .8rem;
+  text-align: right;
+}
+.mission-prob { display: flex; align-items: baseline; gap: 4px; font-size: .76rem; flex-wrap: wrap; }
+
+/* ─── HumanTree focus styling ────────────────────────────────────────────── */
+.ht-branch { padding: 6px 8px; border-left: 2px solid transparent; transition: background .15s; }
+.ht-branch:hover { background: #0a1a14; }
+.ht-focus-tag {
+  font-size: .56rem; color: #000; padding: 1px 5px;
+  letter-spacing: .08em; margin-left: 5px; font-weight: bold;
+}
+
+/* ─── Status row (raid + intel bonus) ────────────────────────────────────── */
+.status-row {
+  display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;
+}
+.intel-bonus {
+  flex: 1; min-width: 140px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; background: #06121a; border: 1px solid #1a3040;
+  font-size: .76rem;
+}
+
+/* ─── Weapon warning ────────────────────────────────────────────────────── */
+.weapon-warning {
+  padding: 6px 10px; margin-bottom: 8px;
+  background: #2a1500; border: 1px solid #cc8800;
+  color: #cc8800; font-size: .76rem;
+}
+
+/* ─── People bar — day/night/mission ────────────────────────────────────── */
+.pb-seg.day     { background: #aa6622; }
+.pb-seg.night   { background: #334477; }
+.pb-seg.mission { background: #aa4488; }
+.pbl.day        { color: #cc9944; }
+.pbl.night      { color: #557799; }
+.pbl.mission    { color: #cc66aa; }
+
+/* ─── Defense split sub-slider ───────────────────────────────────────────── */
+.defense-split {
+  margin: -2px 0 8px 26px; padding: 6px 8px;
+  background: var(--bg2); border-left: 2px solid #66aabb;
+}
+.ds-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 4px; font-size: .76rem;
+}
+.ds-slider {
+  width: 100%; height: 4px; outline: none; cursor: pointer;
+  background: linear-gradient(to right, #cc9944 var(--pct, 50%), #557799 var(--pct, 50%));
+  appearance: none; -webkit-appearance: none;
+}
+.ds-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 12px; height: 12px;
+  background: #c0c0c0; border: 2px solid var(--bg);
+  cursor: pointer; border-radius: 0;
+}
+.ds-slider::-moz-range-thumb {
+  width: 12px; height: 12px;
+  background: #c0c0c0; border: 2px solid var(--bg);
+  cursor: pointer; border-radius: 0;
+}
+
+/* ─── Mission rations ────────────────────────────────────────────────────── */
+.mission-rations {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 6px; padding: 5px 8px;
+  background: #0a0a0a; border-left: 2px solid var(--border2);
+}
+.mr-buttons { display: flex; gap: 2px; }
+.mr-btn {
+  width: 22px; height: 22px;
+  background: var(--bg2); border: 1px solid var(--border2);
+  cursor: pointer; font-family: var(--font); font-size: .85rem;
+  padding: 0; display: flex; align-items: center; justify-content: center;
+}
+.mr-btn:hover { background: #181818; }
+.mr-btn.sel   { background: #0e0e0e; }
+
+/* ─── Heksa mapa ─────────────────────────────────────────────────────────── */
+.map-panel { padding: 14px; }
+.map-layout {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .map-layout { grid-template-columns: 1fr; }
+}
+
+.hex-map { width: 100%; }
+.hex-map.dimmed { opacity: .65; }
+.hex-svg { width: 100%; display: block; }
+
+.hex-tile { transition: opacity .15s; }
+.hex-tile.clickable { cursor: pointer; }
+.hex-tile.clickable:hover path:first-child { fill: #1a2a30 !important; stroke: #22ccff !important; }
+.hex-tile.targeted path:first-child { stroke-width: 2.5px; }
+
+/* ─── Scout objective selector ──────────────────────────────────────────── */
+.map-side { display: flex; flex-direction: column; gap: 10px; }
+.scout-objectives { display: flex; flex-direction: column; gap: 6px; }
+.so-btn {
+  background: var(--bg2); border: 1px solid var(--border2); color: var(--dim);
+  padding: 8px 10px; cursor: pointer; font-family: var(--font);
+  display: grid; grid-template-columns: auto 1fr; column-gap: 10px;
+  align-items: center; text-align: left;
+  transition: background .15s, border-color .15s;
+}
+.so-btn:hover { background: #181818; }
+.so-btn.sel   { background: #0e0e0e; }
+.so-icon  { font-size: 1.2rem; grid-row: span 2; }
+.so-label { font-size: .82rem; font-weight: bold; letter-spacing: .04em; }
+.so-desc  { font-size: .68rem; color: var(--dim); grid-column: 2; }
+
+.map-hint {
+  padding: 6px 10px; background: #06141a; border: 1px solid #1a3a4a;
+  color: #66bbcc; font-size: .76rem;
+}
+.map-legend { display: flex; flex-direction: column; gap: 3px; padding-top: 4px; border-top: 1px solid var(--border); }

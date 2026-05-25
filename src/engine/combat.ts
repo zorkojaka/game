@@ -6,7 +6,6 @@ import type { CombatResult, GameState, Assignment, AIPhase } from './types.js';
 import type { RNGState } from './rng.js';
 import { rngBool, rngInt } from './rng.js';
 import {
-  M_OS,
   COMBAT_BASE_HUMAN_MULTIPLIER,
   COMBAT_EQUIPMENT_MULTIPLIER,
   AI_ROBOT_STRENGTH,
@@ -15,17 +14,29 @@ import {
   PARTIAL_THRESHOLD,
   DEFEAT_THRESHOLD,
   AI_WEAK_POINT_EXPLOIT_BONUS,
+  RATIONS_LEVELS,
+  DEFAULT_RATIONS,
+  INTEL_COMBAT_BONUS_PER_100,
+  INTEL_COMBAT_BONUS_MAX,
 } from './constants.js';
 
 export function calcHumanStrength(
   assignment: Assignment,
   combatResources: number,
-  phase: AIPhase
+  _phase: AIPhase
 ): number {
-  const base = assignment.combatants * COMBAT_BASE_HUMAN_MULTIPLIER
-    + combatResources * COMBAT_EQUIPMENT_MULTIPLIER;
-  const mAxis = M_OS[phase][assignment.axis];
-  return base * mAxis;
+  // Obroki vplivajo na moč ljudi. M_os je odstranjen — bonusi pridejo iz intela in nadgradenj.
+  const tier = RATIONS_LEVELS[assignment.rations ?? DEFAULT_RATIONS] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
+  // Oprema: omejena s številom ljudi v boju
+  const equipUsed = Math.min(combatResources, assignment.combatants);
+  const base = assignment.combatants * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult
+    + equipUsed * COMBAT_EQUIPMENT_MULTIPLIER;
+  return base;
+}
+
+/** Intel bonus kot multiplikator: 1 + bonus */
+export function intelCombatMultiplier(intelligence: number): number {
+  return 1 + Math.min(INTEL_COMBAT_BONUS_MAX, INTEL_COMBAT_BONUS_PER_100 * (intelligence / 100));
 }
 
 export function calcAIStrength(
@@ -107,12 +118,13 @@ export function resolveCombat(
   rng: RNGState,
   exploitingWeakPoint: boolean = false
 ): { result: CombatResult; rng: RNGState } {
-  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase);
+  const intelMult = intelCombatMultiplier(state.resources.intelligence);
+  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase) * intelMult;
   const aiStr = calcAIStrength(state, state.phase);
   const weakBonus = exploitingWeakPoint ? AI_WEAK_POINT_EXPLOIT_BONUS : 0;
   const p = calcSuccessProbability(humanStr, aiStr, weakBonus);
 
-  const mAxis = M_OS[state.phase][assignment.axis];
+  const mAxis = 1.0;  // M_os ni več v bojni moči
   const outcome = determineOutcome(p);
   const aiRobotsEngaged = Math.floor(state.aiRobots * (1 - state.clanActivity) * 0.3);
 

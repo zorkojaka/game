@@ -70,6 +70,31 @@ export const CLAN_ACTIVITY_BY_PHASE: Record<AIPhase, number> = {
 export const CLAN_ACTIVITY_EXPOSURE_MODIFIER = 0.004; // per round, aktiven → počasnejši padec
 export const CLAN_ACTIVITY_HIDDEN_MODIFIER = 0.008;   // per round, skrit → hitrejši padec
 
+// ─── Obroki / rations (1–5) ──────────────────────────────────────────────────
+// Učinkuje na: porabo hrane (foodMult), spremembo populacije (pop±) in moč ljudi (strengthMult).
+// Moč multiplicira donos foragerjev, izvidnikov in bojno moč combatantov.
+export interface RationsTier {
+  foodMult: number;     // multiplikator na porabo hrane na osebo
+  popMin: number;       // minimalna sprememba populacije (lahko negativna)
+  popMax: number;       // maksimalna sprememba populacije
+  strengthMult: number; // koliko efektivneje delajo (donos × ta vrednost)
+  label: string;
+  emoji: string;
+}
+export const RATIONS_LEVELS: Record<number, RationsTier> = {
+  1: { foodMult: 0.50, popMin: -5, popMax: -3, strengthMult: 0.55, label: 'Lakota',   emoji: '💀' },
+  2: { foodMult: 0.75, popMin: -2, popMax: -1, strengthMult: 0.80, label: 'Skopo',    emoji: '🥄' },
+  3: { foodMult: 1.00, popMin:  0, popMax:  0, strengthMult: 1.00, label: 'Normalno', emoji: '🍽' },
+  4: { foodMult: 2.50, popMin:  1, popMax:  3, strengthMult: 1.30, label: 'Dobro',    emoji: '🍞' },
+  5: { foodMult: 5.00, popMin:  3, popMax:  6, strengthMult: 1.60, label: 'Obilje',   emoji: '🥩' },
+};
+
+// Stopnjevana lakota: če hrana pade pod 0 dva meseca zapored, izgube se podvojijo
+export const STARVATION_LOSS_PCT_1ST = 0.25;  // 25 % populacije prvi mesec
+export const STARVATION_LOSS_PCT_2ND = 0.50;  // 50 % drugi mesec
+export const STARVATION_LOSS_PCT_NTH = 0.75;  // 75 % vsak nadaljnji
+export const DEFAULT_RATIONS = 3;
+
 // ─── Fog of war — stroški odkrivanja ─────────────────────────────────────────
 export const INTEL_TO_PARTIAL = 30;   // intel potreben za partial visibility
 export const INTEL_TO_REVEALED = 80;  // intel potreben za revealed visibility
@@ -86,3 +111,58 @@ export const PREPARED_DAMAGE_REDUCTION = 0.4; // 40 % manj škode
 
 // ─── AI šibke točke ───────────────────────────────────────────────────────────
 export const AI_WEAK_POINT_EXPLOIT_BONUS = 0.25; // +25 % k P(uspeh) pri izkoriščanju šibke točke
+
+// ─── Misije proti šibkim točkam (specializirane odprave) ────────────────────
+// Vsaka misija traja nekaj mesecev; vsak mesec obstaja možnost srečanja z AI
+export const MISSION_DURATION_MONTHS: Record<string, number> = {
+  wp_power: 4,
+  wp_comm:  5,
+  wp_core:  6,
+};
+// Bazna verjetnost srečanja na mesec; več ljudi v misiji = bolj vidni
+export const MISSION_ENCOUNTER_BASE         = 0.08;  // 8 %
+export const MISSION_ENCOUNTER_PER_PERSON   = 0.012; // +1.2 % na vsako osebo nad 5
+export const MISSION_ENCOUNTER_AI_KNOW      = 0.10;  // +do 10 % če AI ve veliko
+// Faktor moči odprave: kvadratni koren ljudi × moč/oprema
+export const MISSION_MIN_TEAM = 3;
+// Pri končnem rolu uspeha: P = teamPower / (teamPower + wpDifficulty)
+export const MISSION_WP_DIFFICULTY: Record<string, number> = {
+  wp_power: 70,
+  wp_comm:  90,
+  wp_core:  120,
+};
+
+// ─── Intel kot koeficient k vsem bojem ─────────────────────────────────────
+// Bonus na vse P(zmaga): +5 % na vsakih 100 intela (do max 25 %)
+export const INTEL_COMBAT_BONUS_PER_100  = 0.05;
+export const INTEL_COMBAT_BONUS_MAX      = 0.25;
+
+// ─── Orožje ────────────────────────────────────────────────────────────────
+// Smrt v napadu/obrambi → izguba orožja (1 orožje na 1 padlega)
+// Neuporabljeno orožje ob napadu na kamp → uničenje 20–80 %
+export const WEAPON_DESTROY_MIN_PCT = 0.20;
+export const WEAPON_DESTROY_MAX_PCT = 0.80;
+
+// ─── AI napad na kamp (raid) ─────────────────────────────────────────────────
+// P(raid) = base + popScaling * popFactor + aiKnowBonus * aiKnow
+// modificirano z osjo (hiding -50 %) in klansko aktivnostjo (drugi klani odvračajo)
+export const RAID_BASE_CHANCE          = 0.05;  // 5 % minimum
+export const RAID_POP_SCALING_MAX      = 0.20;  // +do 20 % glede na velikost
+export const RAID_POP_REFERENCE        = 100;   // pop za max scaling
+export const RAID_AI_KNOWLEDGE_BONUS   = 0.15;  // +do 15 % če AI ve veliko
+export const RAID_HIDING_REDUCTION     = 0.50;  // hiding os razpolovi verjetnost
+export const RAID_CLAN_ABSORPTION      = 0.50;  // do 50 % bremena prevzamejo drugi klani
+export const RAID_AI_FORCE_PCT         = 0.50;  // 50 % efektivne AI sile sodeluje pri raidu (5× težje)
+export const DEFENDER_EQUIPMENT_MULT   = 0.40;  // obrambno orožje učinkuje manj kot ofenzivno
+
+// ─── Izvidniške misije — uspeh in ujetje ─────────────────────────────────────
+export const SCOUT_BASE_SUCCESS        = 0.80;  // 80 % baza
+export const SCOUT_INTEL_BONUS_PER_100 = 0.10;  // +10 % uspeha na 100 intela
+export const SCOUT_ESPIONAGE_BONUS     = 0.10;  // +10 % če os = espionage
+export const SCOUT_CAPTURE_BASE        = 0.05;  // 5 % bazna verjetnost ujetja
+export const SCOUT_CAPTURE_PER_SCOUT   = 0.004; // +0.4 % za vsakega scoutsa (več → bolj vidni)
+export const SCOUT_HIDING_REDUCTION    = 0.50;  // hiding os razpolovi verjetnost ujetja
+export const SCOUT_AI_KNOWLEDGE_BONUS  = 0.20;  // +do 20 % ujetja če AI ve veliko
+export const SCOUT_PARTIAL_EFFECTIVE   = 0.60;  // če misija delno spodleti, donos × 0.6
+export const SCOUT_CAPTURED_LOSS_MIN   = 0.20;  // pri ujetju izgubimo 20–50 % izvidnikov
+export const SCOUT_CAPTURED_LOSS_MAX   = 0.50;

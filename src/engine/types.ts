@@ -39,11 +39,76 @@ export interface Resources {
 
 // ─── Assignment — kako razporediš populacijo ta mesec ─────────────────────────
 
+// ─── Heksa mapa ──────────────────────────────────────────────────────────────
+// Pointy-top heks, axial koordinate (q, r)
+export interface HexTile {
+  q: number;
+  r: number;
+  visibility: Visibility;
+  fogDensity: number;          // 0–1, raste proti AI jedru
+  distanceToCore: number;
+  isClanCamp: boolean;
+  isAICore: boolean;
+  hidesWeakPointId?: string;
+}
+
+export type ScoutObjective = 'map' | 'ai_robots' | 'ai_weakpoints';
+
+export interface ScoutPlan {
+  objective: ScoutObjective;
+  targetTileIds?: string[];    // če objective='map'
+}
+
+export function tileId(t: { q: number; r: number }): string {
+  return `${t.q},${t.r}`;
+}
+
 export interface Assignment {
-  axis: HumanAxis;          // kateri osi daš fokus
-  combatants: number;       // koliko jih pošlješ v spopad/akcijo
-  foragers: number;         // iščejo preživetvene vire
-  scouts: number;           // špijonaža / research (info vir)
+  // Os ni več izbira na rundo — izhaja iz nadgradenj v Človekovem drevesu
+  axis: HumanAxis;          // ohrani za backward compat; izvedeno iz humanFocus
+  combatants: number;       // NAPAD: gredo udariti AI
+  dayGuard: number;         // OBRAMBA — dnevna straža
+  nightGuard: number;       // OBRAMBA — nočna straža
+  foragers: number;         // iščejo preživetvene vire (v kampu)
+  scouts: number;           // špijonaža / research (na terenu)
+  rations: number;          // 1–5
+  // Razporeditev v misije (po WP id-ju)
+  missionAssignments?: Record<string, number>;
+  // Obroki za ekipe na misijah (po WP id-ju, 1–5)
+  missionRations?: Record<string, number>;
+  // Kam gredo izvidniki (default = ai_weakpoints za backward compat)
+  scoutPlan?: ScoutPlan;
+}
+
+export interface Mission {
+  weakPointId: string;
+  assigned: number;            // ljudje vključeni
+  monthsTotal: number;         // koliko mesecev traja
+  monthsRemaining: number;     // do konca
+  successProbability: number;  // izračunana ob startu (informativno)
+  rations: number;             // 1–5 obroki ekipe (vpliva na moč in stroške)
+  status: 'in_progress' | 'success' | 'failed' | 'aborted';
+  resultNarrative?: string;
+}
+
+// Izid AI napada na kamp
+export interface RaidResult {
+  occurred: boolean;
+  outcome: 'victory' | 'partial' | 'defeat' | 'annihilation' | null;
+  timeOfDay: 'day' | 'night' | null;   // dnevni ali nočni napad
+  defendersLost: number;                 // straža, ki je bila buden
+  sleepersLost: number;                  // straža, ki je spala (delna škoda + foragerji)
+  foragersLost: number;
+  aiRobotsDestroyed: number;
+  weaponsDestroyed: number;              // če orožje ni v rabi
+  successProbability: number;
+}
+
+// Izid izvidniške misije
+export interface ScoutResult {
+  captured: boolean;          // ali jih je AI ujel
+  scoutsLost: number;
+  effectivenessMult: number;  // koliko intela/megle so prinesli (1.0 polno, 0.5 polovičen ipd.)
 }
 
 // ─── Combat result ────────────────────────────────────────────────────────────
@@ -95,6 +160,20 @@ export interface GameState {
   // Drugi klani (abstraktirano)
   clanActivity: number; // [0,1] — davek na AI silo
 
+  // Človekova zgodovina osi — koliko rund je bila izbrana vsaka os
+  // Določa odklenjene noduse v Človekovem drevesu napredka
+  axisHistory: Record<HumanAxis, number>;
+
+  // Aktivne misije proti AI šibkim točkam (timer odprave)
+  activeMissions: Mission[];
+  completedMissions: Mission[];
+
+  // Stopnjevana lakota — koliko zaporednih mesecev je hrana padla pod 0
+  consecutiveStarvationMonths: number;
+
+  // Heksa mapa
+  mapTiles: HexTile[];
+
   // RNG (determinizem)
   rngSeed: number;
   rngCallCount: number;
@@ -112,6 +191,8 @@ export interface RoundLog {
   phase: AIPhase;
   assignment: Assignment;
   combat: CombatResult | null;
+  raid: RaidResult | null;
+  scout: ScoutResult | null;
   resourceDelta: Partial<Resources>;
   populationDelta: number;
   clanActivityDelta: number;

@@ -25,11 +25,68 @@ export interface Resources {
   intelligence: number;
 }
 
+export interface HexTile {
+  q: number;
+  r: number;
+  visibility: Visibility;
+  fogDensity: number;
+  distanceToCore: number;
+  isClanCamp: boolean;
+  isAICore: boolean;
+  hidesWeakPointId?: string;
+}
+
+export type ScoutObjective = 'map' | 'ai_robots' | 'ai_weakpoints';
+
+export interface ScoutPlan {
+  objective: ScoutObjective;
+  targetTileIds?: string[];
+}
+
+export function tileId(t: { q: number; r: number }): string {
+  return `${t.q},${t.r}`;
+}
+
 export interface Assignment {
   axis: HumanAxis;
   combatants: number;
+  dayGuard: number;
+  nightGuard: number;
   foragers: number;
   scouts: number;
+  rations: number;
+  missionAssignments?: Record<string, number>;
+  missionRations?: Record<string, number>;
+  scoutPlan?: ScoutPlan;
+}
+
+export interface Mission {
+  weakPointId: string;
+  assigned: number;
+  monthsTotal: number;
+  monthsRemaining: number;
+  successProbability: number;
+  rations: number;
+  status: 'in_progress' | 'success' | 'failed' | 'aborted';
+  resultNarrative?: string;
+}
+
+export interface RaidResult {
+  occurred: boolean;
+  outcome: 'victory' | 'partial' | 'defeat' | 'annihilation' | null;
+  timeOfDay: 'day' | 'night' | null;
+  defendersLost: number;
+  sleepersLost: number;
+  foragersLost: number;
+  aiRobotsDestroyed: number;
+  weaponsDestroyed: number;
+  successProbability: number;
+}
+
+export interface ScoutResult {
+  captured: boolean;
+  scoutsLost: number;
+  effectivenessMult: number;
 }
 
 export interface CombatResult {
@@ -43,19 +100,6 @@ export interface CombatResult {
   spoils: Partial<Resources>;
   aiInfoGained: number;
   infoGained: number;
-}
-
-export interface RoundLog {
-  round: number;
-  phase: AIPhase;
-  assignment: Assignment;
-  combat: CombatResult | null;
-  resourceDelta: Partial<Resources>;
-  populationDelta: number;
-  clanActivityDelta: number;
-  aiKnowledgeDelta: number;
-  revealedNodes: string[];
-  narrative: string;
 }
 
 export interface GameState {
@@ -72,6 +116,11 @@ export interface GameState {
   aiTree: AITreeNode[];
   aiWeakPoints: AIWeakPoint[];
   clanActivity: number;
+  axisHistory: Record<HumanAxis, number>;
+  activeMissions: Mission[];
+  completedMissions: Mission[];
+  consecutiveStarvationMonths: number;
+  mapTiles: HexTile[];
   rngSeed: number;
   status: 'active' | 'victory' | 'defeat_extinction' | 'defeat_overwhelmed';
   lastRoundLog: RoundLog | null;
@@ -82,4 +131,27 @@ export interface OddsPreview {
   mAxisModifier: number;
   humanStrength: number;
   aiStrength: number;
+  raidProbability: number;
+  raidRepelProbability: number;
+  scoutSuccessProbability: number;
+  scoutCaptureProbability: number;
+  forageSafetyProbability: number;
+  intelBonus: number;               // koeficient iz intela [0–MAX]
+  weaponCap: number;                // max ljudi v boju (= orožje)
+  missionPreviews: Record<string, { successProbability: number; encounterPerMonth: number; monthsTotal: number }>;
+}
+
+export interface RoundLog {
+  round: number;
+  phase: AIPhase;
+  assignment: Assignment;
+  combat: CombatResult | null;
+  raid: RaidResult | null;
+  scout: ScoutResult | null;
+  resourceDelta: Partial<Resources>;
+  populationDelta: number;
+  clanActivityDelta: number;
+  aiKnowledgeDelta: number;
+  revealedNodes: string[];
+  narrative: string;
 }
