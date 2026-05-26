@@ -1936,10 +1936,15 @@ export default function App() {
           <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
             onPathClick={handlePathClick} expeditions={game.expeditions ?? []}
             wps={game.aiWeakPoints} drawingMode={scoutObj === 'map'} />
-          <div className="map-legend dim small" style={{ marginTop: 8 }}>
-            <span style={{ color: '#66ccaa' }}>⌂</span> klan · <span style={{ color: '#cc3333' }}>☣</span> AI jedro ·
-            <span style={{ color: '#cc8800' }}> ◆</span> šibka točka · <span style={{ color: '#3377cc' }}> ●</span> aktivna odprava ·
-            rdeč = neraziskan · moder = raziskan · sij = domač
+          <div className="map-legend">
+            <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
+            <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
+            <span className="ml-item"><span style={{ color: '#cc8800' }}>◆</span> šibka točka</span>
+            <span className="ml-item"><span style={{ color: '#3377cc' }}>●</span> aktivna odprava</span>
+            <span className="ml-sep">·</span>
+            <span className="ml-item" style={{ color: '#7a3a3a' }}>rdeč = neraziskan</span>
+            <span className="ml-item" style={{ color: '#5a8a9c' }}>moder = raziskan</span>
+            <span className="ml-item" style={{ color: '#5aa0e0' }}>sij = domač</span>
           </div>
         </div>
         <EventLog entries={eventLog} />
