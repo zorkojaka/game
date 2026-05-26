@@ -505,7 +505,7 @@ function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsCha
           <div key={wp.id} className={`wp-card mission-card ${cls} ${isTargeted ? 'targeted' : ''}`}>
             <div className="wp-icon">{icon}</div>
             <div className="wp-body">
-              {isTargeted && <span className="wp-target-badge">🎯 IZBRANO ZA NAPAD</span>
+              {isTargeted && <span className="wp-target-badge">🎯 IZBRANO ZA NAPAD</span>}
               <div className="wp-name">{name}</div>
               {wp.exploited && <span className="wp-done-tag">UNIČENO</span>}
               {activeM && (
