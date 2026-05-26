@@ -679,16 +679,23 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
         {roles.map((r, ri) => {
           const freeIdx = roles.findIndex(x => x.key === '_');
           const isFree = r.key === '_';
-          const canPlus  = !isFree && (freeIdx >= 0 ? roles[freeIdx].count > 0 : false);
+          const otherTotal = roles.reduce((s, x, i) => s + (i === ri ? 0 : x.count), 0);
+          // Plus: navadna vloga vzame iz Prosti; Prosti vzame iz drugih proporcionalno
+          const canPlus  = isFree ? otherTotal > 0 : (freeIdx >= 0 ? roles[freeIdx].count > 0 : false);
           const canMinus = r.count > 0;
           const step = (delta: number) => {
-            const nc = roles.map(x => x.count);
-            if (delta > 0 && canPlus) {
-              nc[ri] += 1;
-              nc[freeIdx] -= 1;
-            } else if (delta < 0 && canMinus) {
-              nc[ri] -= 1;
-              if (freeIdx >= 0) nc[freeIdx] += 1;
+            let nc = roles.map(x => x.count);
+            if (isFree) {
+              // Prosti: uporabi proporcionalno prerazporeditev
+              nc = applyProportional(nc, ri, delta);
+            } else {
+              if (delta > 0 && canPlus) {
+                nc[ri] += 1;
+                nc[freeIdx] -= 1;
+              } else if (delta < 0 && canMinus) {
+                nc[ri] -= 1;
+                if (freeIdx >= 0) nc[freeIdx] += 1;
+              }
             }
             onTransfer(nc);
           };
@@ -697,13 +704,9 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
               <div className="pa-label-head">
                 <span>{r.icon} <b style={{ color: r.color }}>{r.label}</b></span>
                 <span className="pa-pm">
-                  {!isFree && (
-                    <button className="pa-btn" disabled={!canMinus} onClick={() => step(-1)}>−</button>
-                  )}
+                  <button className="pa-btn" disabled={!canMinus} onClick={() => step(-1)}>−</button>
                   <b className="pa-count">{r.count}</b>
-                  {!isFree && (
-                    <button className="pa-btn" disabled={!canPlus} onClick={() => step(+1)}>+</button>
-                  )}
+                  <button className="pa-btn" disabled={!canPlus} onClick={() => step(+1)}>+</button>
                 </span>
               </div>
               {r.yieldText && <span className="pa-yield dim small">{r.yieldText}</span>}
