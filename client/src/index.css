@@ -1268,3 +1268,33 @@ input[type=range]::-moz-range-thumb {
 }
 .map-legend > div, .map-legend > span { display: inline-flex; align-items: center; gap: 3px; }
 .map-legend::-webkit-scrollbar { height: 4px; }
+
+/* ─── Allocator: fiksni stolpci v vseh treh vrsticah ────────────────────── */
+.pa-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+.pa-context-row, .pa-labels, .pa-bar { /* override flex from earlier */
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+.pa-labels { gap: 4px; }
+.pa-bar    { gap: 4px; position: relative; }
+
+.pa-label {
+  /* odstrani flex iz starega */
+  flex: unset !important;
+  padding: 6px 10px;
+  display: flex; flex-direction: column; gap: 2px;
+  border-top: 2px solid; border-color: inherit;
+  min-width: 0;
+}
+.pa-seg {
+  /* odstrani flex iz starega */
+  flex: unset !important;
+  min-width: 0;
+}
+
+/* Handles imajo zdaj fiksne pozicije (20/40/60/80 %) */
+.pa-handle { z-index: 6; }

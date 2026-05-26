@@ -639,9 +639,6 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
     setDrag(null);
   }
 
-  // Skupna populacija za prikaz = available (vključen "prosti" segment v vsoti)
-  const total = Math.max(1, available);
-
   return (
     <div className="people-allocator">
       {/* Konteksten control nad vsako vlogo (5 enakih stolpcev) */}
@@ -672,7 +669,7 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
             onTransfer(nc);
           };
           return (
-            <div key={r.key} className="pa-label" style={{ flex: Math.max(0.6, r.count / total), color: r.color }}>
+            <div key={r.key} className="pa-label" style={{ color: r.color }}>
               <div className="pa-label-head">
                 <span>{r.icon} <b style={{ color: r.color }}>{r.label}</b></span>
                 <span className="pa-pm">
@@ -698,11 +695,11 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
         })}
       </div>
 
-      {/* Glavna razdelilna palica z ljudmi */}
+      {/* Glavna razdelilna palica z ljudmi — fiksne enake širine stolpcev */}
       <div className="pa-bar" ref={barRef}>
-        {roles.map((r, i) => (
+        {roles.map((r) => (
           <div key={r.key} className={`pa-seg pa-${r.key}`}
-            style={{ flex: Math.max(0.6, r.count / total), background: r.color + '14', borderTopColor: r.color }}>
+            style={{ background: r.color + '14', borderTopColor: r.color }}>
             <div className="pa-people">
               {Array.from({ length: r.count }, (_, idx) => (
                 <div key={idx} className="pa-person" style={{ background: r.color + '40', borderColor: r.color, color: r.color }}>
@@ -712,21 +709,18 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
             </div>
           </div>
         ))}
-        {/* Ročice na koncih posameznih segmentov (razen zadnjega "Prosti") */}
+        {/* Vlečne ročice na DESNEM robu vsakega segmenta (razen zadnjega).
+            Drag desno = vloga raste, levo = vloga upade. */}
         {roles.slice(0, -1).map((_, i) => {
-          // Position % = cumulative count up to and including role i / total
-          // Uskladi s flex (Math.max(0.6) floor)
-          const flexes = roles.map(r => Math.max(0.6, r.count / total));
-          const totalFlex = flexes.reduce((s, f) => s + f, 0);
-          const before = flexes.slice(0, i + 1).reduce((s, f) => s + f, 0);
-          const leftPct = before / totalFlex * 100;
+          const leftPct = ((i + 1) / roles.length) * 100;
           return (
             <div key={i} className={`pa-handle ${drag?.handleIdx === i ? 'dragging' : ''}`}
               style={{ left: `${leftPct}%` }}
               onPointerDown={e => startDrag(i, e)}
               onPointerMove={moveDrag}
               onPointerUp={endDrag}
-              onPointerCancel={endDrag}>
+              onPointerCancel={endDrag}
+              title={`Vleči desno: +${roles[i].label} · levo: −${roles[i].label}`}>
               <div className="pa-handle-bar" />
               <div className="pa-handle-grip">⇔</div>
             </div>
