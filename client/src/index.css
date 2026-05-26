@@ -1333,3 +1333,10 @@ input[type=range]::-moz-range-thumb {
 
 /* Razmik v resource-row da trend ne zlepi z meri */
 .resource-row .dual-knowledge { gap: 10px; }
+
+/* ─── ResourceRow: trend na sredini ─────────────────────────────────────── */
+.resource-row > .bt-compact {
+  flex: 1; min-width: 80px; max-width: 280px;
+  padding: 0 6px;
+  align-self: center;
+}

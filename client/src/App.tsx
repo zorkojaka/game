@@ -88,8 +88,8 @@ function ResStat({ icon, label, value, color }: { icon: string; label: string; v
   return <BigStat icon={icon} label={label} value={value} color={color ?? '#88aacc'} />;
 }
 
-/** Dvojni meter znanja — naše vs AI z trendnim grafom vmes */
-function DualKnowledge({ ourK, aiK, entries }: { ourK: number; aiK: number; entries?: EventEntry[] }) {
+/** Dvojni meter znanja — naše vs AI */
+function DualKnowledge({ ourK, aiK }: { ourK: number; aiK: number }) {
   const ourColor = ourK >= 0.6 ? '#22cc88' : ourK >= 0.3 ? '#3377cc' : '#2a4a6a';
   const aiColor  = aiK  >= 0.7 ? '#cc2222' : aiK  >= 0.4 ? '#cc7700' : '#553333';
   return (
@@ -102,12 +102,7 @@ function DualKnowledge({ ourK, aiK, entries }: { ourK: number; aiK: number; entr
           <div className="dk-bar-fill" style={{ width: `${Math.round(ourK * 100)}%`, background: ourColor }} />
         </div>
       </div>
-      {/* Trendni graf premoči — vmes med meri */}
-      {entries && entries.length > 0 ? (
-        <CompactBalanceTrend entries={entries} />
-      ) : (
-        <div className="dk-divider">VS</div>
-      )}
+      <div className="dk-divider">VS</div>
       {/* AI znanje o nas */}
       <div className="dk-meter dk-meter-right">
         <div className="dk-label" style={{ color: aiColor }}>👁 AI VE</div>
@@ -147,7 +142,7 @@ function PhaseHeader({ game, onNewGame, loading }: { game: GameState; onNewGame:
   );
 }
 
-/** Resursna vrstica — sovražne info + dvojni meter znanja s trendom vmes */
+/** Resursna vrstica — sovražne info | trend premoči | dvojni meter znanja */
 function ResourceRow({ game, eventLog }: { game: GameState; eventLog: EventEntry[] }) {
   const ourK = calcOurKnowledge(game.aiTree);
   return (
@@ -157,7 +152,9 @@ function ResourceRow({ game, eventLog }: { game: GameState; eventLog: EventEntry
         <BigStat icon="🌍" label="Klani aktiv"  value={Math.round(game.clanActivity * 100)} color="#88aa66" unit="%" />
       </div>
       <div className="res-divider" />
-      <DualKnowledge ourK={ourK} aiK={game.aiKnowledge} entries={eventLog} />
+      <CompactBalanceTrend entries={eventLog} />
+      <div className="res-divider" />
+      <DualKnowledge ourK={ourK} aiK={game.aiKnowledge} />
     </div>
   );
 }
