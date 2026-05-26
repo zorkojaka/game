@@ -1298,37 +1298,6 @@ function HexMap({ tiles, draftPath, onPathClick, expeditions, wps, drawingMode }
           </pattern>
         </defs>
 
-        {/* Aktivne odprave: prepotovana pot (polna) + preostala pot (črtkana) */}
-        {expeditions.filter(e => e.status === 'traveling').map(e => {
-          const color = e.kind === 'mission' ? '#cc8800' : '#22ccff';
-          return (
-            <g key={`path_${e.id}`} className="path-lines">
-              {e.path.slice(0, -1).map((s, i) => {
-                const a = shift(hexToPixel(s.q, s.r, SIZE));
-                const b = shift(hexToPixel(e.path[i + 1].q, e.path[i + 1].r, SIZE));
-                const isDone = i < e.currentIndex;
-                return (
-                  <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                    stroke={color}
-                    strokeWidth={isDone ? 2.2 : 1.6}
-                    strokeOpacity={isDone ? 0.85 : 0.55}
-                    strokeDasharray={isDone ? undefined : '3 2'} />
-                );
-              })}
-            </g>
-          );
-        })}
-
-        {/* Draft path (igralec gradi novo odpravo) */}
-        {draftPath.length > 1 && (
-          <g className="path-lines">
-            {draftPath.slice(0, -1).map((s, i) => {
-              const a = shift(hexToPixel(s.q, s.r, SIZE));
-              const b = shift(hexToPixel(draftPath[i + 1].q, draftPath[i + 1].r, SIZE));
-              return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#22ccff" strokeWidth="2.4" strokeDasharray="4 3" />;
-            })}
-          </g>
-        )}
 
         {tiles.map(t => {
           const id = tileId(t);
@@ -1398,6 +1367,50 @@ function HexMap({ tiles, draftPath, onPathClick, expeditions, wps, drawingMode }
             </g>
           );
         })}
+
+        {/* Aktivne odprave: prepotovana pot (polna) + preostala pot (črtkana) */}
+        {expeditions.filter(e => e.status === 'traveling').map(e => {
+          const color = e.kind === 'mission' ? '#cc8800' : '#22ccff';
+          return (
+            <g key={`path_${e.id}`} className="path-lines" pointerEvents="none">
+              {e.path.slice(0, -1).map((s, i) => {
+                const a = shift(hexToPixel(s.q, s.r, SIZE));
+                const b = shift(hexToPixel(e.path[i + 1].q, e.path[i + 1].r, SIZE));
+                const isDone = i < e.currentIndex;
+                return (
+                  <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                    stroke={color}
+                    strokeWidth={isDone ? 3 : 2.2}
+                    strokeOpacity={isDone ? 1 : 0.7}
+                    strokeDasharray={isDone ? undefined : '4 3'} />
+                );
+              })}
+              {/* Označi cilj odprave */}
+              {e.path.length > 0 && (() => {
+                const t = e.path[e.path.length - 1];
+                const p = shift(hexToPixel(t.q, t.r, SIZE));
+                return (
+                  <g>
+                    <circle cx={p.x} cy={p.y - SIZE * 0.15} r="5" fill="none" stroke={color} strokeWidth="1.8" />
+                    <circle cx={p.x} cy={p.y - SIZE * 0.15} r="2" fill={color} />
+                  </g>
+                );
+              })()}
+            </g>
+          );
+        })}
+
+        {/* Draft path (igralec gradi novo odpravo) — NAD tile fillom */}
+        {draftPath.length > 1 && (
+          <g className="path-lines" pointerEvents="none">
+            {draftPath.slice(0, -1).map((s, i) => {
+              const a = shift(hexToPixel(s.q, s.r, SIZE));
+              const b = shift(hexToPixel(draftPath[i + 1].q, draftPath[i + 1].r, SIZE));
+              return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                stroke="#22ccff" strokeWidth="2.6" strokeDasharray="4 3" />;
+            })}
+          </g>
+        )}
 
         {/* Aktivne odprave kot ikone — hover + klik za info */}
         {expPositions.map(({ exp, tile }) => {
