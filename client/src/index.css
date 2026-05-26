@@ -1415,3 +1415,22 @@ input[type=range]::-moz-range-thumb {
 }
 .map-legend::-webkit-scrollbar { height: 3px; }
 .map-legend::-webkit-scrollbar-thumb { background: #2a2a2a; }
+
+/* ─── Map: izbrana šibka točka (klik na heks) ──────────────────────────── */
+.hex-tile.wp-selected path:first-child {
+  filter: drop-shadow(0 0 6px #ffd84a);
+}
+
+/* ─── Mission card: izbrana tarča ─────────────────────────────────────── */
+.wp-card.mission-card.targeted {
+  background: #1a1500;
+  border-left: 3px solid #ffd84a;
+  box-shadow: 0 0 12px rgba(255,216,74,.25);
+}
+.wp-target-badge {
+  display: inline-block; padding: 2px 8px;
+  background: #ffd84a; color: #000;
+  font-size: .62rem; font-weight: bold;
+  letter-spacing: .08em;
+  margin-bottom: 4px;
+}

@@ -468,7 +468,7 @@ function MissionRationsButtons({ value, onChange }: { value: number; onChange: (
 }
 
 /** Misije proti šibkim točkam AI */
-function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsChange, odds, availablePop }: {
+function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsChange, odds, availablePop, selectedWpId }: {
   wps: AIWeakPoint[]; aiTree: AITreeNode[];
   active: Mission[];
   plan: Record<string, number>;
@@ -477,6 +477,7 @@ function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsCha
   onRationsChange: (id: string, lvl: number) => void;
   odds: OddsPreview | null;
   availablePop: number;
+  selectedWpId?: string;
 }) {
   return (
     <div className="panel">
@@ -499,10 +500,12 @@ function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsCha
         const ppl = activeM?.assigned ?? planned;
         const foodCostMonth = Math.round(ppl * rTierM.foodMult);
 
+        const isTargeted = selectedWpId === wp.id;
         return (
-          <div key={wp.id} className={`wp-card mission-card ${cls}`}>
+          <div key={wp.id} className={`wp-card mission-card ${cls} ${isTargeted ? 'targeted' : ''}`}>
             <div className="wp-icon">{icon}</div>
             <div className="wp-body">
+              {isTargeted && <span className="wp-target-badge">🎯 IZBRANO ZA NAPAD</span>
               <div className="wp-name">{name}</div>
               {wp.exploited && <span className="wp-done-tag">UNIČENO</span>}
               {activeM && (
@@ -1256,10 +1259,12 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, onPathClick, expeditions, wps, drawingMode }: {
+function HexMap({ tiles, draftPath, onPathClick, onWpSelect, selectedWpId, expeditions, wps, drawingMode }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   onPathClick: (tile: { q: number; r: number }) => void;
+  onWpSelect: (wpId: string) => void;
+  selectedWpId: string;
   expeditions: Expedition[];
   wps: AIWeakPoint[];
   drawingMode: boolean;
@@ -1330,24 +1335,40 @@ function HexMap({ tiles, draftPath, onPathClick, expeditions, wps, drawingMode }
           if (isInDraft) stroke = '#22ccff';
 
           const canClickDraw = drawingMode && !t.isClanCamp && (
-            // Lahko klikneš heks, ki je sosednji zadnjemu v poti
             (lastStep && areNeighbors(lastStep, t)) ||
-            // Ali odznačiš heks v poti (klik na zadnjega)
             isLast
           );
+          const canSelectWp = wpVisible && wp && !wp.exploited && !canClickDraw;
+          const isWpSelected = wp && wp.id === selectedWpId;
+          if (isWpSelected) stroke = '#ffd84a';
+
+          const handleClick = canClickDraw
+            ? () => onPathClick({ q: t.q, r: t.r })
+            : canSelectWp
+              ? () => onWpSelect(wp!.id)
+              : undefined;
 
           return (
             <g key={id}
-               className={`hex-tile ${canClickDraw ? 'clickable' : ''} ${isInDraft ? 'in-draft' : ''}`}
-               onClick={canClickDraw ? () => onPathClick({ q: t.q, r: t.r }) : undefined}>
+               className={`hex-tile ${(canClickDraw || canSelectWp) ? 'clickable' : ''} ${isInDraft ? 'in-draft' : ''} ${isWpSelected ? 'wp-selected' : ''}`}
+               onClick={handleClick}>
               <path d={hexPath(p.x, p.y, SIZE)} fill={fill} stroke={stroke}
-                strokeWidth={isInDraft ? 2.5 : 1} />
+                strokeWidth={isInDraft || isWpSelected ? 2.5 : 1} />
               {label && (
                 <text x={p.x} y={p.y + 4} textAnchor="middle"
                   fontSize={t.isClanCamp || t.isAICore || wpVisible ? 22 : 18}
                   fill={labelColor} fontFamily="'Courier New', monospace"
                   fontWeight={t.isClanCamp || t.isAICore || wpVisible ? 'bold' : 'normal'}>
                   {label}
+                </text>
+              )}
+              {/* WP ime pod diamond ikono — ko je razkrita */}
+              {wpVisible && wp && (
+                <text x={p.x} y={p.y + SIZE * 0.55} textAnchor="middle"
+                  fontSize="7.5" fill={isWpSelected ? '#ffd84a' : '#cc8800'}
+                  fontFamily="'Courier New', monospace" fontWeight="bold"
+                  style={{ pointerEvents: 'none' }}>
+                  {wp.label.split(' ').slice(0, 2).join(' ').slice(0, 14)}
                 </text>
               )}
               {/* Progress overlay: za delno raziskane prikaže koliko je raziskano */}
@@ -1366,6 +1387,18 @@ function HexMap({ tiles, draftPath, onPathClick, expeditions, wps, drawingMode }
                   fontSize="10" fill="#000" fontWeight="bold" fontFamily="'Courier New', monospace">
                   {draftIdx(t)}
                 </text>
+              )}
+              {/* CILJ oznaka, če je wp izbran */}
+              {isWpSelected && (
+                <g style={{ pointerEvents: 'none' }}>
+                  <circle cx={p.x} cy={p.y - SIZE * 0.6} r="6" fill="#ffd84a">
+                    <animate attributeName="opacity" values="1;0.4;1" dur="1s" repeatCount="indefinite" />
+                  </circle>
+                  <text x={p.x} y={p.y - SIZE * 0.6 + 3} textAnchor="middle"
+                    fontSize="8" fill="#000" fontWeight="bold" fontFamily="'Courier New', monospace">
+                    !
+                  </text>
+                </g>
               )}
             </g>
           );
@@ -1971,7 +2004,10 @@ export default function App() {
             </span>
           </div>
           <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
-            onPathClick={handlePathClick} expeditions={game.expeditions ?? []}
+            onPathClick={handlePathClick}
+            onWpSelect={(id) => setTargetWP(targetWP === id ? '' : id)}
+            selectedWpId={targetWP}
+            expeditions={game.expeditions ?? []}
             wps={game.aiWeakPoints} drawingMode={scoutObj === 'map'} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
@@ -2162,7 +2198,7 @@ export default function App() {
         <Missions wps={game.aiWeakPoints} aiTree={game.aiTree}
           active={game.activeMissions ?? []} plan={missions} planR={missionR}
           onPlanChange={setMissionAssignment} onRationsChange={setMissionRations}
-          odds={odds} availablePop={availablePop} />
+          odds={odds} availablePop={availablePop} selectedWpId={targetWP} />
       </div>
     </div>
   );
