@@ -1298,3 +1298,19 @@ input[type=range]::-moz-range-thumb {
 
 /* Handles imajo zdaj fiksne pozicije (20/40/60/80 %) */
 .pa-handle { z-index: 6; }
+
+/* ─── Popravek: scout objectives compact = stolpec (gumbi v 3-col gridu, razlaga pod) ── */
+.scout-objectives.compact {
+  display: flex !important;
+  flex-direction: column;
+  gap: 2px;
+  grid-template-columns: none;
+}
+.scout-objectives.compact .so-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+}
+.scout-objectives.compact .so-desc-line {
+  width: 100%;
+}
