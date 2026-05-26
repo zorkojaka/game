@@ -1314,3 +1314,22 @@ input[type=range]::-moz-range-thumb {
 .scout-objectives.compact .so-desc-line {
   width: 100%;
 }
+
+/* ─── CompactBalanceTrend — inline med dvema meterjema znanja ──────────── */
+.bt-compact {
+  display: flex; flex-direction: column;
+  min-width: 100px; max-width: 200px; flex: 1;
+  padding: 0 6px;
+}
+.bt-compact-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: .55rem; letter-spacing: .08em;
+  color: var(--dim);
+  line-height: 1.1;
+}
+.bt-compact-title { text-transform: uppercase; }
+.bt-compact-delta { font-size: .78rem; font-weight: bold; }
+.bt-compact-svg { width: 100%; height: 30px; display: block; margin-top: 2px; }
+
+/* Razmik v resource-row da trend ne zlepi z meri */
+.resource-row .dual-knowledge { gap: 10px; }

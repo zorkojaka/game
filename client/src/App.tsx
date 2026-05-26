@@ -88,22 +88,26 @@ function ResStat({ icon, label, value, color }: { icon: string; label: string; v
   return <BigStat icon={icon} label={label} value={value} color={color ?? '#88aacc'} />;
 }
 
-/** Dvojni meter znanja — naše vs AI */
-function DualKnowledge({ ourK, aiK }: { ourK: number; aiK: number }) {
+/** Dvojni meter znanja — naše vs AI z trendnim grafom vmes */
+function DualKnowledge({ ourK, aiK, entries }: { ourK: number; aiK: number; entries?: EventEntry[] }) {
   const ourColor = ourK >= 0.6 ? '#22cc88' : ourK >= 0.3 ? '#3377cc' : '#2a4a6a';
   const aiColor  = aiK  >= 0.7 ? '#cc2222' : aiK  >= 0.4 ? '#cc7700' : '#553333';
   return (
     <div className="dual-knowledge">
       {/* Naše znanje o AI */}
       <div className="dk-meter">
-        <div className="dk-label" style={{ color: ourColor }}>🔭 NAŠE</div>
+        <div className="dk-label" style={{ color: ourColor }}>🔭 LJUDJE VEMO</div>
         <div className="dk-val"   style={{ color: ourColor }}>{pct(ourK)}</div>
         <div className="dk-bar-track">
           <div className="dk-bar-fill" style={{ width: `${Math.round(ourK * 100)}%`, background: ourColor }} />
         </div>
       </div>
-      {/* Ločilo */}
-      <div className="dk-divider">VS</div>
+      {/* Trendni graf premoči — vmes med meri */}
+      {entries && entries.length > 0 ? (
+        <CompactBalanceTrend entries={entries} />
+      ) : (
+        <div className="dk-divider">VS</div>
+      )}
       {/* AI znanje o nas */}
       <div className="dk-meter dk-meter-right">
         <div className="dk-label" style={{ color: aiColor }}>👁 AI VE</div>
@@ -143,8 +147,8 @@ function PhaseHeader({ game, onNewGame, loading }: { game: GameState; onNewGame:
   );
 }
 
-/** Resursna vrstica — sovražne info + dvojni meter znanja (grafično, brez bar-ov) */
-function ResourceRow({ game }: { game: GameState }) {
+/** Resursna vrstica — sovražne info + dvojni meter znanja s trendom vmes */
+function ResourceRow({ game, eventLog }: { game: GameState; eventLog: EventEntry[] }) {
   const ourK = calcOurKnowledge(game.aiTree);
   return (
     <div className="resource-row">
@@ -153,7 +157,7 @@ function ResourceRow({ game }: { game: GameState }) {
         <BigStat icon="🌍" label="Klani aktiv"  value={Math.round(game.clanActivity * 100)} color="#88aa66" unit="%" />
       </div>
       <div className="res-divider" />
-      <DualKnowledge ourK={ourK} aiK={game.aiKnowledge} />
+      <DualKnowledge ourK={ourK} aiK={game.aiKnowledge} entries={eventLog} />
     </div>
   );
 }
@@ -952,6 +956,42 @@ function LedgerChip({ item }: { item: LedgerItem }) {
   );
 }
 
+/** Kompaktni trendni graf premoči — samo SVG (brez glave in legende), za inline rabo. */
+function CompactBalanceTrend({ entries }: { entries: EventEntry[] }) {
+  if (entries.length < 1) return <div className="dk-divider">VS</div>;
+  const ord = [...entries].reverse();
+  const N = ord.length;
+  const H = 30;
+  const W = Math.max(20, N - 1);
+  const usable = H - 4;
+  const ourPts   = ord.map((e, i) => ({ x: i, y: 2 + (1 - e.ourKnow) * usable }));
+  const theirPts = ord.map((e, i) => ({ x: i, y: 2 + (1 - e.aiKnow)  * usable }));
+  const toPath = (pts: typeof ourPts) => pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y.toFixed(2)}`).join(' ');
+  const last = ord[ord.length - 1];
+  const delta = last ? (last.ourKnow - last.aiKnow) * 100 : 0;
+  return (
+    <div className="bt-compact">
+      <div className="bt-compact-head">
+        <span className="bt-compact-title">premoč skozi čas</span>
+        <span className="bt-compact-delta" style={{ color: delta >= 0 ? '#66ccaa' : '#cc4444' }}>
+          {delta > 0 ? '+' : ''}{delta.toFixed(0)}%
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="bt-compact-svg">
+        <line x1="0" y1={H/2} x2={W} y2={H/2} stroke="#1e1e1e" strokeWidth="0.3" strokeDasharray="0.5 0.5" />
+        <path d={toPath(theirPts)} fill="none" stroke="#cc3333" strokeWidth="0.7" />
+        <path d={toPath(ourPts)}   fill="none" stroke="#22aa88" strokeWidth="0.7" />
+        {ourPts.length > 0 && (
+          <>
+            <circle cx={ourPts[ourPts.length-1].x}   cy={ourPts[ourPts.length-1].y}   r="0.9" fill="#22aa88" />
+            <circle cx={theirPts[theirPts.length-1].x} cy={theirPts[theirPts.length-1].y} r="0.9" fill="#cc3333" />
+          </>
+        )}
+      </svg>
+    </div>
+  );
+}
+
 /** Trendni graf premoči — mi vemo vs AI ve, oldest left -> newest right. */
 function BalanceTrend({ entries }: { entries: EventEntry[] }) {
   if (entries.length < 1) return null;
@@ -987,7 +1027,7 @@ function BalanceTrend({ entries }: { entries: EventEntry[] }) {
         )}
       </svg>
       <div className="bt-legend small">
-        <span style={{ color: '#22aa88' }}>● MI VEMO {Math.round((last?.ourKnow ?? 0) * 100)}%</span>
+        <span style={{ color: '#22aa88' }}>● LJUDJE VEMO {Math.round((last?.ourKnow ?? 0) * 100)}%</span>
         <span style={{ color: '#cc3333' }}>● AI VE {Math.round((last?.aiKnow ?? 0) * 100)}%</span>
       </div>
     </div>
@@ -1002,7 +1042,6 @@ function EventLog({ entries }: { entries: EventEntry[] }) {
         <h3>ČASOVNI TRAK</h3>
         <span className="panel-badge">{entries.length}m</span>
       </div>
-      <BalanceTrend entries={entries} />
       <div className="timeline-scroll">
         {entries.length === 0 && (
           <div className="dim small" style={{ padding: 12 }}>
@@ -1863,7 +1902,7 @@ export default function App() {
       <PhaseHeader game={game} onNewGame={handleNew} loading={loading} />
 
       {/* ─── PAS 2: Resursi klan ─── */}
-      <ResourceRow game={game} />
+      <ResourceRow game={game} eventLog={eventLog} />
 
       {/* ─── PAS 3: Mapa + Časovni trak (log) ─── */}
       <div className="band band-map-log">
