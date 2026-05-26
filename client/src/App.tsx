@@ -116,25 +116,48 @@ function DualKnowledge({ ourK, aiK }: { ourK: number; aiK: number }) {
   );
 }
 
-/** Faza header: badge, oznaka, pike za mesece, gumb za novo igro */
+/** Faza header: vse 3 faze v vrsti levo→desno + Nova igra desno */
 function PhaseHeader({ game, onNewGame, loading }: { game: GameState; onNewGame: () => void; loading: boolean }) {
-  const p = PHASE[game.phase];
+  const phases: Array<keyof typeof PHASE> = ['find', 'understand', 'eliminate'];
+  const phaseOrder: Record<string, number> = { find: 0, understand: 1, eliminate: 2 };
+  const currentIdx = phaseOrder[game.phase];
   return (
-    <header className="phase-header">
-      <div className="ph-badge" style={{ borderColor: p.color, color: p.color }}>{p.num}</div>
-      <div className="ph-body">
-        <div className="ph-label" style={{ color: p.color }}>{p.full}</div>
-        <div className="ph-rounds">
-          {Array.from({ length: 12 }, (_, i) => (
-            <span
-              key={i}
-              className={`round-dot ${i < game.round - 1 ? 'done' : i === game.round - 1 ? 'current' : ''}`}
-              style={i === game.round - 1 ? { borderColor: p.color, background: p.color } : {}}
-            />
-          ))}
-          <span className="ph-total dim">·  {game.totalRounds}/36</span>
-        </div>
-      </div>
+    <header className="phase-header phases-row">
+      {phases.map((ph, idx) => {
+        const p = PHASE[ph];
+        const isCurrent = idx === currentIdx;
+        const isPast    = idx < currentIdx;
+        const isFuture  = idx > currentIdx;
+        const roundsDone = isPast ? 12 : isCurrent ? game.round - 1 : 0;
+        const stateLabel = isPast ? 'zaključena' : isCurrent ? `${game.round}/12` : 'čaka';
+        return (
+          <div key={ph} className={`ph-block ${isCurrent ? 'current' : isPast ? 'past' : 'future'}`}
+               style={{ borderColor: isCurrent ? p.color : '#1e1e1e' }}>
+            <div className="ph-block-head">
+              <div className="ph-badge" style={{
+                borderColor: p.color, color: p.color,
+                opacity: isFuture ? 0.35 : isPast ? 0.6 : 1,
+              }}>{p.num}</div>
+              <div className="ph-block-info">
+                <div className="ph-label" style={{
+                  color: isCurrent ? p.color : isPast ? '#7a7a7a' : '#4a4a4a',
+                }}>{p.full}</div>
+                <div className="ph-rounds">
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <span
+                      key={i}
+                      className={`round-dot ${i < roundsDone ? 'done' : i === roundsDone && isCurrent ? 'current' : ''}`}
+                      style={i === roundsDone && isCurrent ? { borderColor: p.color, background: p.color } : {}}
+                    />
+                  ))}
+                  <span className="ph-state dim small">{stateLabel}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      <div className="ph-total-cell dim small">M {game.totalRounds}/36</div>
       <button className="ph-newgame" onClick={onNewGame} disabled={loading} title="Nova igra">
         {loading ? '⟳' : '↺ Nova igra'}
       </button>
