@@ -70,20 +70,22 @@ function Bar({ ratio, color, height = 6 }: { ratio: number; color?: string; heig
   );
 }
 
-/** En resurs: ikona + oznaka + vrstica + vrednost */
-function ResStat({ icon, label, value, max, color }: { icon: string; label: string; value: number; max: number; color?: string }) {
-  const ratio = max > 0 ? value / max : 0;
-  const c = color ?? barColor(ratio);
+/** Velika grafična kartica za en resurs: ikona + oznaka + številka (brez bar-a) */
+function BigStat({ icon, label, value, color, unit }: { icon: string; label: string; value: number | string; color: string; unit?: string }) {
   return (
-    <div className="res-stat">
-      <div className="res-head">
-        <span className="res-icon">{icon}</span>
-        <span className="res-label">{label}</span>
-        <span className="res-value" style={{ color: c }}>{value}</span>
+    <div className="big-stat" style={{ borderColor: color }}>
+      <div className="bs-icon" style={{ color }}>{icon}</div>
+      <div className="bs-body">
+        <div className="bs-label dim small">{label}</div>
+        <div className="bs-val" style={{ color }}>{value}{unit && <span className="bs-unit">{unit}</span>}</div>
       </div>
-      <Bar ratio={ratio} color={c} />
     </div>
   );
+}
+
+/** Stari ResStat ostal samo za morebitne legacy klice — preusmerjen na BigStat brez bar-a. */
+function ResStat({ icon, label, value, color }: { icon: string; label: string; value: number; max?: number; color?: string }) {
+  return <BigStat icon={icon} label={label} value={value} color={color ?? '#88aacc'} />;
 }
 
 /** Dvojni meter znanja — naše vs AI */
@@ -141,15 +143,14 @@ function PhaseHeader({ game, onNewGame, loading }: { game: GameState; onNewGame:
   );
 }
 
-/** Resursna vrstica — sovražne info + dvojni meter znanja */
+/** Resursna vrstica — sovražne info + dvojni meter znanja (grafično, brez bar-ov) */
 function ResourceRow({ game }: { game: GameState }) {
-  const robotMax = 200;
   const ourK = calcOurKnowledge(game.aiTree);
   return (
     <div className="resource-row">
       <div className="res-group enemy">
-        <ResStat icon="🤖" label="AI roboti"    value={game.aiRobots}                         max={robotMax} color="#bb3333" />
-        <ResStat icon="🌍" label="Klani aktiv"  value={Math.round(game.clanActivity * 100)}    max={100} />
+        <BigStat icon="🤖" label="AI roboti"    value={game.aiRobots}                      color="#cc3333" />
+        <BigStat icon="🌍" label="Klani aktiv"  value={Math.round(game.clanActivity * 100)} color="#88aa66" unit="%" />
       </div>
       <div className="res-divider" />
       <DualKnowledge ourK={ourK} aiK={game.aiKnowledge} />
@@ -160,11 +161,7 @@ function ResourceRow({ game }: { game: GameState }) {
 /** Klan status — populacija s prikazom kamp/odprave, hrana, orožje, intel */
 function ClanStatus({ game, inMissions }: { game: GameState; inMissions: number }) {
   const r = game.resources;
-  const popMax = game.maxPopulation;
   const inCamp = Math.max(0, game.population - inMissions);
-  const survMax = Math.max(r.survival, game.population * 8);
-  const combMax = Math.max(r.combat, 100);
-  const intelMax = Math.max(r.intelligence, 200);
   return (
     <div className="clan-status">
       {/* Populacija — prevladujoča vrstica s split bar */}
@@ -172,7 +169,6 @@ function ClanStatus({ game, inMissions }: { game: GameState; inMissions: number 
         <div className="cs-pop-head">
           <span className="cs-pop-title">👥 POPULACIJA</span>
           <span className="cs-pop-big">{game.population}</span>
-          <span className="dim small">/ {popMax} max</span>
         </div>
         <div className="cs-pop-split">
           {inCamp > 0 && (
@@ -191,11 +187,11 @@ function ClanStatus({ game, inMissions }: { game: GameState; inMissions: number 
           )}
         </div>
       </div>
-      {/* Ostali viri kot kartice */}
+      {/* Ostali viri grafično — velike ikone, brez bar-ov */}
       <div className="cs-resources">
-        <ResStat icon="🍞" label="Hrana/Voda"  value={r.survival}     max={survMax} />
-        <ResStat icon="⚔"  label="Orožje"      value={r.combat}       max={combMax} />
-        <ResStat icon="👁"  label="Intel"       value={r.intelligence} max={intelMax} color="#5588ff" />
+        <BigStat icon="🍞" label="Hrana/Voda" value={r.survival}     color="#cc8800" />
+        <BigStat icon="⚔"  label="Orožje"     value={r.combat}       color="#cc4433" />
+        <BigStat icon="👁"  label="Intel"      value={r.intelligence} color="#3388cc" />
       </div>
     </div>
   );
@@ -1402,31 +1398,39 @@ function HexMap({ tiles, draftPath, onPathClick, expeditions, wps, drawingMode }
   );
 }
 
-/** Izbira cilja izvidnikov — kompaktna verzija (3 ikone) */
+/** Izbira cilja izvidnikov — 3 ikone + razlaga izbire */
 function ScoutObjectiveSelector({ value, onChange }: { value: ScoutObjective; onChange: (o: ScoutObjective) => void }) {
-  const opts: Array<{ id: ScoutObjective; icon: string; label: string; color: string }> = [
-    { id: 'map',           icon: '🗺',  label: 'Mapa',         color: '#22ccff' },
-    { id: 'ai_robots',     icon: '🤖', label: 'AI roboti',    color: '#cc8800' },
-    { id: 'ai_weakpoints', icon: '🎯', label: 'Ranljivosti',  color: '#cc3333' },
+  const opts: Array<{ id: ScoutObjective; icon: string; label: string; color: string; desc: string }> = [
+    { id: 'map',           icon: '🗺',  label: 'Mapa',         color: '#22ccff', desc: 'Razkrij meglo na mapi in odkrij šibke točke v terenu.' },
+    { id: 'ai_robots',     icon: '🤖', label: 'AI roboti',    color: '#cc8800', desc: '+intel → boljši % v vseh bojih.' },
+    { id: 'ai_weakpoints', icon: '🎯', label: 'Ranljivosti',  color: '#cc3333', desc: 'Razkrij vozlišča AI načrtovalnega drevesa.' },
   ];
+  const sel = opts.find(o => o.id === value);
   return (
     <div className="scout-objectives compact">
-      {opts.map(o => (
-        <button key={o.id} className={`so-btn ${value === o.id ? 'sel' : ''}`}
-          style={value === o.id ? { borderColor: o.color, color: o.color } : {}}
-          onClick={() => onChange(o.id)}
-          title={o.label}>
-          <span className="so-icon">{o.icon}</span>
-          <span className="so-label-mini">{o.label}</span>
-        </button>
-      ))}
+      <div className="so-row">
+        {opts.map(o => (
+          <button key={o.id} className={`so-btn ${value === o.id ? 'sel' : ''}`}
+            style={value === o.id ? { borderColor: o.color, color: o.color } : {}}
+            onClick={() => onChange(o.id)}
+            title={`${o.label} — ${o.desc}`}>
+            <span className="so-icon">{o.icon}</span>
+            <span className="so-label-mini">{o.label}</span>
+          </button>
+        ))}
+      </div>
+      {sel && <div className="so-desc-line dim small">{sel.desc}</div>}
     </div>
   );
 }
 
-/** Kompaktni rations selector — 5 emoji gumbov v eni vrstici */
+/** Kompaktni rations selector — 5 emoji gumbov + razlaga izbire */
 function RationsMini({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   const r = RATIONS[value];
+  const popHint = r.popMin === 0 && r.popMax === 0 ? '±0' :
+                  r.popMin === r.popMax ? `${r.popMin > 0 ? '+' : ''}${r.popMin}` :
+                  `${r.popMin > 0 ? '+' : ''}${r.popMin}…${r.popMax > 0 ? '+' : ''}${r.popMax}`;
+  const popColor = r.popMin < 0 ? '#cc4444' : r.popMin > 0 ? '#22cc88' : '#888';
   return (
     <div className="rations-mini">
       <div className="rm-row">
@@ -1443,7 +1447,13 @@ function RationsMini({ value, onChange }: { value: number; onChange: (n: number)
           );
         })}
       </div>
-      <div className="rm-info" style={{ color: r.color }}>{r.label}</div>
+      <div className="rm-info">
+        <span style={{ color: r.color }}>{r.label}</span>
+        <span className="dim small"> · moč </span>
+        <b style={{ color: r.color }}>×{r.strengthMult}</b>
+        <span className="dim small"> · ljudje </span>
+        <b style={{ color: popColor }}>{popHint}</b>
+      </div>
     </div>
   );
 }
@@ -1923,13 +1933,20 @@ export default function App() {
                 ) },
               { key: 'd', label: 'Obramba', icon: '🛡', color: '#66aabb', count: defenders,
                 yieldText: `${defenders} stražarjev · ${defenders} orožja`,
-                probLabel: 'Odbije', prob: odds?.raidRepelProbability,
                 contextTop: (
                   <div className="pa-ctx pa-ctx-defense">
-                    <span className="dim small">⚠ Verjetnost napada AI</span>
-                    <span className="pa-ctx-val" style={{ color: probColor(1 - (odds?.raidProbability ?? 0)) }}>
-                      {odds ? Math.round(odds.raidProbability * 100) + '%' : '–'}
-                    </span>
+                    <div className="pa-ctx-line">
+                      <span className="dim small">⚠ Napad AI:</span>
+                      <b className="pa-ctx-val-sm" style={{ color: probColor(1 - (odds?.raidProbability ?? 0)) }}>
+                        {odds ? Math.round(odds.raidProbability * 100) + '%' : '–'}
+                      </b>
+                    </div>
+                    <div className="pa-ctx-line">
+                      <span className="dim small">✓ Obramba odbije:</span>
+                      <b className="pa-ctx-val-sm" style={{ color: probColor(odds?.raidRepelProbability ?? 0) }}>
+                        {defenders > 0 && odds ? Math.round(odds.raidRepelProbability * 100) + '%' : '–'}
+                      </b>
+                    </div>
                   </div>
                 ) },
               { key: 'f', label: 'Nabiralci', icon: '🌾', color: '#6aa630', count: foragers,

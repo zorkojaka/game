@@ -1225,3 +1225,46 @@ input[type=range]::-moz-range-thumb {
   margin-top: 8px; padding-top: 6px;
   border-top: 1px solid var(--border);
 }
+
+/* ─── BigStat ─────────────────────────────────────────────────────────── */
+.big-stat {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg2);
+  border: 1px solid; border-left-width: 3px;
+  min-width: 110px; flex: 1;
+}
+.bs-icon { font-size: 1.7rem; line-height: 1; }
+.bs-body { flex: 1; min-width: 0; }
+.bs-label { font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; line-height: 1; margin-bottom: 3px; }
+.bs-val { font-size: 1.3rem; font-weight: bold; line-height: 1; }
+.bs-unit { font-size: .8rem; font-weight: normal; margin-left: 2px; }
+
+/* ResourceRow tighter padding because no bars anymore */
+.resource-row { padding: 6px 10px; gap: 8px; }
+.res-group { flex-wrap: nowrap; }
+
+/* ─── Obramba context — dve vrstici (raid + repel) ─────────────────────── */
+.pa-ctx-line { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; line-height: 1.2; }
+.pa-ctx-val-sm { font-size: .9rem; }
+
+/* ─── Scout objective razlaga ──────────────────────────────────────────── */
+.so-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; }
+.so-desc-line {
+  margin-top: 3px; padding: 3px 4px;
+  background: rgba(255,255,255,.03);
+  font-size: .62rem; line-height: 1.3;
+  text-align: center;
+}
+
+/* ─── Map legend — ena vrstica, kompaktno ──────────────────────────────── */
+.map-legend {
+  display: flex; flex-wrap: nowrap; align-items: center;
+  gap: 8px; overflow-x: auto;
+  white-space: nowrap;
+  font-size: .65rem !important; line-height: 1.2;
+  padding: 4px 6px;
+  background: #060606; border-top: 1px solid var(--border);
+}
+.map-legend > div, .map-legend > span { display: inline-flex; align-items: center; gap: 3px; }
+.map-legend::-webkit-scrollbar { height: 4px; }
