@@ -140,26 +140,58 @@ function PhaseHeader({ game }: { game: GameState }) {
   );
 }
 
-/** Resursna vrstica — dve skupini: človeški / AI */
+/** Resursna vrstica — samo svetne/AI info na vrhu */
 function ResourceRow({ game }: { game: GameState }) {
-  const r = game.resources;
-  const popMax = game.maxPopulation;
-  const survMax = Math.max(r.survival, game.population * 8);
-  const combMax = Math.max(r.combat, 100);
-  const intelMax = Math.max(r.intelligence, 200);
   const robotMax = 200;
   return (
     <div className="resource-row">
-      <div className="res-group">
-        <ResStat icon="👥" label="Populacija"  value={game.population} max={popMax} />
-        <ResStat icon="🍞" label="Hrana/Voda"  value={r.survival}      max={survMax} />
-        <ResStat icon="⚔"  label="Orožje"      value={r.combat}        max={combMax} />
-        <ResStat icon="👁"  label="Intel"       value={r.intelligence}  max={intelMax} color="#5588ff" />
-      </div>
-      <div className="res-divider" />
       <div className="res-group enemy">
-        <ResStat icon="🤖" label="AI roboti"    value={game.aiRobots}          max={robotMax} color="#bb3333" />
-        <ResStat icon="🌍" label="Klani aktiv"  value={Math.round(game.clanActivity * 100)} max={100} />
+        <ResStat icon="🤖" label="AI roboti"    value={game.aiRobots}                         max={robotMax} color="#bb3333" />
+        <ResStat icon="🌍" label="Klani aktiv"  value={Math.round(game.clanActivity * 100)}    max={100} />
+      </div>
+    </div>
+  );
+}
+
+/** Klan status — populacija s prikazom kamp/odprave, hrana, orožje, intel */
+function ClanStatus({ game, inMissions }: { game: GameState; inMissions: number }) {
+  const r = game.resources;
+  const popMax = game.maxPopulation;
+  const inCamp = Math.max(0, game.population - inMissions);
+  const survMax = Math.max(r.survival, game.population * 8);
+  const combMax = Math.max(r.combat, 100);
+  const intelMax = Math.max(r.intelligence, 200);
+  return (
+    <div className="clan-status">
+      {/* Populacija — prevladujoča vrstica s split bar */}
+      <div className="cs-pop">
+        <div className="cs-pop-head">
+          <span className="cs-pop-title">👥 POPULACIJA</span>
+          <span className="cs-pop-big">{game.population}</span>
+          <span className="dim small">/ {popMax} max</span>
+        </div>
+        <div className="cs-pop-split">
+          {inCamp > 0 && (
+            <div className="cs-pop-camp" style={{ flex: inCamp }} title={`V kampu: ${inCamp}`}>
+              <span className="cs-pop-icon">🏠</span>
+              <span className="cs-pop-val">{inCamp}</span>
+              <span className="cs-pop-label dim small">v kampu</span>
+            </div>
+          )}
+          {inMissions > 0 && (
+            <div className="cs-pop-out" style={{ flex: inMissions }} title={`Na odpravah: ${inMissions}`}>
+              <span className="cs-pop-icon">🎯</span>
+              <span className="cs-pop-val">{inMissions}</span>
+              <span className="cs-pop-label dim small">na odpravah</span>
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Ostali viri kot kartice */}
+      <div className="cs-resources">
+        <ResStat icon="🍞" label="Hrana/Voda"  value={r.survival}     max={survMax} />
+        <ResStat icon="⚔"  label="Orožje"      value={r.combat}       max={combMax} />
+        <ResStat icon="👁"  label="Intel"       value={r.intelligence} max={intelMax} color="#5588ff" />
       </div>
     </div>
   );
@@ -521,6 +553,60 @@ type AllocRole = {
   extraLabel?: React.ReactNode;   // dodatne komponente v naslovni vrstici (npr. day/night split slider)
 };
 
+/** Prerazporedi števila po proporcionalnem ključu: focusIdx se spremeni za `delta`,
+ *  ostali pa proporcionalno k njihovi velikosti dajo/sprejmejo. */
+function applyProportional(startCounts: number[], focusIdx: number, delta: number): number[] {
+  if (delta === 0) return [...startCounts];
+  const nc = [...startCounts];
+  const otherIdxs = nc.map((_, i) => i).filter(i => i !== focusIdx);
+  const otherSum = otherIdxs.reduce((s, i) => s + nc[i], 0);
+
+  if (delta > 0) {
+    // Vloga raste — vzemi iz ostalih proporcionalno
+    if (otherSum === 0) return nc;
+    const actual = Math.min(delta, otherSum);
+    nc[focusIdx] += actual;
+    let remaining = actual;
+    for (let j = 0; j < otherIdxs.length; j++) {
+      const i = otherIdxs[j];
+      const isLast = j === otherIdxs.length - 1;
+      const share = isLast ? remaining : Math.min(Math.round(actual * nc[i] / otherSum), nc[i]);
+      nc[i] = Math.max(0, nc[i] - share);
+      remaining -= share;
+    }
+    if (remaining > 0) nc[focusIdx] -= remaining;
+    if (remaining < 0) {
+      // Nazadnji je dobil več, kot bi smel — popravi
+      let surplus = -remaining;
+      for (let j = otherIdxs.length - 1; j >= 0 && surplus > 0; j--) {
+        const i = otherIdxs[j];
+        // Vrni surplus nazaj v i (preveč smo vzeli)
+        nc[i] += surplus;
+        surplus = 0;
+      }
+      nc[focusIdx] -= -remaining;
+    }
+  } else {
+    // Vloga upade — daj ostalim proporcionalno (če so vsi 0, prosti dobi vse)
+    const actual = Math.min(-delta, nc[focusIdx]);
+    nc[focusIdx] -= actual;
+    if (otherSum === 0) {
+      // Vsi ostali 0 — dodaj zadnjemu (pričakovano "Prosti")
+      nc[otherIdxs[otherIdxs.length - 1]] += actual;
+    } else {
+      let remaining = actual;
+      for (let j = 0; j < otherIdxs.length; j++) {
+        const i = otherIdxs[j];
+        const isLast = j === otherIdxs.length - 1;
+        const share = isLast ? remaining : Math.round(actual * nc[i] / otherSum);
+        nc[i] += share;
+        remaining -= share;
+      }
+    }
+  }
+  return nc;
+}
+
 function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer }: {
   roles: AllocRole[];
   available: number;
@@ -540,17 +626,10 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
   function moveDrag(e: React.PointerEvent) {
     if (!drag) return;
     const delta = Math.round((e.clientX - drag.startX) * available / drag.barWidth);
-    const newCounts = [...drag.startCounts];
-    const i = drag.handleIdx;
-    if (delta > 0) {
-      const give = Math.min(delta, newCounts[i + 1]);
-      newCounts[i + 1] -= give;
-      newCounts[i] += give;
-    } else if (delta < 0) {
-      const give = Math.min(-delta, newCounts[i]);
-      newCounts[i] -= give;
-      newCounts[i + 1] += give;
-    }
+    // Handle drag = sprememba vloge LEVO od ročice (focusIdx).
+    // Prerazporeditev se odvije iz / na VSE ostale vloge proporcionalno.
+    const focusIdx = drag.handleIdx;
+    const newCounts = applyProportional(drag.startCounts, focusIdx, delta);
     onTransfer(newCounts);
   }
   function endDrag(e: React.PointerEvent) {
@@ -623,11 +702,13 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
             </div>
           </div>
         ))}
-        {/* Vlečne meje */}
+        {/* Ročice na koncih posameznih segmentov (razen zadnjega "Prosti") */}
         {roles.slice(0, -1).map((_, i) => {
-          // pozicija meje = vsota count[0..i] / total
-          const before = roles.slice(0, i + 1).reduce((s, r) => s + Math.max(0.6, r.count / total), 0);
-          const totalFlex = roles.reduce((s, r) => s + Math.max(0.6, r.count / total), 0);
+          // Position % = cumulative count up to and including role i / total
+          // Uskladi s flex (Math.max(0.6) floor)
+          const flexes = roles.map(r => Math.max(0.6, r.count / total));
+          const totalFlex = flexes.reduce((s, f) => s + f, 0);
+          const before = flexes.slice(0, i + 1).reduce((s, f) => s + f, 0);
           const leftPct = before / totalFlex * 100;
           return (
             <div key={i} className={`pa-handle ${drag?.handleIdx === i ? 'dragging' : ''}`}
@@ -1747,9 +1828,11 @@ export default function App() {
           <h3>RAZPOREDI ENOTE</h3>
           <span className="dim small">
             {availablePop} razpoložljivih
-            {inMissions > 0 && ` · ${inMissions} v aktivnih misijah`}
+            {inMissions > 0 && ` · ${inMissions} na odpravah/misijah`}
           </span>
         </div>
+
+        <ClanStatus game={game} inMissions={inMissions} />
 
         <div className="cmd-section">
           <div className="cmd-label">Obroki · določajo porabo hrane, moč ljudi in rast populacije</div>

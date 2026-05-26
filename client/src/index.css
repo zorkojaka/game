@@ -1061,3 +1061,40 @@ input[type=range]::-moz-range-thumb {
 .ee-text      { color: #c8c8c8; }      /* log narrative */
 .fs-arrow,
 .ph-total     { color: #8a8a8a; }
+
+/* ─── ClanStatus (pod mapo) ─────────────────────────────────────────────── */
+.clan-status {
+  display: flex; flex-direction: column; gap: 10px;
+  margin-bottom: 12px; padding: 10px 12px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-left: 3px solid #22aa88;
+}
+
+.cs-pop { display: flex; flex-direction: column; gap: 6px; }
+.cs-pop-head {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+}
+.cs-pop-title { font-size: .78rem; letter-spacing: .08em; color: #66ccaa; font-weight: bold; }
+.cs-pop-big   { font-size: 1.45rem; font-weight: bold; color: #d8d8d8; }
+
+.cs-pop-split {
+  display: flex; gap: 3px; min-height: 36px;
+}
+.cs-pop-camp, .cs-pop-out {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px; border: 1px solid;
+}
+.cs-pop-camp {
+  background: rgba(34,170,136,.12); border-color: #22aa88; color: #66ccaa;
+}
+.cs-pop-out {
+  background: rgba(170,68,136,.12); border-color: #aa4488; color: #cc88aa;
+}
+.cs-pop-icon { font-size: 1rem; }
+.cs-pop-val { font-weight: bold; font-size: 1rem; }
+.cs-pop-label { white-space: nowrap; }
+
+.cs-resources {
+  display: flex; gap: 12px; flex-wrap: wrap;
+}
+.cs-resources .res-stat { min-width: 120px; flex: 1; }
