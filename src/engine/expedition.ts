@@ -17,7 +17,7 @@ import {
   SCOUT_CAPTURED_LOSS_MIN, SCOUT_CAPTURED_LOSS_MAX,
 } from './constants.js';
 
-export const TILES_PER_MONTH = 2;  // konstantna hitrost; oddaljenost določa skupno trajanje
+export const TILES_PER_MONTH = 1;  // en korak = en mesec
 
 const CLAN_POS = { q: 0, r: 4 };
 

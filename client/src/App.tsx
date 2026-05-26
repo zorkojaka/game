@@ -1408,7 +1408,7 @@ function HexMap({ tiles, draftPath, onPathClick, expeditions, wps, drawingMode }
         const tile = exp.path[exp.currentIndex];
         const target = exp.path[exp.path.length - 1];
         const stepsLeft = exp.path.length - 1 - exp.currentIndex;
-        const monthsLeft = Math.ceil(stepsLeft / 2);
+        const monthsLeft = stepsLeft;  // 1 korak = 1 mesec
         const color = exp.kind === 'mission' ? '#cc8800' : '#22ccff';
         // Pozicija popupa: nad heksom kjer je odprava
         const p = shift(hexToPixel(tile.q, tile.r, SIZE));
@@ -1840,7 +1840,7 @@ export default function App() {
   }
 
   // Statistike za draft pot (mesecev + tveganje)
-  const TILES_PER_MONTH_FE = 2;
+  const TILES_PER_MONTH_FE = 1;  // en korak = en mesec
   const draftPathMonths = Math.max(0, Math.ceil((draftPath.length - 1) / TILES_PER_MONTH_FE));
   function tileEncounterMultFE(p: number, distFromCamp: number): number {
     let m = p < 0.25 ? 1.5 : p < 0.50 ? 1.2 : p < 1.0 ? 0.7 : 0.3;
