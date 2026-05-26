@@ -1076,10 +1076,10 @@ function EventLog({ entries }: { entries: EventEntry[] }) {
         )}
         {entries.map((e) => {
           const isOpen = openTs === e.ts;
-          // Top 3 najpomembnejši ledger po absolutni vrednosti
+          const isSpecial = /💥 ŠIBKA TOČKA UNIČENA/.test(e.narrative);
           const top = [...e.ledger].sort((a,b) => Math.abs(b.value) - Math.abs(a.value)).slice(0, 4);
           return (
-            <div key={e.ts} className={`tl-row ${isOpen ? 'open' : ''}`}
+            <div key={e.ts} className={`tl-row ${isOpen ? 'open' : ''} ${isSpecial ? 'special' : ''}`}
                  onClick={() => setOpenTs(isOpen ? null : e.ts)}>
               <div className="tl-row-main">
                 <span className="tl-round" style={{ color: PHASE[e.phase].color, borderColor: PHASE[e.phase].color }}>
@@ -1327,7 +1327,14 @@ function HexMap({ tiles, draftPath, onPathClick, onWpSelect, selectedWpId, exped
           } else {
             // raziskan
             label = wpVisible ? '◆' : '';
-            if (wpVisible) { labelColor = '#cc8800'; stroke = '#cc8800'; }
+            if (wpVisible) {
+              if (wp?.exploited) {
+                label = '✓'; labelColor = '#22cc66'; stroke = '#22cc66';
+                fill = '#0a1a0c';
+              } else {
+                labelColor = '#cc8800'; stroke = '#cc8800';
+              }
+            }
           }
 
           const isInDraft = inDraft(t);
@@ -1338,7 +1345,7 @@ function HexMap({ tiles, draftPath, onPathClick, onWpSelect, selectedWpId, exped
             (lastStep && areNeighbors(lastStep, t)) ||
             isLast
           );
-          const canSelectWp = wpVisible && wp && !wp.exploited && !canClickDraw;
+          const canSelectWp = !!(wpVisible && wp && !wp.exploited && !canClickDraw);
           const isWpSelected = wp && wp.id === selectedWpId;
           if (isWpSelected) stroke = '#ffd84a';
 
@@ -1365,10 +1372,21 @@ function HexMap({ tiles, draftPath, onPathClick, onWpSelect, selectedWpId, exped
               {/* WP ime pod diamond ikono — ko je razkrita */}
               {wpVisible && wp && (
                 <text x={p.x} y={p.y + SIZE * 0.55} textAnchor="middle"
-                  fontSize="7.5" fill={isWpSelected ? '#ffd84a' : '#cc8800'}
+                  fontSize="7.5"
+                  fill={wp.exploited ? '#22cc66' : isWpSelected ? '#ffd84a' : '#cc8800'}
                   fontFamily="'Courier New', monospace" fontWeight="bold"
+                  textDecoration={wp.exploited ? 'line-through' : undefined}
                   style={{ pointerEvents: 'none' }}>
                   {wp.label.split(' ').slice(0, 2).join(' ').slice(0, 14)}
+                </text>
+              )}
+              {/* UNIČENO badge nad ikono ko je wp exploited */}
+              {wpVisible && wp?.exploited && (
+                <text x={p.x} y={p.y - SIZE * 0.45} textAnchor="middle"
+                  fontSize="6.5" fill="#22cc66"
+                  fontFamily="'Courier New', monospace" fontWeight="bold"
+                  style={{ pointerEvents: 'none', letterSpacing: '1px' }}>
+                  UNIČENO
                 </text>
               )}
               {/* Progress overlay: za delno raziskane prikaže koliko je raziskano */}
@@ -1791,6 +1809,7 @@ export default function App() {
       if (log.scout?.captured) icons.push({ icon: '🔭', color: '#cc4444', title: 'Izvidniki ujeti' });
       if (log.revealedNodes?.length) icons.push({ icon: '🔍', color: '#22cc66', title: `${log.revealedNodes.length} vozlišč razkritih` });
       if (/✓ Izvidniška odprava dospela/.test(log.narrative)) icons.push({ icon: '✓', color: '#22ccff', title: 'Odprava dospela' });
+      if (/💥 ŠIBKA TOČKA UNIČENA/.test(log.narrative)) icons.push({ icon: '💥', color: '#ffd84a', title: 'ŠIBKA TOČKA UNIČENA' });
       if (/🎯 Misija .* uspela/.test(log.narrative)) icons.push({ icon: '🎯', color: '#22cc66', title: 'Misija uspela' });
       if (/☠ Odprava izgubljena/.test(log.narrative)) icons.push({ icon: '☠', color: '#cc2222', title: 'Odprava izgubljena' });
       if (/Nova faza/.test(log.narrative)) icons.push({ icon: '🌑', color: '#cc8800', title: 'Fazni prehod' });

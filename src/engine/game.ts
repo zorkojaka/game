@@ -344,6 +344,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   let aiKnowledge = state.aiKnowledge;
   let combatLog = null;
   let scoutsKilled = scoutResult.scoutsLost;
+  const expeditionEvents: string[] = [];   // posebni dogodki (vrnitve, izgube, uničene šibke točke)
 
   const isExploiting = targetWeakPoint
     ? aiWeakPoints.some(wp => wp.id === targetWeakPoint && wp.discovered)
@@ -368,7 +369,11 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
 
     if (isExploiting && result.outcome === 'victory') {
       const idx = aiWeakPoints.findIndex(wp => wp.id === targetWeakPoint);
-      if (idx >= 0) aiWeakPoints[idx] = { ...aiWeakPoints[idx], exploited: true };
+      if (idx >= 0) {
+        const wpLabel = aiWeakPoints[idx].label;
+        aiWeakPoints[idx] = { ...aiWeakPoints[idx], exploited: true };
+        expeditionEvents.push(`💥 ŠIBKA TOČKA UNIČENA: ${wpLabel} — v napadu izkoriščena.`);
+      }
     }
   }
 
@@ -408,7 +413,6 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   const oldCompletedExps = state.completedExpeditions ?? [];
   const tickedExps: Expedition[] = [];
   const finishedExps: Expedition[] = [];
-  const expeditionEvents: string[] = [];
 
   for (const e of oldExps) {
     const r = tickExpedition(e, mapTiles, aiKnowledge, rng);
@@ -422,8 +426,11 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       if (r.exp.status === 'completed') {
         if (r.exp.kind === 'mission' && r.exp.weakPointId) {
           const idx = aiWeakPoints.findIndex(wp => wp.id === r.exp.weakPointId);
-          if (idx >= 0) aiWeakPoints[idx] = { ...aiWeakPoints[idx], exploited: true, discovered: true };
-          expeditionEvents.push(`🎯 Misija na ${r.exp.weakPointId} uspela — ${r.exp.assigned} se vrača v kamp.`);
+          if (idx >= 0) {
+            const wpLabel = aiWeakPoints[idx].label;
+            aiWeakPoints[idx] = { ...aiWeakPoints[idx], exploited: true, discovered: true };
+            expeditionEvents.push(`💥 ŠIBKA TOČKA UNIČENA: ${wpLabel} — ${r.exp.assigned} se vrača v kamp.`);
+          }
         } else {
           const target = r.exp.path[r.exp.path.length - 1];
           expeditionEvents.push(`✓ Izvidniška odprava dospela na (${target.q},${target.r}) — ${r.exp.assigned} se vrača v kamp.`);
@@ -508,7 +515,11 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         newlyCompleted.push({ ...m, assigned: assignedNow, monthsRemaining: 0, rations: mRationsLvl, status: 'success',
           resultNarrative: `Odprava na ${m.weakPointId} uspela.` });
         const idx = aiWeakPoints.findIndex(wp => wp.id === m.weakPointId);
-        if (idx >= 0) aiWeakPoints[idx] = { ...aiWeakPoints[idx], exploited: true, discovered: true };
+        if (idx >= 0) {
+          const wpLabel = aiWeakPoints[idx].label;
+          aiWeakPoints[idx] = { ...aiWeakPoints[idx], exploited: true, discovered: true };
+          expeditionEvents.push(`💥 ŠIBKA TOČKA UNIČENA: ${wpLabel} — odprava se vrača.`);
+        }
       } else {
         const [lossPct, rngL] = rngInt(rng, 30, 70); rng = rngL;
         const lost = Math.floor(assignedNow * lossPct / 100);

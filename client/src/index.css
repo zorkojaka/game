@@ -1434,3 +1434,10 @@ input[type=range]::-moz-range-thumb {
   letter-spacing: .08em;
   margin-bottom: 4px;
 }
+
+/* ─── Posebni dogodki (npr. uničena šibka točka) v časovnem traku ───────── */
+.tl-row.special {
+  background: #1a1500 !important;
+  border-left: 3px solid #ffd84a !important;
+}
+.tl-row.special .tl-round { color: #ffd84a !important; border-color: #ffd84a !important; }
