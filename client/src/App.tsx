@@ -922,11 +922,15 @@ function OddsArc({ p, color }: { p: number; color: string }) {
 
 /** Kronološki dnevnik dogodkov ob mapi (frontend-only akumulacija) */
 interface LedgerItem { icon: string; label: string; value: number; }
+interface KeyIcon    { icon: string; color: string; title: string; }
 interface EventEntry {
   round: number;
   phase: AIPhase;
   narrative: string;
   ledger: LedgerItem[];
+  icons: KeyIcon[];
+  ourKnow: number;       // 0..1
+  aiKnow:  number;       // 0..1
   ts: number;
 }
 
@@ -944,34 +948,105 @@ function LedgerChip({ item }: { item: LedgerItem }) {
   );
 }
 
+/** Trendni graf premoči — mi vemo vs AI ve, oldest left -> newest right. */
+function BalanceTrend({ entries }: { entries: EventEntry[] }) {
+  if (entries.length < 1) return null;
+  const ord = [...entries].reverse();  // newest-first → oldest-first
+  const N = ord.length;
+  const H = 56;
+  const W = Math.max(20, N - 1);
+  const usable = H - 8;
+  const ourPts   = ord.map((e, i) => ({ x: i, y: 4 + (1 - e.ourKnow) * usable }));
+  const theirPts = ord.map((e, i) => ({ x: i, y: 4 + (1 - e.aiKnow)  * usable }));
+  const toPath = (pts: typeof ourPts) => pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y.toFixed(2)}`).join(' ');
+  const last = ord[ord.length - 1];
+  const delta = last ? (last.ourKnow - last.aiKnow) * 100 : 0;
+  return (
+    <div className="balance-trend">
+      <div className="bt-head">
+        <span className="bt-title">PREMOČ ČEZ ČAS</span>
+        <span className="bt-delta" style={{ color: delta >= 0 ? '#66ccaa' : '#cc4444' }}>
+          {delta > 0 ? '+' : ''}{delta.toFixed(0)}%
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="bt-svg">
+        {/* Mid line */}
+        <line x1="0" y1={H/2} x2={W} y2={H/2} stroke="#1e1e1e" strokeWidth="0.3" strokeDasharray="0.5 0.5" />
+        <path d={toPath(theirPts)} fill="none" stroke="#cc3333" strokeWidth="0.7" />
+        <path d={toPath(ourPts)}   fill="none" stroke="#22aa88" strokeWidth="0.7" />
+        {/* End dots */}
+        {ourPts.length > 0 && (
+          <>
+            <circle cx={ourPts[ourPts.length-1].x}   cy={ourPts[ourPts.length-1].y}   r="0.9" fill="#22aa88" />
+            <circle cx={theirPts[theirPts.length-1].x} cy={theirPts[theirPts.length-1].y} r="0.9" fill="#cc3333" />
+          </>
+        )}
+      </svg>
+      <div className="bt-legend small">
+        <span style={{ color: '#22aa88' }}>● MI VEMO {Math.round((last?.ourKnow ?? 0) * 100)}%</span>
+        <span style={{ color: '#cc3333' }}>● AI VE {Math.round((last?.aiKnow ?? 0) * 100)}%</span>
+      </div>
+    </div>
+  );
+}
+
 function EventLog({ entries }: { entries: EventEntry[] }) {
+  const [openTs, setOpenTs] = useState<number | null>(null);
   return (
     <div className="panel event-log-panel">
       <div className="panel-head">
-        <h3>DNEVNIK DOGODKOV</h3>
-        <span className="panel-badge">{entries.length}</span>
+        <h3>ČASOVNI TRAK</h3>
+        <span className="panel-badge">{entries.length}m</span>
       </div>
-      <div className="event-log-scroll">
+      <BalanceTrend entries={entries} />
+      <div className="timeline-scroll">
         {entries.length === 0 && (
           <div className="dim small" style={{ padding: 12 }}>
             Mesec še ni minil. Razporedi ekipe in izvedi mesec.
           </div>
         )}
-        {entries.map((e, i) => (
-          <div key={e.ts} className="event-entry">
-            <div className="ee-head">
-              <span className="ee-round" style={{ color: PHASE[e.phase].color }}>M{e.round}</span>
-              <span className="ee-phase dim small">{PHASE[e.phase].label}</span>
-              {i === 0 && <span className="ee-latest">NOVO</span>}
-            </div>
-            <p className="ee-text">{e.narrative}</p>
-            {e.ledger.length > 0 && (
-              <div className="ee-ledger">
-                {e.ledger.map((item, idx) => <LedgerChip key={idx} item={item} />)}
+        {entries.map((e) => {
+          const isOpen = openTs === e.ts;
+          // Top 3 najpomembnejši ledger po absolutni vrednosti
+          const top = [...e.ledger].sort((a,b) => Math.abs(b.value) - Math.abs(a.value)).slice(0, 4);
+          return (
+            <div key={e.ts} className={`tl-row ${isOpen ? 'open' : ''}`}
+                 onClick={() => setOpenTs(isOpen ? null : e.ts)}>
+              <div className="tl-row-main">
+                <span className="tl-round" style={{ color: PHASE[e.phase].color, borderColor: PHASE[e.phase].color }}>
+                  M{e.round}
+                </span>
+                <div className="tl-icons">
+                  {e.icons.length === 0 && <span className="dim small">·</span>}
+                  {e.icons.map((ic, i) => (
+                    <span key={i} className="tl-icon" style={{ color: ic.color }} title={ic.title}>{ic.icon}</span>
+                  ))}
+                </div>
+                <div className="tl-mini-ledger">
+                  {top.map((it, i) => {
+                    const pos = it.value > 0;
+                    return (
+                      <span key={i} className="tl-chip" style={{ color: pos ? '#22cc88' : '#cc4444' }} title={it.label}>
+                        {it.icon}{pos ? '+' : ''}{it.value}
+                      </span>
+                    );
+                  })}
+                </div>
+                <span className="tl-expand dim">{isOpen ? '▾' : '▸'}</span>
               </div>
-            )}
-          </div>
-        ))}
+              {isOpen && (
+                <div className="tl-row-detail">
+                  <p className="ee-text">{e.narrative}</p>
+                  {e.ledger.length > top.length && (
+                    <div className="ee-ledger">
+                      {e.ledger.map((item, idx) => <LedgerChip key={idx} item={item} />)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1506,12 +1581,13 @@ export default function App() {
     }
   }, [scoutObj, game?.mapTiles]);
 
-  // Akumuliraj log dogodkov — vsak nov mesec doda vnos z dogodki + poračunom
+  // Akumuliraj log dogodkov — vsak nov mesec doda vnos z dogodki + poračunom + ikone
   useEffect(() => {
     if (!game?.lastRoundLog) return;
     const log = game.lastRoundLog;
     setEventLog(prev => {
       if (prev[0] && prev[0].round === log.round && prev[0].phase === log.phase) return prev;
+
       const ledger: LedgerItem[] = [];
       if (log.populationDelta !== 0)
         ledger.push({ icon: '👥', label: 'populacija', value: log.populationDelta });
@@ -1521,10 +1597,8 @@ export default function App() {
       if (dS !== 0) ledger.push({ icon: '🍞', label: 'hrana',  value: dS });
       if (dC !== 0) ledger.push({ icon: '⚔',  label: 'orožje', value: dC });
       if (dI !== 0) ledger.push({ icon: '👁',  label: 'intel',  value: dI });
-      if (log.combat?.aiRobotsDestroyed)
-        ledger.push({ icon: '🤖', label: 'AI roboti', value: -log.combat.aiRobotsDestroyed });
-      if (log.raid?.aiRobotsDestroyed)
-        ledger.push({ icon: '🤖', label: 'AI roboti', value: -log.raid.aiRobotsDestroyed });
+      const robotsKilled = (log.combat?.aiRobotsDestroyed ?? 0) + (log.raid?.aiRobotsDestroyed ?? 0);
+      if (robotsKilled) ledger.push({ icon: '🤖', label: 'AI roboti', value: -robotsKilled });
       if (log.raid?.weaponsDestroyed)
         ledger.push({ icon: '💥', label: 'uničeno orožje', value: -log.raid.weaponsDestroyed });
       if (log.revealedNodes?.length)
@@ -1533,9 +1607,31 @@ export default function App() {
         ledger.push({ icon: '🕵', label: 'AI ve o nas %', value: Math.round(log.aiKnowledgeDelta * 100) });
       if (log.clanActivityDelta && Math.round(log.clanActivityDelta * 100) !== 0)
         ledger.push({ icon: '🌍', label: 'klani %', value: Math.round(log.clanActivityDelta * 100) });
+
+      // Ključne ikone za hitri pregled v traku
+      const icons: KeyIcon[] = [];
+      const outcomeColors = { victory: '#22cc66', partial: '#cc8800', defeat: '#cc4444', annihilation: '#cc2222' } as const;
+      if (log.combat) {
+        icons.push({ icon: '⚔', color: outcomeColors[log.combat.outcome], title: `Napad: ${log.combat.outcome}` });
+      }
+      if (log.raid?.occurred && log.raid.outcome) {
+        icons.push({ icon: '🛡', color: outcomeColors[log.raid.outcome], title: `Raid: ${log.raid.outcome}` });
+      }
+      if (log.scout?.captured) icons.push({ icon: '🔭', color: '#cc4444', title: 'Izvidniki ujeti' });
+      if (log.revealedNodes?.length) icons.push({ icon: '🔍', color: '#22cc66', title: `${log.revealedNodes.length} vozlišč razkritih` });
+      if (/✓ Izvidniška odprava dospela/.test(log.narrative)) icons.push({ icon: '✓', color: '#22ccff', title: 'Odprava dospela' });
+      if (/🎯 Misija .* uspela/.test(log.narrative)) icons.push({ icon: '🎯', color: '#22cc66', title: 'Misija uspela' });
+      if (/☠ Odprava izgubljena/.test(log.narrative)) icons.push({ icon: '☠', color: '#cc2222', title: 'Odprava izgubljena' });
+      if (/Nova faza/.test(log.narrative)) icons.push({ icon: '🌑', color: '#cc8800', title: 'Fazni prehod' });
+      if ((game.consecutiveStarvationMonths ?? 0) > 0) icons.push({ icon: '💀', color: '#cc2222', title: 'Lakota' });
+
+      const ourKnow = calcOurKnowledge(game.aiTree);
+      const aiKnow  = game.aiKnowledge;
+
       const entry: EventEntry = {
         round: log.round, phase: log.phase,
-        narrative: log.narrative, ledger,
+        narrative: log.narrative, ledger, icons,
+        ourKnow, aiKnow,
         ts: Date.now(),
       };
       return [entry, ...prev].slice(0, 50);
@@ -1727,7 +1823,7 @@ export default function App() {
       {/* ─── PAS 2: Resursi klan ─── */}
       <ResourceRow game={game} />
 
-      {/* ─── PAS 3: Mapa + Log dogajanja ─── */}
+      {/* ─── PAS 3: Mapa + Časovni trak (log) ─── */}
       <div className="band band-map-log">
         <div className="panel map-panel">
           <div className="panel-head">
@@ -1736,88 +1832,14 @@ export default function App() {
               {(game.mapTiles ?? []).filter(t => t.researchProgress >= 0.50).length} / {(game.mapTiles ?? []).length} raziskanih
             </span>
           </div>
-          <div className="map-layout">
-            <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
-              onPathClick={handlePathClick} expeditions={game.expeditions ?? []}
-              wps={game.aiWeakPoints} drawingMode={scoutObj === 'map'} />
-            <div className="map-side">
-              <div className="cmd-label">Cilj izvidnikov ta mesec ({scouts} izvidnikov)</div>
-              <ScoutObjectiveSelector value={scoutObj} onChange={setScoutObj} />
-              {scoutObj === 'map' && (
-                <div className="path-builder">
-                  <div className="pb-instr dim small">
-                    Klikni sosednji heks, da gradiš pot. Klik na zadnji heks = odznači.
-                  </div>
-                  {draftPath.length < 2 && (
-                    <div className="map-hint">Pot je prazna. Prvi heks je kamp ⌂ — klikni sosednjega.</div>
-                  )}
-                  {draftPath.length >= 2 && (
-                    <div className="path-stats">
-                      <div className="ps-row">
-                        <span className="dim small">Korakov:</span>
-                        <b>{draftPath.length - 1}</b>
-                      </div>
-                      <div className="ps-row">
-                        <span className="dim small">Trajanje:</span>
-                        <b style={{ color: '#cc8800' }}>{draftPathMonths} mesec(ev)</b>
-                      </div>
-                      <div className="ps-row">
-                        <span className="dim small">Skupno tveganje srečanja:</span>
-                        <b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b>
-                      </div>
-                      <div className="ps-row">
-                        <span className="dim small">Izvidnikov:</span>
-                        <b style={{ color: '#3377cc' }}>{scouts}</b>
-                      </div>
-                    </div>
-                  )}
-                  <button className="autofit-btn" disabled={!canStartExpedition}
-                    onClick={() => { /* odprava se odda ob izvedbi meseca; tukaj samo info */ }}>
-                    {canStartExpedition ? '▶ Odprava se odda ob izvedbi meseca' : 'Najprej nariši pot in določi izvidnike'}
-                  </button>
-                </div>
-              )}
-              <div className="map-legend dim small">
-                <div><span style={{ color: '#66ccaa' }}>⌂</span> klan · <span style={{ color: '#cc3333' }}>☣</span> AI jedro</div>
-                <div><span style={{ color: '#cc8800' }}>◆</span> šibka točka · <span style={{ color: '#3377cc' }}>●</span> aktivna odprava</div>
-                <div>rdeč = neraziskan (&lt;50%) · moder = raziskan · sij = domač (100%)</div>
-              </div>
-            </div>
+          <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
+            onPathClick={handlePathClick} expeditions={game.expeditions ?? []}
+            wps={game.aiWeakPoints} drawingMode={scoutObj === 'map'} />
+          <div className="map-legend dim small" style={{ marginTop: 8 }}>
+            <span style={{ color: '#66ccaa' }}>⌂</span> klan · <span style={{ color: '#cc3333' }}>☣</span> AI jedro ·
+            <span style={{ color: '#cc8800' }}> ◆</span> šibka točka · <span style={{ color: '#3377cc' }}> ●</span> aktivna odprava ·
+            rdeč = neraziskan · moder = raziskan · sij = domač
           </div>
-
-          {/* Aktivne odprave */}
-          {(game.expeditions ?? []).length > 0 && (
-            <div className="active-expeditions">
-              <div className="cmd-label" style={{ marginTop: 12, marginBottom: 6 }}>Aktivne odprave</div>
-              {game.expeditions.map(e => {
-                const steps = e.path.length - 1;
-                const done = e.currentIndex;
-                const target = e.path[e.path.length - 1];
-                return (
-                  <div key={e.id} className="exp-card">
-                    <div className="exp-head">
-                      <span className="exp-kind" style={{ color: e.kind === 'mission' ? '#cc8800' : '#22ccff' }}>
-                        {e.kind === 'mission' ? '🎯' : '🔭'} {e.assigned} ljudi
-                      </span>
-                      <span className="dim small">cilj: ({target?.q},{target?.r})</span>
-                    </div>
-                    <div className="exp-progress">
-                      <div className="ep-track">
-                        <div className="ep-fill" style={{ width: `${(done / Math.max(1, steps)) * 100}%`,
-                          background: e.kind === 'mission' ? '#cc8800' : '#22ccff' }} />
-                      </div>
-                      <span className="dim small">{done} / {steps}</span>
-                    </div>
-                    {e.encountersLog.length > 0 && (
-                      <div className="exp-events dim small">
-                        {e.encountersLog.slice(-2).join(' · ')}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
         <EventLog entries={eventLog} />
       </div>
@@ -1893,6 +1915,83 @@ export default function App() {
             </button>
           )}
         </div>
+
+        {/* Cilj izvidnikov — odločitev kam gredo + risanje poti */}
+        <div className="cmd-section">
+          <div className="cmd-label">🔭 Cilj izvidnikov ta mesec ({scouts} izvidnikov)</div>
+          <ScoutObjectiveSelector value={scoutObj} onChange={setScoutObj} />
+          {scoutObj === 'map' && (
+            <div className="path-builder">
+              <div className="pb-instr dim small">
+                Klikni sosednji heks na mapi, da gradiš pot odprave. Klik na zadnji heks = odznači.
+              </div>
+              {draftPath.length < 2 && (
+                <div className="map-hint">Pot je prazna. Prvi heks je kamp ⌂ — klikni sosednjega na mapi zgoraj.</div>
+              )}
+              {draftPath.length >= 2 && (
+                <div className="path-stats">
+                  <div className="ps-row">
+                    <span className="dim small">Korakov:</span>
+                    <b>{draftPath.length - 1}</b>
+                  </div>
+                  <div className="ps-row">
+                    <span className="dim small">Trajanje:</span>
+                    <b style={{ color: '#cc8800' }}>{draftPathMonths} mesec(ev)</b>
+                  </div>
+                  <div className="ps-row">
+                    <span className="dim small">Skupno tveganje srečanja:</span>
+                    <b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b>
+                  </div>
+                  <div className="ps-row">
+                    <span className="dim small">Izvidnikov za odpravo:</span>
+                    <b style={{ color: '#3377cc' }}>{scouts}</b>
+                  </div>
+                </div>
+              )}
+              <div className="dim small" style={{ marginTop: 6 }}>
+                {canStartExpedition
+                  ? '✓ Pripravljeno — odprava se sproži ob izvedbi meseca'
+                  : 'Najprej nariši pot na mapi in določi vsaj 1 izvidnika'}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Aktivne odprave */}
+        {(game.expeditions ?? []).length > 0 && (
+          <div className="cmd-section">
+            <div className="cmd-label">Aktivne odprave ({game.expeditions.length})</div>
+            <div className="active-expeditions">
+              {game.expeditions.map(e => {
+                const steps = e.path.length - 1;
+                const done = e.currentIndex;
+                const target = e.path[e.path.length - 1];
+                return (
+                  <div key={e.id} className="exp-card">
+                    <div className="exp-head">
+                      <span className="exp-kind" style={{ color: e.kind === 'mission' ? '#cc8800' : '#22ccff' }}>
+                        {e.kind === 'mission' ? '🎯' : '🔭'} {e.assigned} ljudi
+                      </span>
+                      <span className="dim small">cilj: ({target?.q},{target?.r})</span>
+                    </div>
+                    <div className="exp-progress">
+                      <div className="ep-track">
+                        <div className="ep-fill" style={{ width: `${(done / Math.max(1, steps)) * 100}%`,
+                          background: e.kind === 'mission' ? '#cc8800' : '#22ccff' }} />
+                      </div>
+                      <span className="dim small">{done} / {steps}</span>
+                    </div>
+                    {e.encountersLog.length > 0 && (
+                      <div className="exp-events dim small">
+                        {e.encountersLog.slice(-2).join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <OddsDisplay odds={odds} combatants={combatants} />
 

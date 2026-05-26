@@ -1098,3 +1098,56 @@ input[type=range]::-moz-range-thumb {
   display: flex; gap: 12px; flex-wrap: wrap;
 }
 .cs-resources .res-stat { min-width: 120px; flex: 1; }
+
+/* ─── BalanceTrend ───────────────────────────────────────────────────────── */
+.balance-trend {
+  margin-bottom: 8px; padding: 6px 8px;
+  background: #060606; border: 1px solid var(--border);
+}
+.bt-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.bt-title { font-size: .62rem; letter-spacing: .12em; color: var(--dim); }
+.bt-delta { font-size: .85rem; font-weight: bold; }
+.bt-svg { width: 100%; height: 56px; display: block; }
+.bt-legend { display: flex; justify-content: space-between; gap: 6px; margin-top: 3px; }
+
+/* ─── Timeline rows ─────────────────────────────────────────────────────── */
+.timeline-scroll {
+  display: flex; flex-direction: column; gap: 3px;
+  max-height: 540px; overflow-y: auto; padding-right: 2px;
+}
+.timeline-scroll::-webkit-scrollbar { width: 6px; }
+.timeline-scroll::-webkit-scrollbar-thumb { background: #2a2a2a; }
+.timeline-scroll::-webkit-scrollbar-track { background: #0a0a0a; }
+
+.tl-row {
+  background: var(--bg2);
+  border-left: 2px solid #2a2a2a;
+  cursor: pointer;
+  transition: background .12s;
+}
+.tl-row:hover { background: #161616; }
+.tl-row.open { background: #14110a; border-left-color: #cc8800; }
+.tl-row:first-child { border-left-color: #cc8800; }
+
+.tl-row-main {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 8px;
+}
+.tl-round {
+  font-size: .68rem; font-weight: bold;
+  padding: 1px 5px; border: 1px solid;
+  min-width: 32px; text-align: center;
+}
+.tl-icons { display: flex; gap: 3px; flex: 0 0 auto; }
+.tl-icon { font-size: .95rem; line-height: 1; }
+.tl-mini-ledger {
+  display: flex; gap: 4px; flex: 1; flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.tl-chip { font-size: .68rem; font-weight: bold; white-space: nowrap; }
+.tl-expand { font-size: .8rem; }
+
+.tl-row-detail {
+  padding: 6px 10px 10px 10px;
+  border-top: 1px dashed var(--border2);
+}
