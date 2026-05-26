@@ -65,20 +65,17 @@ export function raidProbability(state: GameState, axis: HumanAxis): number {
   return Math.max(0, Math.min(1, p));
 }
 
-/** Verjetnost, da obramba odbije napad ob danem času dneva.
- *  Branilci, ki spijo, se borijo le s ~30 % polne moči (zbujeni, slabo opremljeni). */
-export function raidRepelProbability(state: GameState, assignment: Assignment, timeOfDay: 'day' | 'night' = 'day'): number {
-  const awake = timeOfDay === 'day' ? assignment.dayGuard : assignment.nightGuard;
-  const asleep = timeOfDay === 'day' ? assignment.nightGuard : assignment.dayGuard;
-  if (awake + asleep <= 0) return 0;
+/** Verjetnost, da obramba odbije napad. Vsi branilci so v boju. */
+export function raidRepelProbability(state: GameState, assignment: Assignment): number {
+  const defenders = (assignment.defenders ?? 0) + (assignment.dayGuard ?? 0) + (assignment.nightGuard ?? 0);
+  if (defenders <= 0) return 0;
   const tier = RATIONS_LEVELS[assignment.rations ?? DEFAULT_RATIONS] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
   const axisH = state.axisHistory ?? { hiding: 0, espionage: 0, defense: 0 };
   const defenseLvl = Math.floor((axisH.defense ?? 0) / 3);
   const intelB = intelCombatBonus(state);
-  const awakeStr = awake * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult * (1 + 0.10 * defenseLvl);
-  const sleepStr = asleep * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult * 0.30;
-  const equip = Math.min(state.resources.combat, awake + asleep) * DEFENDER_EQUIPMENT_MULT;
-  const defStr = (awakeStr + sleepStr + equip) * (1 + intelB);
+  const base = defenders * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult * (1 + 0.10 * defenseLvl);
+  const equip = Math.min(state.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT;
+  const defStr = (base + equip) * (1 + intelB);
   const aiForce = Math.floor(state.aiRobots * (1 - state.clanActivity) * RAID_AI_FORCE_PCT);
   const aiStr = aiForce * AI_ROBOT_STRENGTH;
   return defStr / (defStr + Math.max(1, aiStr));
@@ -105,12 +102,11 @@ export function scoutCaptureProbability(state: GameState, assignment: Assignment
   return Math.max(0, Math.min(0.80, p));
 }
 
-/** Pričakovana varnost za nabiralce (in spečo stražo). */
+/** Pričakovana varnost za nabiralce. */
 export function forageSafetyProbability(state: GameState, assignment: Assignment): number {
   const pRaid = raidProbability(state, assignment.axis);
-  // Predpostavi povprečje dan/noč
-  const pRepelAvg = (raidRepelProbability(state, assignment, 'day') + raidRepelProbability(state, assignment, 'night')) / 2;
-  return Math.max(0, Math.min(1, 1 - pRaid * (1 - pRepelAvg)));
+  const pRepel = raidRepelProbability(state, assignment);
+  return Math.max(0, Math.min(1, 1 - pRaid * (1 - pRepel)));
 }
 
 // ─── Misije proti šibkim točkam ───────────────────────────────────────────
@@ -143,62 +139,53 @@ function outcomeFromP(p: number): Outcome {
   return 'annihilation';
 }
 
-/** Resolve raid — z dnem/nočjo + uničenjem orožja v skladišču. */
+/** Resolve raid — vsi branilci se borijo + uničenje neuporabljenega orožja. */
 function resolveRaid(
   state: GameState, assignment: Assignment, rng: RNGState
 ): { result: RaidResult; rng: RNGState } {
-  // Roll dan/noč
-  const [todRoll, rng2] = rngNext(rng); rng = rng2;
-  const timeOfDay: 'day' | 'night' = todRoll < 0.5 ? 'day' : 'night';
-  const awake = timeOfDay === 'day' ? assignment.dayGuard : assignment.nightGuard;
-  const asleep = timeOfDay === 'day' ? assignment.nightGuard : assignment.dayGuard;
-
-  const p = raidRepelProbability(state, assignment, timeOfDay);
+  const defenders = (assignment.defenders ?? 0) + (assignment.dayGuard ?? 0) + (assignment.nightGuard ?? 0);
+  const p = raidRepelProbability(state, assignment);
   const outcome = outcomeFromP(p);
   const aiForce = Math.floor(state.aiRobots * (1 - state.clanActivity) * RAID_AI_FORCE_PCT);
 
-  let defendersLost = 0, sleepersLost = 0, foragersLost = 0, aiRobotsDestroyed = 0;
+  let defendersLost = 0, foragersLost = 0, aiRobotsDestroyed = 0;
   switch (outcome) {
     case 'victory':
-      defendersLost     = Math.floor(awake * 0.05);
-      sleepersLost      = Math.floor(asleep * 0.05);
+      defendersLost     = Math.floor(defenders * 0.05);
       foragersLost      = 0;
       aiRobotsDestroyed = Math.floor(aiForce * 0.80);
       break;
     case 'partial':
-      defendersLost     = Math.floor(awake * 0.25);
-      sleepersLost      = Math.floor(asleep * 0.40);
+      defendersLost     = Math.floor(defenders * 0.25);
       foragersLost      = Math.floor(assignment.foragers * 0.15);
       aiRobotsDestroyed = Math.floor(aiForce * 0.35);
       break;
     case 'defeat':
-      defendersLost     = Math.floor(awake * 0.60);
-      sleepersLost      = Math.floor(asleep * 0.80);
+      defendersLost     = Math.floor(defenders * 0.60);
       foragersLost      = Math.floor(assignment.foragers * 0.40);
       aiRobotsDestroyed = Math.floor(aiForce * 0.12);
       break;
     case 'annihilation':
-      defendersLost     = awake;
-      sleepersLost      = asleep;
+      defendersLost     = defenders;
       foragersLost      = Math.floor(assignment.foragers * 0.70);
       aiRobotsDestroyed = Math.floor(aiForce * 0.03);
       break;
   }
 
   // Uničenje orožja v skladišču (kar ni v rabi, ko napadejo)
-  const weaponsInUse = awake + asleep + assignment.combatants;
+  const weaponsInUse = defenders + assignment.combatants;
   const weaponsIdle  = Math.max(0, state.resources.combat - weaponsInUse);
   let weaponsDestroyed = 0;
   if (weaponsIdle > 0) {
-    const [pctRoll, rng3] = rngInt(rng, WEAPON_DESTROY_MIN_PCT * 100, WEAPON_DESTROY_MAX_PCT * 100);
-    rng = rng3;
+    const [pctRoll, rng2] = rngInt(rng, WEAPON_DESTROY_MIN_PCT * 100, WEAPON_DESTROY_MAX_PCT * 100);
+    rng = rng2;
     weaponsDestroyed = Math.floor(weaponsIdle * pctRoll / 100);
   }
 
   return {
     result: {
-      occurred: true, outcome, timeOfDay,
-      defendersLost, sleepersLost, foragersLost, aiRobotsDestroyed, weaponsDestroyed,
+      occurred: true, outcome,
+      defendersLost, foragersLost, aiRobotsDestroyed, weaponsDestroyed,
       successProbability: p,
     },
     rng,
@@ -251,24 +238,22 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   let rng: RNGState = { seed: state.rngSeed, calls: state.rngCallCount };
   const { assignment: rawAssignment, targetWeakPoint } = action;
 
-  // Normaliziraj — backward compat in clamp na orožje
+  // Normaliziraj — backward compat (dayGuard+nightGuard → defenders) + clamp na orožje
   const cap = Math.floor(state.resources.combat);
-  // dayGuard + nightGuard + combatants ≤ orožje
-  const wantedDay   = rawAssignment.dayGuard   ?? 0;
-  const wantedNight = rawAssignment.nightGuard ?? 0;
+  const wantedDefenders = (rawAssignment.defenders ?? 0)
+    + (rawAssignment.dayGuard ?? 0) + (rawAssignment.nightGuard ?? 0);
   const wantedCombat = rawAssignment.combatants ?? 0;
-  const totalArmed = wantedDay + wantedNight + wantedCombat;
+  const totalArmed = wantedDefenders + wantedCombat;
   let assignment: Assignment;
   if (totalArmed > cap && totalArmed > 0) {
     const k = cap / totalArmed;
     assignment = {
       ...rawAssignment,
       combatants: Math.floor(wantedCombat * k),
-      dayGuard:   Math.floor(wantedDay * k),
-      nightGuard: Math.floor(wantedNight * k),
+      defenders:  Math.floor(wantedDefenders * k),
     };
   } else {
-    assignment = { ...rawAssignment, combatants: wantedCombat, dayGuard: wantedDay, nightGuard: wantedNight };
+    assignment = { ...rawAssignment, combatants: wantedCombat, defenders: wantedDefenders };
   }
 
   // 0. Človekovo drevo napredka — bonusi iz zgodovine osi
@@ -395,34 +380,23 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     const { result: raidRes, rng: rngR2 } = resolveRaid(state, assignment, rng);
     rng = rngR2;
     raidLog = raidRes;
-    const defSave = Math.floor((raidRes.defendersLost + raidRes.sleepersLost) * 0.10 * defenseLvl);
-    const totalGuardLost = Math.max(0, raidRes.defendersLost + raidRes.sleepersLost - defSave);
+    const defSave = Math.floor(raidRes.defendersLost * 0.10 * defenseLvl);
+    const actualDef = Math.max(0, raidRes.defendersLost - defSave);
     const forSave = Math.floor(raidRes.foragersLost  * 0.10 * defenseLvl);
     const actualFor = Math.max(0, raidRes.foragersLost  - forSave);
-    population -= totalGuardLost + actualFor;
-    // Smrti branilcev → izguba orožja
-    combat = Math.max(0, combat - totalGuardLost);
-    // Uničeno orožje v skladišču
+    population -= actualDef + actualFor;
+    combat = Math.max(0, combat - actualDef);
     combat = Math.max(0, combat - raidRes.weaponsDestroyed);
     aiRobots = Math.max(0, aiRobots - raidRes.aiRobotsDestroyed);
     if (defSave > 0 || forSave > 0) {
-      // Proporcionalno zmanjšaj logirana stanja
-      const k1 = (raidRes.defendersLost + raidRes.sleepersLost) > 0
-        ? Math.max(0, raidRes.defendersLost + raidRes.sleepersLost - defSave) / (raidRes.defendersLost + raidRes.sleepersLost)
-        : 1;
-      raidLog = {
-        ...raidRes,
-        defendersLost: Math.floor(raidRes.defendersLost * k1),
-        sleepersLost:  Math.floor(raidRes.sleepersLost  * k1),
-        foragersLost:  actualFor,
-      };
+      raidLog = { ...raidRes, defendersLost: actualDef, foragersLost: actualFor };
     }
     aiKnowledge = Math.min(1, aiKnowledge + (raidRes.outcome === 'victory' ? 0.03 : raidRes.outcome === 'partial' ? 0.07 : 0.15));
   } else {
-    raidLog = { occurred: false, outcome: null, timeOfDay: null,
-      defendersLost: 0, sleepersLost: 0, foragersLost: 0,
+    raidLog = { occurred: false, outcome: null,
+      defendersLost: 0, foragersLost: 0,
       aiRobotsDestroyed: 0, weaponsDestroyed: 0,
-      successProbability: (raidRepelProbability(state, assignment, 'day') + raidRepelProbability(state, assignment, 'night')) / 2 };
+      successProbability: raidRepelProbability(state, assignment) };
   }
 
   // 6c. Pop loss od ujetih izvidnikov
@@ -780,9 +754,7 @@ export function previewOdds(state: GameState, assignment: Assignment) {
     humanStrength: humanStr,
     aiStrength: aiStr,
     raidProbability: raidProbability(state, assignment.axis),
-    raidRepelProbability: (raidRepelProbability(state, assignment, 'day') + raidRepelProbability(state, assignment, 'night')) / 2,
-    raidRepelProbabilityDay:   raidRepelProbability(state, assignment, 'day'),
-    raidRepelProbabilityNight: raidRepelProbability(state, assignment, 'night'),
+    raidRepelProbability: raidRepelProbability(state, assignment),
     scoutSuccessProbability: scoutSuccessProbability(state, assignment),
     scoutCaptureProbability: scoutCaptureProbability(state, assignment),
     forageSafetyProbability: forageSafetyProbability(state, assignment),

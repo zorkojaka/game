@@ -653,29 +653,27 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
 }
 
 /** Vizualna razporeditev populacije */
-function PeopleBar({ pop, combatants, dayGuard, nightGuard, foragers, scouts, inMissions, newMission }: {
-  pop: number; combatants: number; dayGuard: number; nightGuard: number;
+function PeopleBar({ pop, combatants, defenders, foragers, scouts, inMissions, newMission }: {
+  pop: number; combatants: number; defenders: number;
   foragers: number; scouts: number; inMissions: number; newMission: number;
 }) {
-  const used = combatants + dayGuard + nightGuard + foragers + scouts + inMissions + newMission;
+  const used = combatants + defenders + foragers + scouts + inMissions + newMission;
   const free = Math.max(0, pop - used);
   const over = used > pop;
   if (pop === 0) return null;
   return (
     <div className="people-bar-wrap">
       <div className={`people-bar ${over ? 'over' : ''}`}>
-        {combatants > 0 && <div className="pb-seg combat"   style={{ flex: combatants }} title={`Napad: ${combatants}`} />}
-        {dayGuard   > 0 && <div className="pb-seg day"      style={{ flex: dayGuard }}   title={`Dnevna straža: ${dayGuard}`} />}
-        {nightGuard > 0 && <div className="pb-seg night"    style={{ flex: nightGuard }} title={`Nočna straža: ${nightGuard}`} />}
-        {foragers   > 0 && <div className="pb-seg forage"   style={{ flex: foragers }}   title={`Nabiralci: ${foragers}`} />}
-        {scouts     > 0 && <div className="pb-seg scout"    style={{ flex: scouts }}     title={`Izvidniki: ${scouts}`} />}
+        {combatants > 0 && <div className="pb-seg combat"  style={{ flex: combatants }} title={`Napad: ${combatants}`} />}
+        {defenders  > 0 && <div className="pb-seg defense" style={{ flex: defenders }}  title={`Obramba: ${defenders}`} />}
+        {foragers   > 0 && <div className="pb-seg forage"  style={{ flex: foragers }}   title={`Nabiralci: ${foragers}`} />}
+        {scouts     > 0 && <div className="pb-seg scout"   style={{ flex: scouts }}     title={`Izvidniki: ${scouts}`} />}
         {(inMissions + newMission) > 0 && <div className="pb-seg mission" style={{ flex: inMissions + newMission }} title={`V misijah: ${inMissions + newMission}`} />}
-        {free       > 0 && <div className="pb-seg free"     style={{ flex: free }}       title={`Prosti: ${free}`} />}
+        {free       > 0 && <div className="pb-seg free"    style={{ flex: free }}       title={`Prosti: ${free}`} />}
       </div>
       <div className="pb-legend">
         <span className="pbl combat">⚔ {combatants}</span>
-        <span className="pbl day">🌞 {dayGuard}</span>
-        <span className="pbl night">🌜 {nightGuard}</span>
+        <span className="pbl defense">🛡 {defenders}</span>
         <span className="pbl forage">🌾 {foragers}</span>
         <span className="pbl scout">🔭 {scouts}</span>
         {(inMissions + newMission) > 0 && <span className="pbl mission">🎯 {inMissions + newMission}</span>}
@@ -1373,8 +1371,7 @@ export default function App() {
   const [loading,    setLoading]    = useState(false);
   const [axis,       setAxis]       = useState<HumanAxis>('hiding');
   const [combatants,   setCombatants]   = useState(0);
-  const [defenseTotal, setDefenseTotal] = useState(15);
-  const [dayGuard,     setDayGuard]     = useState(8); // dnevni del; nočni = total - day
+  const [defenders,    setDefenders]    = useState(15);
   const [foragers,     setForagers]     = useState(20);
   const [scouts,       setScouts]       = useState(10);
   const [missions,     setMissions]     = useState<Record<string, number>>({});
@@ -1383,8 +1380,6 @@ export default function App() {
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
-
-  const nightGuard = Math.max(0, defenseTotal - dayGuard);
   const [targetWP,   setTargetWP]   = useState('');
   const [rations,    setRations]    = useState(3);
   const [odds,         setOdds]         = useState<OddsPreview | null>(null);
@@ -1470,12 +1465,12 @@ export default function App() {
   useEffect(() => {
     if (!game || game.status !== 'active') return;
     const t = setTimeout(() => {
-      previewOdds(game.runId, { axis, combatants, dayGuard, nightGuard, foragers, scouts, rations,
+      previewOdds(game.runId, { axis, combatants, defenders, foragers, scouts, rations,
         missionAssignments: missions, missionRations: missionR,
         scoutPlan: { objective: scoutObj, targetTileIds: Array.from(scoutTargets) } }).then(setOdds).catch(() => setOdds(null));
     }, 250);
     return () => clearTimeout(t);
-  }, [game?.runId, game?.totalRounds, axis, combatants, defenseTotal, dayGuard, foragers, scouts, rations,
+  }, [game?.runId, game?.totalRounds, axis, combatants, defenders, foragers, scouts, rations,
       JSON.stringify(missions), JSON.stringify(missionR), scoutObj, scoutTargets.size]);
 
   const handleNew = async () => {
@@ -1484,7 +1479,7 @@ export default function App() {
       const g = await createGame();
       setGame(g);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('hiding'); setCombatants(0); setDefenseTotal(15); setDayGuard(8); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('ai_weakpoints'); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]);
+      setAxis('hiding'); setCombatants(0); setDefenders(15); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('ai_weakpoints'); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]);
     } finally { setLoading(false); }
   };
 
@@ -1497,7 +1492,7 @@ export default function App() {
         newExpeditions.push({ kind: 'scout', path: draftPath, assigned: scouts, rations });
       }
       const { state } = await playRound(game.runId, {
-        assignment: { axis, combatants, dayGuard, nightGuard, foragers, scouts, rations,
+        assignment: { axis, combatants, defenders, foragers, scouts, rations,
           missionAssignments: missions, missionRations: missionR,
           scoutPlan: { objective: scoutObj, targetTileIds: Array.from(scoutTargets) },
           newExpeditions: newExpeditions.length > 0 ? newExpeditions : undefined },
@@ -1517,28 +1512,23 @@ export default function App() {
                    + (game?.expeditions ?? []).reduce((s, e) => s + e.assigned, 0);
   // Pa še novi razporedi v misije ta mesec
   const newMissionPeople = Object.values(missions).reduce((s, v) => s + v, 0);
-  const assignedHome = combatants + defenseTotal + foragers + scouts;
+  const assignedHome = combatants + defenders + foragers + scouts;
   const assigned    = assignedHome + newMissionPeople;
   const availablePop = Math.max(0, pop - inMissions);
   const over = assignedHome + newMissionPeople > availablePop;
 
   const weaponCap = game ? Math.floor(game.resources.combat) : 0;
-  const armedTotal = combatants + defenseTotal;
+  const armedTotal = combatants + defenders;
   const overArmed  = armedTotal > weaponCap;
 
   type SliderKey = 'c' | 'd' | 'f' | 's';
   function setSliderClamped(which: SliderKey, newVal: number) {
     const v = Math.max(0, Math.min(availablePop, Math.floor(newVal)));
-    const cur = { c: combatants, d: defenseTotal, f: foragers, s: scouts };
+    const cur = { c: combatants, d: defenders, f: foragers, s: scouts };
     cur[which] = v;
     const total = cur.c + cur.d + cur.f + cur.s + newMissionPeople;
     if (total <= availablePop) {
-      // Posebej: če se spremeni "d", ohrani split razmerje
-      if (which === 'd') {
-        const ratio = defenseTotal > 0 ? dayGuard / defenseTotal : 0.5;
-        setDayGuard(Math.round(cur.d * ratio));
-      }
-      setCombatants(cur.c); setDefenseTotal(cur.d); setForagers(cur.f); setScouts(cur.s);
+      setCombatants(cur.c); setDefenders(cur.d); setForagers(cur.f); setScouts(cur.s);
       return;
     }
     const others = (['c','d','f','s'] as const).filter(k => k !== which);
@@ -1550,16 +1540,7 @@ export default function App() {
       const scale = capLeft / otherSum;
       others.forEach(k => { cur[k] = Math.floor(cur[k] * scale); });
     }
-    // Če smo skrčili defenseTotal, prilagodi dayGuard
-    if (cur.d !== defenseTotal) {
-      const ratio = defenseTotal > 0 ? dayGuard / defenseTotal : 0.5;
-      setDayGuard(Math.round(cur.d * ratio));
-    }
-    if (which === 'd') {
-      const ratio = defenseTotal > 0 ? dayGuard / defenseTotal : 0.5;
-      setDayGuard(Math.round(cur.d * ratio));
-    }
-    setCombatants(cur.c); setDefenseTotal(cur.d); setForagers(cur.f); setScouts(cur.s);
+    setCombatants(cur.c); setDefenders(cur.d); setForagers(cur.f); setScouts(cur.s);
   }
 
   function toggleScoutTarget(id: string) {
@@ -1627,10 +1608,7 @@ export default function App() {
     if (assigned === 0 || availablePop === 0) return;
     const scale = availablePop / assigned;
     setCombatants(Math.floor(combatants * scale));
-    const newDefTotal = Math.floor(defenseTotal * scale);
-    const ratio = defenseTotal > 0 ? dayGuard / defenseTotal : 0.5;
-    setDefenseTotal(newDefTotal);
-    setDayGuard(Math.round(newDefTotal * ratio));
+    setDefenders(Math.floor(defenders * scale));
     setForagers(Math.floor(foragers * scale));
     setScouts(Math.floor(scouts * scale));
     const newMap: Record<string, number> = {};
@@ -1808,48 +1786,20 @@ export default function App() {
               { key: 'c', label: 'Napad',     icon: '⚔', color: '#cc4433', count: combatants,
                 yieldText: `+${(combatants * 1.2 * rTier.strengthMult).toFixed(0)} moč · ${combatants} orožja`,
                 probLabel: combatants > 0 ? 'Zmaga' : undefined, prob: combatants > 0 ? odds?.successProbability : undefined },
-              { key: 'd', label: 'Obramba',   icon: '🛡', color: '#66aabb', count: defenseTotal,
-                yieldText: `${defenseTotal} stražarjev · ${defenseTotal} orožja`,
-                extraLabel: defenseTotal > 0 ? (
-                  <div className="defense-split inline">
-                    <div className="ds-prob-row">
-                      <span className="ds-prob-day small">
-                        🌞 dan <b>{dayGuard}</b>
-                        <span style={{ color: probColor(odds?.raidRepelProbabilityDay ?? 0), marginLeft: 4 }}>
-                          {odds ? Math.round(odds.raidRepelProbabilityDay * 100) : 0}%
-                        </span>
-                      </span>
-                      <span className="ds-prob-night small">
-                        <span style={{ color: probColor(odds?.raidRepelProbabilityNight ?? 0), marginRight: 4 }}>
-                          {odds ? Math.round(odds.raidRepelProbabilityNight * 100) : 0}%
-                        </span>
-                        <b>{nightGuard}</b> noč 🌜
-                      </span>
-                    </div>
-                    <input type="range" min={0} max={defenseTotal} value={dayGuard} step={1}
-                      onChange={e => setDayGuard(Math.max(0, Math.min(defenseTotal, +e.target.value)))}
-                      className="ds-slider"
-                      style={{ ['--pct' as never]: `${defenseTotal > 0 ? (dayGuard / defenseTotal * 100).toFixed(1) : 0}%` } as React.CSSProperties} />
-                  </div>
-                ) : undefined },
+              { key: 'd', label: 'Obramba',   icon: '🛡', color: '#66aabb', count: defenders,
+                yieldText: `${defenders} stražarjev · ${defenders} orožja`,
+                probLabel: 'Odbije napad', prob: odds?.raidRepelProbability },
               { key: 'f', label: 'Nabiralci', icon: '🌾', color: '#6aa630', count: foragers,
                 yieldText: `${survBalance >= 0 ? '+' : ''}${survBalance} hrana`,
                 probLabel: 'Brez izgub', prob: odds?.forageSafetyProbability },
               { key: 's', label: 'Izvidniki', icon: '🔭', color: '#3377cc', count: scouts,
                 yieldText: `+${scoutIntel} intel`,
                 probLabel: scouts > 0 ? 'Uspeh' : undefined, prob: scouts > 0 ? odds?.scoutSuccessProbability : undefined },
-              { key: '_', label: 'Prosti',    icon: '·', color: '#666666', count: Math.max(0, availablePop - combatants - defenseTotal - foragers - scouts) },
+              { key: '_', label: 'Prosti',    icon: '·', color: '#888888', count: Math.max(0, availablePop - combatants - defenders - foragers - scouts) },
             ]}
             onTransfer={(nc) => {
               const [nC, nD, nF, nS] = nc;
-              // Ohrani day/night razmerje pri spremembi obrambe
-              if (nD !== defenseTotal && defenseTotal > 0) {
-                const ratio = dayGuard / defenseTotal;
-                setDayGuard(Math.round(nD * ratio));
-              } else if (nD !== defenseTotal && defenseTotal === 0) {
-                setDayGuard(Math.floor(nD / 2));
-              }
-              setCombatants(nC); setDefenseTotal(nD); setForagers(nF); setScouts(nS);
+              setCombatants(nC); setDefenders(nD); setForagers(nF); setScouts(nS);
             }}
           />
 

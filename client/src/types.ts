@@ -75,8 +75,7 @@ export function tileId(t: { q: number; r: number }): string {
 export interface Assignment {
   axis: HumanAxis;
   combatants: number;
-  dayGuard: number;
-  nightGuard: number;
+  defenders: number;
   foragers: number;
   scouts: number;
   rations: number;
@@ -84,6 +83,8 @@ export interface Assignment {
   missionRations?: Record<string, number>;
   scoutPlan?: ScoutPlan;
   newExpeditions?: NewExpeditionInput[];
+  dayGuard?: number;
+  nightGuard?: number;
 }
 
 export interface Mission {
@@ -100,9 +101,7 @@ export interface Mission {
 export interface RaidResult {
   occurred: boolean;
   outcome: 'victory' | 'partial' | 'defeat' | 'annihilation' | null;
-  timeOfDay: 'day' | 'night' | null;
   defendersLost: number;
-  sleepersLost: number;
   foragersLost: number;
   aiRobotsDestroyed: number;
   weaponsDestroyed: number;
@@ -161,8 +160,6 @@ export interface OddsPreview {
   aiStrength: number;
   raidProbability: number;
   raidRepelProbability: number;
-  raidRepelProbabilityDay: number;
-  raidRepelProbabilityNight: number;
   scoutSuccessProbability: number;
   scoutCaptureProbability: number;
   forageSafetyProbability: number;

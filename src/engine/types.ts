@@ -89,22 +89,19 @@ export function tileId(t: { q: number; r: number }): string {
 }
 
 export interface Assignment {
-  // Os ni več izbira na rundo — izhaja iz nadgradenj v Človekovem drevesu
-  axis: HumanAxis;          // ohrani za backward compat; izvedeno iz humanFocus
-  combatants: number;       // NAPAD: gredo udariti AI
-  dayGuard: number;         // OBRAMBA — dnevna straža
-  nightGuard: number;       // OBRAMBA — nočna straža
-  foragers: number;         // iščejo preživetvene vire (v kampu)
-  scouts: number;           // špijonaža / research (na terenu)
-  rations: number;          // 1–5
-  // Razporeditev v misije (po WP id-ju)
+  axis: HumanAxis;
+  combatants: number;       // NAPAD
+  defenders: number;        // OBRAMBA (enotna, brez dan/noč razdelitve)
+  foragers: number;
+  scouts: number;
+  rations: number;
   missionAssignments?: Record<string, number>;
-  // Obroki za ekipe na misijah (po WP id-ju, 1–5)
   missionRations?: Record<string, number>;
-  // Kam gredo izvidniki (default = ai_weakpoints za backward compat)
   scoutPlan?: ScoutPlan;
-  // Nove odprave, ki jih igralec sproži ta mesec (scout/mission s potjo)
   newExpeditions?: NewExpeditionInput[];
+  // Legacy (ne uporabljati — ohranjeno za stara state-a)
+  dayGuard?: number;
+  nightGuard?: number;
 }
 
 export interface Mission {
@@ -122,12 +119,10 @@ export interface Mission {
 export interface RaidResult {
   occurred: boolean;
   outcome: 'victory' | 'partial' | 'defeat' | 'annihilation' | null;
-  timeOfDay: 'day' | 'night' | null;   // dnevni ali nočni napad
-  defendersLost: number;                 // straža, ki je bila buden
-  sleepersLost: number;                  // straža, ki je spala (delna škoda + foragerji)
+  defendersLost: number;
   foragersLost: number;
   aiRobotsDestroyed: number;
-  weaponsDestroyed: number;              // če orožje ni v rabi
+  weaponsDestroyed: number;
   successProbability: number;
 }
 
