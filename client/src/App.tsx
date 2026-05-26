@@ -115,10 +115,9 @@ function DualKnowledge({ ourK, aiK }: { ourK: number; aiK: number }) {
   );
 }
 
-/** Faza header: badge, oznaka, pike za mesece, dvojni meter */
-function PhaseHeader({ game }: { game: GameState }) {
+/** Faza header: badge, oznaka, pike za mesece, gumb za novo igro */
+function PhaseHeader({ game, onNewGame, loading }: { game: GameState; onNewGame: () => void; loading: boolean }) {
   const p = PHASE[game.phase];
-  const ourK = calcOurKnowledge(game.aiTree);
   return (
     <header className="phase-header">
       <div className="ph-badge" style={{ borderColor: p.color, color: p.color }}>{p.num}</div>
@@ -135,20 +134,25 @@ function PhaseHeader({ game }: { game: GameState }) {
           <span className="ph-total dim">·  {game.totalRounds}/36</span>
         </div>
       </div>
-      <DualKnowledge ourK={ourK} aiK={game.aiKnowledge} />
+      <button className="ph-newgame" onClick={onNewGame} disabled={loading} title="Nova igra">
+        {loading ? '⟳' : '↺ Nova igra'}
+      </button>
     </header>
   );
 }
 
-/** Resursna vrstica — samo svetne/AI info na vrhu */
+/** Resursna vrstica — sovražne info + dvojni meter znanja */
 function ResourceRow({ game }: { game: GameState }) {
   const robotMax = 200;
+  const ourK = calcOurKnowledge(game.aiTree);
   return (
     <div className="resource-row">
       <div className="res-group enemy">
         <ResStat icon="🤖" label="AI roboti"    value={game.aiRobots}                         max={robotMax} color="#bb3333" />
         <ResStat icon="🌍" label="Klani aktiv"  value={Math.round(game.clanActivity * 100)}    max={100} />
       </div>
+      <div className="res-divider" />
+      <DualKnowledge ourK={ourK} aiK={game.aiKnowledge} />
     </div>
   );
 }
@@ -550,7 +554,8 @@ type AllocRole = {
   yieldText?: string;
   probLabel?: string;
   prob?: number;
-  extraLabel?: React.ReactNode;   // dodatne komponente v naslovni vrstici (npr. day/night split slider)
+  extraLabel?: React.ReactNode;
+  contextTop?: React.ReactNode;    // konteksten control/info NAD vlogo (verjetnost / rations / scout obj)
 };
 
 /** Prerazporedi števila po proporcionalnem ključu: focusIdx se spremeni za `delta`,
@@ -643,6 +648,15 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
 
   return (
     <div className="people-allocator">
+      {/* Konteksten control nad vsako vlogo (5 enakih stolpcev) */}
+      <div className="pa-context-row">
+        {roles.map(r => (
+          <div key={r.key} className="pa-context-cell">
+            {r.contextTop}
+          </div>
+        ))}
+      </div>
+
       {/* Naslovi vrstic + +/− gumbi */}
       <div className="pa-labels">
         {roles.map((r, ri) => {
@@ -1388,24 +1402,48 @@ function HexMap({ tiles, draftPath, onPathClick, expeditions, wps, drawingMode }
   );
 }
 
-/** Izbira cilja izvidnikov (3 možnosti) */
+/** Izbira cilja izvidnikov — kompaktna verzija (3 ikone) */
 function ScoutObjectiveSelector({ value, onChange }: { value: ScoutObjective; onChange: (o: ScoutObjective) => void }) {
-  const opts: Array<{ id: ScoutObjective; icon: string; label: string; desc: string; color: string }> = [
-    { id: 'map',           icon: '🗺',  label: 'Razišči mapo',       desc: 'Razkrij meglo + šibke točke',     color: '#22ccff' },
-    { id: 'ai_robots',     icon: '🤖', label: 'Razišči AI robote',  desc: '+intel = boljši bojni odstotki', color: '#cc8800' },
-    { id: 'ai_weakpoints', icon: '🎯', label: 'Razišči ranljivosti', desc: 'Razkrij AI načrtovalno drevo',   color: '#cc3333' },
+  const opts: Array<{ id: ScoutObjective; icon: string; label: string; color: string }> = [
+    { id: 'map',           icon: '🗺',  label: 'Mapa',         color: '#22ccff' },
+    { id: 'ai_robots',     icon: '🤖', label: 'AI roboti',    color: '#cc8800' },
+    { id: 'ai_weakpoints', icon: '🎯', label: 'Ranljivosti',  color: '#cc3333' },
   ];
   return (
-    <div className="scout-objectives">
+    <div className="scout-objectives compact">
       {opts.map(o => (
         <button key={o.id} className={`so-btn ${value === o.id ? 'sel' : ''}`}
           style={value === o.id ? { borderColor: o.color, color: o.color } : {}}
-          onClick={() => onChange(o.id)}>
+          onClick={() => onChange(o.id)}
+          title={o.label}>
           <span className="so-icon">{o.icon}</span>
-          <span className="so-label">{o.label}</span>
-          <span className="so-desc">{o.desc}</span>
+          <span className="so-label-mini">{o.label}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+/** Kompaktni rations selector — 5 emoji gumbov v eni vrstici */
+function RationsMini({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  const r = RATIONS[value];
+  return (
+    <div className="rations-mini">
+      <div className="rm-row">
+        {[1,2,3,4,5].map(lvl => {
+          const t = RATIONS[lvl];
+          return (
+            <button key={lvl}
+              className={`rm-btn ${value === lvl ? 'sel' : ''}`}
+              style={value === lvl ? { borderColor: t.color, color: t.color } : {}}
+              onClick={() => onChange(lvl)}
+              title={`${t.label} — hrana ×${t.foodMult}, moč ×${t.strengthMult}`}>
+              <span>{t.emoji}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="rm-info" style={{ color: r.color }}>{r.label}</div>
     </div>
   );
 }
@@ -1817,8 +1855,8 @@ export default function App() {
           onClose={() => setPhaseTrans(null)}
         />
       )}
-      {/* ─── PAS 1: Humanity vs AI score ─── */}
-      <PhaseHeader game={game} />
+      {/* ─── PAS 1: Faza + Nova igra ─── */}
+      <PhaseHeader game={game} onNewGame={handleNew} loading={loading} />
 
       {/* ─── PAS 2: Resursi klan ─── */}
       <ResourceRow game={game} />
@@ -1856,31 +1894,13 @@ export default function App() {
 
         <ClanStatus game={game} inMissions={inMissions} />
 
-        <div className="cmd-section">
-          <div className="cmd-label">Obroki · določajo porabo hrane, moč ljudi in rast populacije</div>
-          <RationsSelector value={rations} onChange={setRations} pop={pop} />
-        </div>
+        {overArmed && (
+          <div className="weapon-warning">
+            ⚠ Premalo orožja: imaš {weaponCap}, v boju {armedTotal} (napad+obramba). Engine skrči.
+          </div>
+        )}
 
         <div className="cmd-section">
-          {odds && (
-            <div className="status-row">
-              <div className="raid-warning" style={{ borderColor: probColor(1 - odds.raidProbability) }}>
-                <span>⚠ Verjetnost napada AI:</span>
-                <span className="raid-prob" style={{ color: probColor(1 - odds.raidProbability) }}>
-                  {Math.round(odds.raidProbability * 100)}%
-                </span>
-              </div>
-              <div className="intel-bonus">
-                <span className="dim small">Intel bonus v vseh bojih:</span>
-                <span style={{ color: '#3388cc' }}>+{Math.round(odds.intelBonus * 100)}%</span>
-              </div>
-            </div>
-          )}
-          {overArmed && (
-            <div className="weapon-warning">
-              ⚠ Premalo orožja: imaš {weaponCap}, v boju {armedTotal} (napad+obramba). Engine skrči.
-            </div>
-          )}
 
           {/* Vizualni razdelilnik ljudi po vlogah */}
           <PeopleAllocator
@@ -1888,19 +1908,39 @@ export default function App() {
             inMissions={inMissions}
             newMission={newMissionPeople}
             roles={[
-              { key: 'c', label: 'Napad',     icon: '⚔', color: '#cc4433', count: combatants,
+              { key: 'c', label: 'Napad', icon: '⚔', color: '#cc4433', count: combatants,
                 yieldText: `+${(combatants * 1.2 * rTier.strengthMult).toFixed(0)} moč · ${combatants} orožja`,
-                probLabel: combatants > 0 ? 'Zmaga' : undefined, prob: combatants > 0 ? odds?.successProbability : undefined },
-              { key: 'd', label: 'Obramba',   icon: '🛡', color: '#66aabb', count: defenders,
+                contextTop: (
+                  <div className="pa-ctx pa-ctx-combat">
+                    <span className="dim small">🎯 Zmaga v napadu</span>
+                    <span className="pa-ctx-val" style={{ color: combatants > 0 ? probColor(odds?.successProbability ?? 0) : '#555' }}>
+                      {combatants > 0 && odds ? Math.round(odds.successProbability * 100) + '%' : '–'}
+                    </span>
+                    {odds && odds.intelBonus > 0 && (
+                      <span className="pa-ctx-extra small" style={{ color: '#3388cc' }}>+intel bonus {Math.round(odds.intelBonus * 100)}%</span>
+                    )}
+                  </div>
+                ) },
+              { key: 'd', label: 'Obramba', icon: '🛡', color: '#66aabb', count: defenders,
                 yieldText: `${defenders} stražarjev · ${defenders} orožja`,
-                probLabel: 'Odbije napad', prob: odds?.raidRepelProbability },
+                probLabel: 'Odbije', prob: odds?.raidRepelProbability,
+                contextTop: (
+                  <div className="pa-ctx pa-ctx-defense">
+                    <span className="dim small">⚠ Verjetnost napada AI</span>
+                    <span className="pa-ctx-val" style={{ color: probColor(1 - (odds?.raidProbability ?? 0)) }}>
+                      {odds ? Math.round(odds.raidProbability * 100) + '%' : '–'}
+                    </span>
+                  </div>
+                ) },
               { key: 'f', label: 'Nabiralci', icon: '🌾', color: '#6aa630', count: foragers,
                 yieldText: `${survBalance >= 0 ? '+' : ''}${survBalance} hrana`,
-                probLabel: 'Brez izgub', prob: odds?.forageSafetyProbability },
+                probLabel: 'Brez izgub', prob: odds?.forageSafetyProbability,
+                contextTop: <RationsMini value={rations} onChange={setRations} /> },
               { key: 's', label: 'Izvidniki', icon: '🔭', color: '#3377cc', count: scouts,
                 yieldText: `+${scoutIntel} intel`,
-                probLabel: scouts > 0 ? 'Uspeh' : undefined, prob: scouts > 0 ? odds?.scoutSuccessProbability : undefined },
-              { key: '_', label: 'Prosti',    icon: '·', color: '#888888', count: Math.max(0, availablePop - combatants - defenders - foragers - scouts) },
+                probLabel: scouts > 0 ? 'Uspeh' : undefined, prob: scouts > 0 ? odds?.scoutSuccessProbability : undefined,
+                contextTop: <ScoutObjectiveSelector value={scoutObj} onChange={setScoutObj} /> },
+              { key: '_', label: 'Prosti', icon: '·', color: '#888888', count: Math.max(0, availablePop - combatants - defenders - foragers - scouts) },
             ]}
             onTransfer={(nc) => {
               const [nC, nD, nF, nS] = nc;
@@ -1916,17 +1956,15 @@ export default function App() {
           )}
         </div>
 
-        {/* Cilj izvidnikov — odločitev kam gredo + risanje poti */}
-        <div className="cmd-section">
-          <div className="cmd-label">🔭 Cilj izvidnikov ta mesec ({scouts} izvidnikov)</div>
-          <ScoutObjectiveSelector value={scoutObj} onChange={setScoutObj} />
-          {scoutObj === 'map' && (
+        {/* Path builder za odpravo na mapo (samo če je izbran cilj 'map') */}
+        {scoutObj === 'map' && (
+          <div className="cmd-section">
             <div className="path-builder">
               <div className="pb-instr dim small">
                 Klikni sosednji heks na mapi, da gradiš pot odprave. Klik na zadnji heks = odznači.
               </div>
               {draftPath.length < 2 && (
-                <div className="map-hint">Pot je prazna. Prvi heks je kamp ⌂ — klikni sosednjega na mapi zgoraj.</div>
+                <div className="map-hint">Pot je prazna. Prvi heks je kamp ⌂ — klikni sosednjega na mapi.</div>
               )}
               {draftPath.length >= 2 && (
                 <div className="path-stats">
@@ -1939,7 +1977,7 @@ export default function App() {
                     <b style={{ color: '#cc8800' }}>{draftPathMonths} mesec(ev)</b>
                   </div>
                   <div className="ps-row">
-                    <span className="dim small">Skupno tveganje srečanja:</span>
+                    <span className="dim small">Tveganje srečanja:</span>
                     <b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b>
                   </div>
                   <div className="ps-row">
@@ -1954,8 +1992,8 @@ export default function App() {
                   : 'Najprej nariši pot na mapi in določi vsaj 1 izvidnika'}
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Aktivne odprave */}
         {(game.expeditions ?? []).length > 0 && (
@@ -1998,7 +2036,6 @@ export default function App() {
         <button className="exec-btn" onClick={handleRound} disabled={loading || over}>
           {loading ? '⟳  Izvajam…' : over ? '⚠  Preveč ljudi razporejenih' : '▶  IZVEDI MESEC'}
         </button>
-        <button className="newgame-btn" onClick={handleNew} disabled={loading}>↺ Nova igra</button>
       </div>
 
       {/* ─── PAS 5: Skill drevesi ─── */}

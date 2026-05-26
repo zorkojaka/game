@@ -1151,3 +1151,77 @@ input[type=range]::-moz-range-thumb {
   padding: 6px 10px 10px 10px;
   border-top: 1px dashed var(--border2);
 }
+
+/* ─── PhaseHeader: Nova igra button ──────────────────────────────────────── */
+.ph-newgame {
+  background: var(--bg2); border: 1px solid var(--border2);
+  color: var(--dim); cursor: pointer;
+  font-family: var(--font); font-size: .72rem;
+  padding: 7px 14px; letter-spacing: .08em;
+  transition: border-color .12s, color .12s;
+}
+.ph-newgame:hover:not(:disabled) { border-color: var(--red); color: var(--red); }
+.ph-newgame:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ─── ResourceRow: dvojni meter na desni ────────────────────────────────── */
+.resource-row .dual-knowledge { margin-left: auto; }
+
+/* ─── Allocator context row ─────────────────────────────────────────────── */
+.pa-context-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.pa-context-cell {
+  min-height: 38px;
+  padding: 4px 6px;
+  background: #0a0a0a;
+  border: 1px solid var(--border);
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+}
+
+.pa-ctx { display: flex; flex-direction: column; gap: 1px; }
+.pa-ctx-val { font-size: 1.05rem; font-weight: bold; }
+.pa-ctx-extra { line-height: 1.1; }
+
+/* RationsMini */
+.rations-mini { display: flex; flex-direction: column; gap: 2px; }
+.rm-row { display: flex; gap: 1px; }
+.rm-btn {
+  flex: 1; height: 22px;
+  background: var(--bg2); border: 1px solid var(--border2);
+  cursor: pointer; font-family: var(--font); font-size: .85rem;
+  padding: 0; display: flex; align-items: center; justify-content: center;
+  color: inherit;
+}
+.rm-btn:hover { background: #181818; }
+.rm-btn.sel   { background: #0e0e0e; }
+.rm-info { font-size: .62rem; font-weight: bold; letter-spacing: .06em; text-align: center; }
+
+/* Scout objectives compact */
+.scout-objectives.compact {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+}
+.scout-objectives.compact .so-btn {
+  padding: 3px 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+}
+.scout-objectives.compact .so-icon { font-size: .95rem; }
+.so-label-mini { font-size: .55rem; line-height: 1; }
+
+/* Skrij raid-warning, intel-bonus, status-row če so še kje */
+.status-row, .raid-warning, .intel-bonus { display: none; }
+
+/* Allocator labels: kompaktnejši — ker so info zgoraj v context cellah */
+.pa-label-head { font-size: .72rem; }
+.pa-yield, .pa-prob { font-size: .66rem; }
+
+/* ── tighter command panel — manj presledkov ── */
+.command-panel { padding: 10px 12px; }
+.command-panel .cmd-section {
+  margin-top: 8px; padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
