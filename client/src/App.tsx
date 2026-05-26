@@ -1298,13 +1298,34 @@ function HexMap({ tiles, draftPath, onPathClick, expeditions, wps, drawingMode }
           </pattern>
         </defs>
 
-        {/* Path lines */}
+        {/* Aktivne odprave: prepotovana pot (polna) + preostala pot (črtkana) */}
+        {expeditions.filter(e => e.status === 'traveling').map(e => {
+          const color = e.kind === 'mission' ? '#cc8800' : '#22ccff';
+          return (
+            <g key={`path_${e.id}`} className="path-lines">
+              {e.path.slice(0, -1).map((s, i) => {
+                const a = shift(hexToPixel(s.q, s.r, SIZE));
+                const b = shift(hexToPixel(e.path[i + 1].q, e.path[i + 1].r, SIZE));
+                const isDone = i < e.currentIndex;
+                return (
+                  <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                    stroke={color}
+                    strokeWidth={isDone ? 2.2 : 1.6}
+                    strokeOpacity={isDone ? 0.85 : 0.55}
+                    strokeDasharray={isDone ? undefined : '3 2'} />
+                );
+              })}
+            </g>
+          );
+        })}
+
+        {/* Draft path (igralec gradi novo odpravo) */}
         {draftPath.length > 1 && (
           <g className="path-lines">
             {draftPath.slice(0, -1).map((s, i) => {
               const a = shift(hexToPixel(s.q, s.r, SIZE));
               const b = shift(hexToPixel(draftPath[i + 1].q, draftPath[i + 1].r, SIZE));
-              return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#22ccff" strokeWidth="2" strokeDasharray="4 3" />;
+              return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#22ccff" strokeWidth="2.4" strokeDasharray="4 3" />;
             })}
           </g>
         )}
