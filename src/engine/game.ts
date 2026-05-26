@@ -702,10 +702,10 @@ function buildNarrative(
 
   if (raid && raid.occurred) {
     const o = raid.outcome;
-    if (o === 'victory') parts.push(`AI je napadel kamp, a obramba ga je odbila (${raid.defendersLost} branilcev padlo).`);
-    else if (o === 'partial') parts.push(`AI je napadel kamp — odbili smo, a ${raid.defendersLost} branilcev in ${raid.foragersLost} nabiralcev je padlo.`);
-    else if (o === 'defeat') parts.push(`AI je napadel kamp in prebil obrambo — izgubili smo ${raid.defendersLost} branilcev in ${raid.foragersLost} nabiralcev.`);
-    else if (o === 'annihilation') parts.push(`AI je opustošil kamp — vsi branilci so padli, ${raid.foragersLost} nabiralcev je umrlo.`);
+    if (o === 'victory') parts.push(`AI je napadel kamp, obramba odbila (${raid.defendersLost} branilcev padlo v kampu).`);
+    else if (o === 'partial') parts.push(`AI je napadel kamp — odbili smo, a ${raid.defendersLost} branilcev in ${raid.foragersLost} nabiralcev v kampu je padlo.`);
+    else if (o === 'defeat') parts.push(`AI je napadel kamp in prebil obrambo — v kampu padlo ${raid.defendersLost} branilcev in ${raid.foragersLost} nabiralcev. Ljudje na odpravah ostali nepoškodovani.`);
+    else if (o === 'annihilation') parts.push(`AI je opustošil kamp — vsi branilci so padli, ${raid.foragersLost} nabiralcev je umrlo. Le odprave preživele.`);
   }
 
   if (scout?.captured) {

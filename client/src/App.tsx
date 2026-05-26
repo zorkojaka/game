@@ -760,7 +760,8 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
 
       {(inMissions + newMission > 0) && (
         <div className="pa-mission-note dim small">
-          🎯 {inMissions + newMission} ljudi v misijah/odpravah (niso na voljo).
+          🎯 <b>{inMissions + newMission} ljudi na odpravah</b> — niso v kampu, niso na voljo za razporejanje in
+          <b style={{ color: '#22cc88' }}> niso ogroženi pri napadu AI na kamp</b>.
         </div>
       )}
     </div>
