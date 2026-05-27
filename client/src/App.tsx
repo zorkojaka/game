@@ -2121,7 +2121,71 @@ export default function App() {
             <span className="ml-item" style={{ color: '#5aa0e0' }}>sij = domač</span>
           </div>
         </div>
-        <EventLog entries={eventLog} />
+        <div className="map-right-col">
+          <EventLog entries={eventLog} />
+          {/* Nova odprava — premaknjeno pod časovni trak */}
+          <div className="panel">
+            <div className="panel-head">
+              <h3>🗺 NOVA ODPRAVA</h3>
+              {pendingExpeditions.length > 0 && (
+                <span className="panel-badge">{pendingExpeditions.length} potrjenih · {pendingExpPpl} ljudi</span>
+              )}
+            </div>
+            <div className="path-builder">
+              <div className="pb-instr dim small">
+                Klikni sosednji heks na mapi za gradnjo poti. Klik na zadnji heks = odznači.
+              </div>
+              {draftPath.length < 2 ? (
+                <div className="map-hint">Pot je prazna. Začni s klikom na sosednji heks ⌂ klana.</div>
+              ) : (
+                <>
+                  <div className="path-stats">
+                    <div className="ps-row">
+                      <span className="dim small">Korakov:</span>
+                      <b>{draftPath.length - 1}</b>
+                    </div>
+                    <div className="ps-row">
+                      <span className="dim small">Trajanje:</span>
+                      <b style={{ color: '#cc8800' }}>{draftPathMonths} mesec(ev)</b>
+                    </div>
+                    <div className="ps-row">
+                      <span className="dim small">Tveganje srečanja:</span>
+                      <b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b>
+                    </div>
+                    <div className="ps-row">
+                      <span className="dim small">Ljudje za to odpravo:</span>
+                      <span className="pa-pm">
+                        <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
+                        <b className="pa-count">{draftPeople}</b>
+                        <button className="pa-btn"
+                          disabled={assignedHome + plannedTotal + draftPeople >= availablePop}
+                          onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
+                      </span>
+                    </div>
+                  </div>
+                  <button className="autofit-btn" disabled={!canConfirmDraft}
+                    onClick={confirmDraftExpedition}>
+                    ✓ Potrdi odpravo in nariši novo
+                  </button>
+                </>
+              )}
+
+              {pendingExpeditions.length > 0 && (
+                <div className="pending-exps">
+                  <div className="dim small" style={{ marginBottom: 4 }}>
+                    Potrjene odprave (sproži ob izvedbi meseca):
+                  </div>
+                  {pendingExpeditions.map((e, i) => (
+                    <div key={i} className="pending-exp-row">
+                      <span>🔭 {e.assigned} ljudi · {e.path.length - 1} korakov</span>
+                      <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ─── PAS 4: Razporedi ljudi ─── */}
@@ -2210,64 +2274,6 @@ export default function App() {
           )}
         </div>
 
-        {/* Path builder za odpravo na mapo — VEDNO viden, neodvisen od scout objektive */}
-        <div className="cmd-section">
-          <div className="cmd-label">🗺 Nova odprava na mapo</div>
-          <div className="path-builder">
-            <div className="pb-instr dim small">
-              Klikni sosednji heks na mapi za gradnjo poti. Klik na zadnji heks v poti = odznači.
-            </div>
-            {draftPath.length < 2 ? (
-              <div className="map-hint">Pot je prazna. Začni s klikom na sosednji heks ⌂ klana na mapi.</div>
-            ) : (
-              <>
-                <div className="path-stats">
-                  <div className="ps-row">
-                    <span className="dim small">Korakov:</span>
-                    <b>{draftPath.length - 1}</b>
-                  </div>
-                  <div className="ps-row">
-                    <span className="dim small">Trajanje:</span>
-                    <b style={{ color: '#cc8800' }}>{draftPathMonths} mesec(ev)</b>
-                  </div>
-                  <div className="ps-row">
-                    <span className="dim small">Tveganje srečanja:</span>
-                    <b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b>
-                  </div>
-                  <div className="ps-row">
-                    <span className="dim small">Ljudje za to odpravo:</span>
-                    <span className="pa-pm">
-                      <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
-                      <b className="pa-count">{draftPeople}</b>
-                      <button className="pa-btn"
-                        disabled={assignedHome + plannedTotal + draftPeople >= availablePop}
-                        onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
-                    </span>
-                  </div>
-                </div>
-                <button className="autofit-btn" disabled={!canConfirmDraft}
-                  onClick={confirmDraftExpedition}>
-                  ✓ Potrdi odpravo in nariši novo
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Seznam potrjenih odprav, ki bodo sproženo ob izvedbi meseca */}
-          {pendingExpeditions.length > 0 && (
-            <div className="pending-exps">
-              <div className="dim small" style={{ marginBottom: 4 }}>
-                {pendingExpeditions.length} potrjenih odprav za ta mesec ({pendingExpPpl} ljudi):
-              </div>
-              {pendingExpeditions.map((e, i) => (
-                <div key={i} className="pending-exp-row">
-                  <span>🔭 {e.assigned} ljudi · {e.path.length - 1} korakov</span>
-                  <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* Aktivne odprave */}
         {(game.expeditions ?? []).length > 0 && (

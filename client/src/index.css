@@ -1491,3 +1491,10 @@ input[type=range]::-moz-range-thumb {
   width: 100%; text-align: left;
 }
 .artifact-btn:hover { background: #1a1500; }
+
+/* ─── Map right column — Časovni trak + Nova odprava ─────────────────────── */
+.map-right-col {
+  display: flex; flex-direction: column;
+  gap: .75rem;
+  min-width: 0;
+}
