@@ -1995,7 +1995,16 @@ export default function App() {
   const rTier = RATIONS[rations];
   const foragerYield = Math.floor(foragers * 4 * rTier.strengthMult);
   const scoutIntel   = Math.floor(scouts   * 8 * rTier.strengthMult);
-  const foodCost     = Math.round(game.population * rTier.foodMult);
+  // Populacija, ki je v kampu (brez aktivnih odprav in misij — tisti ne jedo iz domačega skladišča neposredno)
+  const inCampPop    = Math.max(0, game.population);
+  const campFoodCost = Math.round(inCampPop * rTier.foodMult);
+  // Aktivne misije: vsaka ekipa porabi hrano iz kampnega skladišča po svojem nivoju obrokov
+  const missionFoodCost = (game.activeMissions ?? []).reduce((s, m) => {
+    const mTier = RATIONS[m.rations ?? 3] ?? RATIONS[3];
+    return s + Math.round(m.assigned * mTier.foodMult);
+  }, 0);
+  // Aktivne odprave: za zdaj NE jejo iz kampa (so na poti, samostojne)
+  const foodCost     = campFoodCost + missionFoodCost;
   const survBalance  = foragerYield - foodCost;
 
   return (

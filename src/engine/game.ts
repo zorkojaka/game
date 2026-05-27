@@ -365,6 +365,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     aiKnowledge = Math.min(1, aiKnowledge + result.aiInfoGained);
     intelligence += result.infoGained;
     combat = Math.max(0, combat + (result.spoils.combat ?? 0));
+    // Vsak uničen robot v napadu pusti 1 orožje
+    combat += result.aiRobotsDestroyed;
     intelligence += result.spoils.intelligence ?? 0;
 
     if (isExploiting && result.outcome === 'victory') {
@@ -393,6 +395,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     combat = Math.max(0, combat - actualDef);
     combat = Math.max(0, combat - raidRes.weaponsDestroyed);
     aiRobots = Math.max(0, aiRobots - raidRes.aiRobotsDestroyed);
+    // Vsak uničen robot v obrambi pusti 1 orožje
+    combat += raidRes.aiRobotsDestroyed;
     if (defSave > 0 || forSave > 0) {
       raidLog = { ...raidRes, defendersLost: actualDef, foragersLost: actualFor };
     }
