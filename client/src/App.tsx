@@ -578,7 +578,10 @@ type AllocRole = {
   probLabel?: string;
   prob?: number;
   extraLabel?: React.ReactNode;
-  contextTop?: React.ReactNode;    // konteksten control/info NAD vlogo (verjetnost / rations / scout obj)
+  contextTop?: React.ReactNode;
+  markedCount?: number;            // koliko zadnjih figur naj bo "načrtovanih" (drugačna ikona)
+  markedIcon?: string;
+  markedTitle?: string;
 };
 
 /** Prerazporedi števila po proporcionalnem ključu: focusIdx se spremeni za `delta`,
@@ -727,18 +730,34 @@ function PeopleAllocator({ roles, available, inMissions, newMission, onTransfer 
 
       {/* Glavna razdelilna palica z ljudmi — fiksne enake širine stolpcev */}
       <div className="pa-bar" ref={barRef}>
-        {roles.map((r) => (
-          <div key={r.key} className={`pa-seg pa-${r.key}`}
-            style={{ background: r.color + '14', borderTopColor: r.color }}>
-            <div className="pa-people">
-              {Array.from({ length: r.count }, (_, idx) => (
-                <div key={idx} className="pa-person" style={{ background: r.color + '40', borderColor: r.color, color: r.color }}>
-                  {r.icon}
-                </div>
-              ))}
+        {roles.map((r) => {
+          const marked = Math.max(0, Math.min(r.count, r.markedCount ?? 0));
+          return (
+            <div key={r.key} className={`pa-seg pa-${r.key}`}
+              style={{ background: r.color + '14', borderTopColor: r.color }}>
+              <div className="pa-people">
+                {Array.from({ length: r.count }, (_, idx) => {
+                  const isMarked = idx < marked;  // prvi `marked` figur = načrtovani
+                  if (isMarked) {
+                    return (
+                      <div key={idx} className="pa-person planned"
+                        title={r.markedTitle ?? 'načrtovan za odpravo'}
+                        style={{ background: '#1a1500', borderColor: '#ffd84a', color: '#ffd84a' }}>
+                        {r.markedIcon ?? '↑'}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={idx} className="pa-person"
+                      style={{ background: r.color + '40', borderColor: r.color, color: r.color }}>
+                      {r.icon}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {/* Vlečne ročice na DESNEM robu vsakega segmenta (razen zadnjega).
             Drag desno = vloga raste, levo = vloga upade. */}
         {roles.slice(0, -1).map((_, i) => {
@@ -2117,7 +2136,12 @@ export default function App() {
                 yieldText: `+${scoutIntel} intel`,
                 probLabel: scouts > 0 ? 'Uspeh' : undefined, prob: scouts > 0 ? odds?.scoutSuccessProbability : undefined,
                 contextTop: <ScoutObjectiveSelector value={scoutObj} onChange={setScoutObj} /> },
-              { key: '_', label: 'Prosti', icon: '·', color: '#888888', count: Math.max(0, availablePop - combatants - defenders - foragers - scouts) },
+              { key: '_', label: newMissionPeople > 0 ? `Prosti (${newMissionPeople} načrt.)` : 'Prosti',
+                icon: '·', color: '#888888',
+                count: Math.max(0, availablePop - combatants - defenders - foragers - scouts),
+                markedCount: newMissionPeople,
+                markedIcon: '↑',
+                markedTitle: 'načrtovan za odpravo' },
             ]}
             onTransfer={(nc) => {
               const [nC, nD, nF, nS] = nc;

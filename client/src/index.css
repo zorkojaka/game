@@ -1441,3 +1441,17 @@ input[type=range]::-moz-range-thumb {
   border-left: 3px solid #ffd84a !important;
 }
 .tl-row.special .tl-round { color: #ffd84a !important; border-color: #ffd84a !important; }
+
+/* ─── Načrtovani za odpravo (prosti z markerjem) ────────────────────────── */
+.pa-person.planned {
+  position: relative;
+  font-weight: bold;
+}
+.pa-person.planned::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: -2px; bottom: -2px;
+  width: 2px; background: #ffd84a;
+  transform: translateX(-50%) rotate(0deg);
+  pointer-events: none;
+}
