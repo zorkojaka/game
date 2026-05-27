@@ -32,9 +32,10 @@ export interface AIWeakPoint {
 // ─── Resources ────────────────────────────────────────────────────────────────
 
 export interface Resources {
-  survival: number;    // voda + hrana — hranijo populacijo
-  combat: number;      // orožje + material — moč v spopadu
-  intelligence: number; // info iz raziskav — odgrinja meglo
+  survival: number;     // voda + hrana
+  combat: number;       // orožje (1 = ena oseba lahko bije)
+  intelligence: number; // intel
+  material: number;     // elementi iz uničenih robotov — surovina za orožja in zidove
 }
 
 // ─── Assignment — kako razporediš populacijo ta mesec ─────────────────────────
@@ -77,7 +78,7 @@ export interface NewExpeditionInput {
   rations: number;
 }
 
-export type ScoutObjective = 'map' | 'ai_robots' | 'ai_weakpoints';
+export type ScoutObjective = 'ai_robots' | 'ai_weakpoints' | 'weapon_dev' | 'wall_dev';
 
 export interface ScoutPlan {
   objective: ScoutObjective;
@@ -199,6 +200,12 @@ export interface GameState {
   // Odprave (izvidniki in misije s potjo)
   expeditions: Expedition[];
   completedExpeditions: Expedition[];
+
+  // Delavnice v kampu — izvidniki, ki delajo na razvoju orožja ali zidu
+  weaponWorkshopProgress: number;  // skupna scout-meseca; vsakič ko >= scoutsAtStart * 2 → produciraj
+  weaponWorkshopScouts: number;    // št. izvidnikov ob startu tekoče delavnice
+  wallProgress: number;            // scout-meseci na zidu (6 scout-mesecev = 1 zid)
+  wallsBuilt: number;              // skupno število zgrajenih zidov
 
   // RNG (determinizem)
   rngSeed: number;

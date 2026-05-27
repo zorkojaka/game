@@ -23,6 +23,7 @@ export interface Resources {
   survival: number;
   combat: number;
   intelligence: number;
+  material: number;
 }
 
 export interface HexTile {
@@ -61,7 +62,7 @@ export interface NewExpeditionInput {
   rations: number;
 }
 
-export type ScoutObjective = 'map' | 'ai_robots' | 'ai_weakpoints';
+export type ScoutObjective = 'ai_robots' | 'ai_weakpoints' | 'weapon_dev' | 'wall_dev';
 
 export interface ScoutPlan {
   objective: ScoutObjective;
@@ -148,6 +149,10 @@ export interface GameState {
   mapTiles: HexTile[];
   expeditions: Expedition[];
   completedExpeditions: Expedition[];
+  weaponWorkshopProgress: number;
+  weaponWorkshopScouts: number;
+  wallProgress: number;
+  wallsBuilt: number;
   rngSeed: number;
   status: 'active' | 'victory' | 'defeat_extinction' | 'defeat_overwhelmed';
   lastRoundLog: RoundLog | null;

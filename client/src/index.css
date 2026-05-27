@@ -1455,3 +1455,31 @@ input[type=range]::-moz-range-thumb {
   transform: translateX(-50%) rotate(0deg);
   pointer-events: none;
 }
+
+/* ─── Scout objectives compact — zdaj 4 opcije ──────────────────────────── */
+.scout-objectives.compact .so-row {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* Workshop status v command panelu */
+.workshop-status {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 10px; margin-top: 6px;
+  background: #0a0a0a; border-left: 2px solid #cc4433;
+  font-size: .76rem;
+}
+.ws-row { display: flex; justify-content: space-between; align-items: baseline; }
+.ws-bar-track { width: 100%; height: 4px; background: #1a1a1a; overflow: hidden; }
+.ws-bar-fill  { height: 100%; transition: width .3s; }
+
+/* ─── Pending expeditions list ──────────────────────────────────────────── */
+.pending-exps {
+  margin-top: 8px; padding: 6px 8px;
+  background: #14110a; border-left: 2px solid #ffd84a;
+}
+.pending-exp-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 3px 0; font-size: .78rem;
+  border-bottom: 1px dashed var(--border);
+}
+.pending-exp-row:last-child { border-bottom: none; }

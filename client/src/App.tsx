@@ -215,7 +215,11 @@ function ClanStatus({ game, inMissions }: { game: GameState; inMissions: number 
       <div className="cs-resources">
         <BigStat icon="🍞" label="Hrana/Voda" value={r.survival}     color="#cc8800" />
         <BigStat icon="⚔"  label="Orožje"     value={r.combat}       color="#cc4433" />
+        <BigStat icon="⚙"  label="Material"   value={r.material ?? 0} color="#88aabb" />
         <BigStat icon="👁"  label="Intel"      value={r.intelligence} color="#3388cc" />
+        {(game.wallsBuilt ?? 0) > 0 && (
+          <BigStat icon="🧱" label="Zidovi"   value={game.wallsBuilt}  color="#aabb88" />
+        )}
       </div>
     </div>
   );
@@ -1562,7 +1566,8 @@ function HexMap({ tiles, draftPath, onPathClick, onWpSelect, selectedWpId, exped
 /** Izbira cilja izvidnikov — 3 ikone + razlaga izbire */
 function ScoutObjectiveSelector({ value, onChange }: { value: ScoutObjective; onChange: (o: ScoutObjective) => void }) {
   const opts: Array<{ id: ScoutObjective; icon: string; label: string; color: string; desc: string }> = [
-    { id: 'map',           icon: '🗺',  label: 'Mapa',         color: '#22ccff', desc: 'Razkrij meglo na mapi in odkrij šibke točke v terenu.' },
+    { id: 'weapon_dev',    icon: '🔨', label: 'Orožje',       color: '#cc4433', desc: 'Razvoj orožja iz materiala (2 meseca cikel).' },
+    { id: 'wall_dev',      icon: '🧱', label: 'Zid',          color: '#aabb88', desc: 'Gradnja obrambnega zidu (6 mesecev).' },
     { id: 'ai_robots',     icon: '🤖', label: 'AI roboti',    color: '#cc8800', desc: '+intel → boljši % v vseh bojih.' },
     { id: 'ai_weakpoints', icon: '🎯', label: 'Ranljivosti',  color: '#cc3333', desc: 'Razkrij vozlišča AI načrtovalnega drevesa.' },
   ];
@@ -1741,10 +1746,12 @@ export default function App() {
   const [scouts,       setScouts]       = useState(10);
   const [missions,     setMissions]     = useState<Record<string, number>>({});
   const [missionR,     setMissionR]     = useState<Record<string, number>>({});
-  const [scoutObj,     setScoutObj]     = useState<ScoutObjective>('ai_weakpoints');
+  const [scoutObj,     setScoutObj]     = useState<ScoutObjective>('weapon_dev');
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
+  const [draftPeople,  setDraftPeople]  = useState(5);
+  const [pendingExpeditions, setPendingExpeditions] = useState<NewExpeditionInput[]>([]);
   const [targetWP,   setTargetWP]   = useState('');
   const [rations,    setRations]    = useState(3);
   const [odds,         setOdds]         = useState<OddsPreview | null>(null);
@@ -1778,17 +1785,14 @@ export default function App() {
     prevPhaseRef.current = game.phase;
   }, [game?.phase]);
 
-  // Pri map mode poti vedno začni iz klanovega kampa
+  // Pot vedno začni iz klanovega kampa
   useEffect(() => {
     if (!game) return;
-    if (scoutObj === 'map' && draftPath.length === 0) {
+    if (draftPath.length === 0) {
       const clan = game.mapTiles?.find(t => t.isClanCamp);
       if (clan) setDraftPath([{ q: clan.q, r: clan.r }]);
     }
-    if (scoutObj !== 'map' && draftPath.length > 0) {
-      setDraftPath([]);
-    }
-  }, [scoutObj, game?.mapTiles]);
+  }, [game?.mapTiles]);
 
   // Akumuliraj log dogodkov — vsak nov mesec doda vnos z dogodki + poračunom + ikone
   useEffect(() => {
@@ -1866,7 +1870,7 @@ export default function App() {
       const g = await createGame();
       setGame(g);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('hiding'); setCombatants(0); setDefenders(15); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('ai_weakpoints'); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]);
+      setAxis('hiding'); setCombatants(0); setDefenders(15); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('weapon_dev'); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setPendingExpeditions([]);
     } finally { setLoading(false); }
   };
 
@@ -1874,35 +1878,38 @@ export default function App() {
     if (!game || loading) return;
     setLoading(true);
     try {
-      const newExpeditions: NewExpeditionInput[] = [];
-      if (scoutObj === 'map' && draftPath.length >= 2 && scouts > 0) {
-        newExpeditions.push({ kind: 'scout', path: draftPath, assigned: scouts, rations });
+      const newExps: NewExpeditionInput[] = [...pendingExpeditions];
+      // Če uporabnik ni potrdil tekoče poti a ima veljaven draft, ga pošlji tudi
+      if (draftPath.length >= 2 && draftPeople > 0) {
+        newExps.push({ kind: 'scout', path: draftPath, assigned: draftPeople, rations });
       }
       const { state } = await playRound(game.runId, {
         assignment: { axis, combatants, defenders, foragers, scouts, rations,
           missionAssignments: missions, missionRations: missionR,
           scoutPlan: { objective: scoutObj, targetTileIds: Array.from(scoutTargets) },
-          newExpeditions: newExpeditions.length > 0 ? newExpeditions : undefined },
+          newExpeditions: newExps.length > 0 ? newExps : undefined },
         targetWeakPoint: targetWP || undefined,
       });
       setMissions({});
       setScoutTargets(new Set());
-      setDraftPath([]);
+      setPendingExpeditions([]);
+      const clan = state.mapTiles?.find((t: HexTile) => t.isClanCamp);
+      setDraftPath(clan ? [{ q: clan.q, r: clan.r }] : []);
       setGame(state);
       setOdds(null);
     } finally { setLoading(false); }
   };
 
   const pop = game?.population ?? 0;
-  // Ljudje v aktivnih misijah + odpravah (engine drži)
   const inMissions = (game?.activeMissions ?? []).reduce((s, m) => s + m.assigned, 0)
                    + (game?.expeditions ?? []).reduce((s, e) => s + e.assigned, 0);
-  // Pa še novi razporedi v misije ta mesec
   const newMissionPeople = Object.values(missions).reduce((s, v) => s + v, 0);
+  const pendingExpPpl = pendingExpeditions.reduce((s, e) => s + e.assigned, 0);
+  const plannedTotal = newMissionPeople + pendingExpPpl;  // vsi rezervirani za nove odprave/misije
   const assignedHome = combatants + defenders + foragers + scouts;
-  const assigned    = assignedHome + newMissionPeople;
   const availablePop = Math.max(0, pop - inMissions);
-  const over = assignedHome + newMissionPeople > availablePop;
+  const assigned = assignedHome + plannedTotal;
+  const over = assigned > availablePop;
 
   const weaponCap = game ? Math.floor(game.resources.combat) : 0;
   const armedTotal = combatants + defenders;
@@ -1979,7 +1986,8 @@ export default function App() {
     }
     return 1 - pNo;
   })();
-  const canStartExpedition = scoutObj === 'map' && draftPath.length >= 2 && scouts > 0;
+  const canConfirmDraft = draftPath.length >= 2 && draftPeople > 0
+    && (assignedHome + plannedTotal + draftPeople <= availablePop);
 
   function setMissionAssignment(wpId: string, n: number) {
     const v = Math.max(0, Math.floor(n));
@@ -1989,6 +1997,20 @@ export default function App() {
   }
   function setMissionRations(wpId: string, lvl: number) {
     setMissionR({ ...missionR, [wpId]: lvl });
+  }
+
+  function confirmDraftExpedition() {
+    if (draftPath.length < 2 || draftPeople < 1) return;
+    setPendingExpeditions([...pendingExpeditions, {
+      kind: 'scout', path: draftPath, assigned: draftPeople, rations: rations,
+    }]);
+    // Resetiraj draft (pot začni iz klanovega heksa)
+    const clan = game?.mapTiles?.find(t => t.isClanCamp);
+    if (clan) setDraftPath([{ q: clan.q, r: clan.r }]);
+    setDraftPeople(5);
+  }
+  function removePendingExpedition(idx: number) {
+    setPendingExpeditions(pendingExpeditions.filter((_, i) => i !== idx));
   }
 
   function autoFitAllocation() {
@@ -2056,7 +2078,7 @@ export default function App() {
             onWpSelect={(id) => setTargetWP(targetWP === id ? '' : id)}
             selectedWpId={targetWP}
             expeditions={game.expeditions ?? []}
-            wps={game.aiWeakPoints} drawingMode={scoutObj === 'map'} />
+            wps={game.aiWeakPoints} drawingMode={true} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
@@ -2136,10 +2158,10 @@ export default function App() {
                 yieldText: `+${scoutIntel} intel`,
                 probLabel: scouts > 0 ? 'Uspeh' : undefined, prob: scouts > 0 ? odds?.scoutSuccessProbability : undefined,
                 contextTop: <ScoutObjectiveSelector value={scoutObj} onChange={setScoutObj} /> },
-              { key: '_', label: newMissionPeople > 0 ? `Prosti (${newMissionPeople} načrt.)` : 'Prosti',
+              { key: '_', label: plannedTotal > 0 ? `Prosti (${plannedTotal} načrt.)` : 'Prosti',
                 icon: '·', color: '#888888',
                 count: Math.max(0, availablePop - combatants - defenders - foragers - scouts),
-                markedCount: newMissionPeople,
+                markedCount: plannedTotal,
                 markedIcon: '↑',
                 markedTitle: 'načrtovan za odpravo' },
             ]}
@@ -2157,17 +2179,17 @@ export default function App() {
           )}
         </div>
 
-        {/* Path builder za odpravo na mapo (samo če je izbran cilj 'map') */}
-        {scoutObj === 'map' && (
-          <div className="cmd-section">
-            <div className="path-builder">
-              <div className="pb-instr dim small">
-                Klikni sosednji heks na mapi, da gradiš pot odprave. Klik na zadnji heks = odznači.
-              </div>
-              {draftPath.length < 2 && (
-                <div className="map-hint">Pot je prazna. Prvi heks je kamp ⌂ — klikni sosednjega na mapi.</div>
-              )}
-              {draftPath.length >= 2 && (
+        {/* Path builder za odpravo na mapo — VEDNO viden, neodvisen od scout objektive */}
+        <div className="cmd-section">
+          <div className="cmd-label">🗺 Nova odprava na mapo</div>
+          <div className="path-builder">
+            <div className="pb-instr dim small">
+              Klikni sosednji heks na mapi za gradnjo poti. Klik na zadnji heks v poti = odznači.
+            </div>
+            {draftPath.length < 2 ? (
+              <div className="map-hint">Pot je prazna. Začni s klikom na sosednji heks ⌂ klana na mapi.</div>
+            ) : (
+              <>
                 <div className="path-stats">
                   <div className="ps-row">
                     <span className="dim small">Korakov:</span>
@@ -2182,19 +2204,39 @@ export default function App() {
                     <b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b>
                   </div>
                   <div className="ps-row">
-                    <span className="dim small">Izvidnikov za odpravo:</span>
-                    <b style={{ color: '#3377cc' }}>{scouts}</b>
+                    <span className="dim small">Ljudje za to odpravo:</span>
+                    <span className="pa-pm">
+                      <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
+                      <b className="pa-count">{draftPeople}</b>
+                      <button className="pa-btn"
+                        disabled={assignedHome + plannedTotal + draftPeople >= availablePop}
+                        onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
+                    </span>
                   </div>
                 </div>
-              )}
-              <div className="dim small" style={{ marginTop: 6 }}>
-                {canStartExpedition
-                  ? '✓ Pripravljeno — odprava se sproži ob izvedbi meseca'
-                  : 'Najprej nariši pot na mapi in določi vsaj 1 izvidnika'}
-              </div>
-            </div>
+                <button className="autofit-btn" disabled={!canConfirmDraft}
+                  onClick={confirmDraftExpedition}>
+                  ✓ Potrdi odpravo in nariši novo
+                </button>
+              </>
+            )}
           </div>
-        )}
+
+          {/* Seznam potrjenih odprav, ki bodo sproženo ob izvedbi meseca */}
+          {pendingExpeditions.length > 0 && (
+            <div className="pending-exps">
+              <div className="dim small" style={{ marginBottom: 4 }}>
+                {pendingExpeditions.length} potrjenih odprav za ta mesec ({pendingExpPpl} ljudi):
+              </div>
+              {pendingExpeditions.map((e, i) => (
+                <div key={i} className="pending-exp-row">
+                  <span>🔭 {e.assigned} ljudi · {e.path.length - 1} korakov</span>
+                  <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Aktivne odprave */}
         {(game.expeditions ?? []).length > 0 && (

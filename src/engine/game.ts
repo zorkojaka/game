@@ -73,9 +73,10 @@ export function raidRepelProbability(state: GameState, assignment: Assignment): 
   const axisH = state.axisHistory ?? { hiding: 0, espionage: 0, defense: 0 };
   const defenseLvl = Math.floor((axisH.defense ?? 0) / 3);
   const intelB = intelCombatBonus(state);
+  const wallBonus = 1 + 0.20 * (state.wallsBuilt ?? 0);  // vsak zid: +20 % moč obrambe
   const base = defenders * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult * (1 + 0.10 * defenseLvl);
   const equip = Math.min(state.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT;
-  const defStr = (base + equip) * (1 + intelB);
+  const defStr = (base + equip) * (1 + intelB) * wallBonus;
   const aiForce = Math.floor(state.aiRobots * (1 - state.clanActivity) * RAID_AI_FORCE_PCT);
   const aiStr = aiForce * AI_ROBOT_STRENGTH;
   return defStr / (defStr + Math.max(1, aiStr));
@@ -208,6 +209,7 @@ export function newGame(seed?: number): GameState {
       survival: INITIAL_SURVIVAL,
       combat: INITIAL_COMBAT,
       intelligence: INITIAL_INTELLIGENCE,
+      material: 0,
     },
     aiPhaseProgress: 0,
     aiRobots: INITIAL_AI_ROBOTS,
@@ -222,6 +224,10 @@ export function newGame(seed?: number): GameState {
     mapTiles: generateMap(),
     expeditions: [],
     completedExpeditions: [],
+    weaponWorkshopProgress: 0,
+    weaponWorkshopScouts: 0,
+    wallProgress: 0,
+    wallsBuilt: 0,
     rngSeed,
     rngCallCount: 0,
     lastRoundLog: null,
@@ -300,6 +306,9 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   // Donos izvidnikov skaliran z uspehom misije
   const intelGained = Math.floor(effectiveScouts * SCOUT_INTEL_YIELD * rations.strengthMult * scoutResult.effectivenessMult);
   let intelligence = state.resources.intelligence + intelGained;
+  // Material in combat resursa potrebujeta zgodnji declaration (delavnice jih dopolnjujeta/porabljata)
+  let combat = state.resources.combat;
+  let material = state.resources.material ?? 0;
 
   // 4. Izvidniki — razdelitev moči po izbranem cilju
   const scoutObjective = assignment.scoutPlan?.objective ?? 'ai_weakpoints';
@@ -310,22 +319,43 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   let aiTree = state.aiTree;
   let revealed: string[] = [];
   let mapTiles = state.mapTiles ?? generateMap();
-  let revealedTileIds: string[] = [];
+  // Delavnice — preberi prejšnje stanje (backward compat)
+  let weaponWorkshopProgress = state.weaponWorkshopProgress ?? 0;
+  let weaponWorkshopScouts = state.weaponWorkshopScouts ?? 0;
+  let wallProgress = state.wallProgress ?? 0;
+  let wallsBuilt = state.wallsBuilt ?? 0;
+  const workshopEvents: string[] = [];
 
   if (scoutObjective === 'ai_weakpoints') {
-    // Obstoječe vedenje — fog clearing AI tree
     const r = spendIntelOnFog(aiTree, totalScoutBudget);
     aiTree = r.nodes;
     revealed = r.revealed;
-  } else if (scoutObjective === 'map') {
-    // Razkrivanje izbranih heksov
-    const targetIds = assignment.scoutPlan?.targetTileIds ?? [];
-    const m = spendScoutsOnMap(mapTiles, targetIds, totalScoutBudget);
-    mapTiles = m.tiles;
-    revealedTileIds = m.revealed;
   } else if (scoutObjective === 'ai_robots') {
-    // Recon na AI robote — dodaj intel (bonus k bojem skozi intel coef)
     intelligence += Math.floor(totalScoutBudget * 0.6);
+  } else if (scoutObjective === 'weapon_dev' && effectiveScouts > 0) {
+    // Delavnica orožja — vsaki 2 scout-meseca = 1 orožje (z 1 materialom za vsak)
+    if (weaponWorkshopScouts !== effectiveScouts) {
+      weaponWorkshopScouts = effectiveScouts;  // posodobi referenco
+    }
+    weaponWorkshopProgress += 1;  // +1 mesec dela
+    // Ko se nakopiči ≥ 2 mesecev: producirj orožja (število = scoutsAtCycleStart, limitirano z materialom)
+    if (weaponWorkshopProgress >= 2) {
+      const possible = Math.min(weaponWorkshopScouts, material);
+      combat += possible;
+      material -= possible;
+      workshopEvents.push(`🔨 Delavnica orožja: +${possible} orožja (porabljeno ${possible} materiala).`);
+      weaponWorkshopProgress = 0;
+    }
+  } else if (scoutObjective === 'wall_dev' && effectiveScouts > 0) {
+    // Zid: vsakič +effectiveScouts scout-meseca, prag 6 = 1 zid
+    wallProgress += effectiveScouts;
+    const materialCost = Math.min(material, effectiveScouts * 2);
+    material -= materialCost;
+    if (wallProgress >= 6) {
+      wallsBuilt += 1;
+      wallProgress = 0;
+      workshopEvents.push(`🧱 Obrambni zid dograjen! Skupaj ${wallsBuilt} zidov. +bonus obrambi.`);
+    }
   }
 
   // 5. Šibke točke — odkrijemo, če smo dovolj razkrili sosednje vozlišče
@@ -338,7 +368,6 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   });
 
   // 6a. NAPAD (offensive combat — combatants gredo udariti AI)
-  let combat = state.resources.combat;
   let population = state.population;
   let aiRobots = state.aiRobots;
   let aiKnowledge = state.aiKnowledge;
@@ -362,11 +391,11 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     // Smrti v napadu = izguba orožja (1 padel = 1 izgubljeno orožje)
     combat = Math.max(0, combat - actualHumanLost);
     aiRobots = Math.max(0, aiRobots - result.aiRobotsDestroyed);
+    // Vsak uničen robot pusti 1 material (surovina za delavnice)
+    material += result.aiRobotsDestroyed;
     aiKnowledge = Math.min(1, aiKnowledge + result.aiInfoGained);
     intelligence += result.infoGained;
     combat = Math.max(0, combat + (result.spoils.combat ?? 0));
-    // Vsak uničen robot v napadu pusti 1 orožje
-    combat += result.aiRobotsDestroyed;
     intelligence += result.spoils.intelligence ?? 0;
 
     if (isExploiting && result.outcome === 'victory') {
@@ -395,8 +424,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     combat = Math.max(0, combat - actualDef);
     combat = Math.max(0, combat - raidRes.weaponsDestroyed);
     aiRobots = Math.max(0, aiRobots - raidRes.aiRobotsDestroyed);
-    // Vsak uničen robot v obrambi pusti 1 orožje
-    combat += raidRes.aiRobotsDestroyed;
+    // Branilci poberejo material iz uničenih robotov
+    material += raidRes.aiRobotsDestroyed;
     if (defSave > 0 || forSave > 0) {
       raidLog = { ...raidRes, defendersLost: actualDef, foragersLost: actualFor };
     }
@@ -633,12 +662,13 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       survival: survival - state.resources.survival,
       combat: combat - state.resources.combat,
       intelligence: intelligence - state.resources.intelligence,
+      material: material - (state.resources.material ?? 0),
     },
     populationDelta: finalPopulation - state.population,
     clanActivityDelta: clanActivity - state.clanActivity,
     aiKnowledgeDelta: finalAiKnowledge - state.aiKnowledge,
     revealedNodes: revealed,
-    narrative: buildNarrative(assignment, combatLog, raidLog, scoutResult, revealed, phaseComplete, state.phase, expeditionEvents),
+    narrative: buildNarrative(assignment, combatLog, raidLog, scoutResult, revealed, phaseComplete, state.phase, [...expeditionEvents, ...workshopEvents]),
   };
 
   return {
@@ -648,7 +678,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     totalRounds: state.totalRounds + 1,
     population: finalPopulation,
     maxPopulation: finalMaxPopulation,
-    resources: { survival, combat, intelligence },
+    resources: { survival, combat, intelligence, material },
     aiPhaseProgress: phaseComplete ? 0 : aiPhaseProgress,
     aiRobots,
     aiKnowledge: finalAiKnowledge,
@@ -665,6 +695,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     mapTiles,
     expeditions: tickedExps,
     completedExpeditions: [...oldCompletedExps, ...finishedExps],
+    weaponWorkshopProgress, weaponWorkshopScouts, wallProgress, wallsBuilt,
     rngCallCount: rng.calls,
     lastRoundLog: log,
     status,
