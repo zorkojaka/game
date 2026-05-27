@@ -210,6 +210,7 @@ export function newGame(seed?: number): GameState {
       combat: INITIAL_COMBAT,
       intelligence: INITIAL_INTELLIGENCE,
       material: 0,
+      artifacts: 0,
     },
     aiPhaseProgress: 0,
     aiRobots: INITIAL_AI_ROBOTS,
@@ -306,9 +307,10 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   // Donos izvidnikov skaliran z uspehom misije
   const intelGained = Math.floor(effectiveScouts * SCOUT_INTEL_YIELD * rations.strengthMult * scoutResult.effectivenessMult);
   let intelligence = state.resources.intelligence + intelGained;
-  // Material in combat resursa potrebujeta zgodnji declaration (delavnice jih dopolnjujeta/porabljata)
+  // Material, combat in artifacts potrebujejo zgodnji declaration (delavnice + najdbe)
   let combat = state.resources.combat;
   let material = state.resources.material ?? 0;
+  let artifacts = state.resources.artifacts ?? 0;
 
   // 4. Izvidniki — razdelitev moči po izbranem cilju
   const scoutObjective = assignment.scoutPlan?.objective ?? 'ai_weakpoints';
@@ -331,7 +333,9 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     aiTree = r.nodes;
     revealed = r.revealed;
   } else if (scoutObjective === 'ai_robots') {
-    intelligence += Math.floor(totalScoutBudget * 0.6);
+    // Specializirana raziskava AI — velik intel boost (~3× nad bazo)
+    const intelBonus = Math.floor(effectiveScouts * SCOUT_INTEL_YIELD * 3 * rations.strengthMult * scoutResult.effectivenessMult);
+    intelligence += intelBonus;
   } else if (scoutObjective === 'weapon_dev' && effectiveScouts > 0) {
     // Delavnica orožja — vsaki 2 scout-meseca = 1 orožje (z 1 materialom za vsak)
     if (weaponWorkshopScouts !== effectiveScouts) {
@@ -440,6 +444,18 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   // 6c. Pop loss od ujetih izvidnikov
   population -= scoutsKilled;
 
+  // Uporaba artefakta na šibko točko (instant uniči)
+  if (assignment.useArtifactOnWpId && artifacts > 0) {
+    const wpId = assignment.useArtifactOnWpId;
+    const idx = aiWeakPoints.findIndex(w => w.id === wpId);
+    if (idx >= 0 && !aiWeakPoints[idx].exploited) {
+      artifacts -= 1;
+      const wpLabel = aiWeakPoints[idx].label;
+      aiWeakPoints[idx] = { ...aiWeakPoints[idx], exploited: true, discovered: true };
+      expeditionEvents.push(`💎 ARTEFAKT UPORABLJEN: ${wpLabel} — instant uničena!`);
+    }
+  }
+
   // 6c2. ODPRAVE NA POTI (scout + mission s path) — tick + sprejem novih
   const incomingExps = assignment.newExpeditions ?? [];
   const oldExps = state.expeditions ?? [];
@@ -452,7 +468,12 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     rng = r.rng;
     mapTiles = r.tiles;
 
-    // Dogodki med potjo (srečanja)
+    // Najdbe med potjo
+    if (r.finds.material > 0) material += r.finds.material;
+    if (r.finds.weapons > 0)  combat   += r.finds.weapons;
+    if (r.finds.artifacts > 0) artifacts += r.finds.artifacts;
+
+    // Dogodki med potjo (srečanja + najdbe)
     for (const ev of r.events) expeditionEvents.push(`🔭 ${ev}`);
 
     if (r.exp.status === 'completed' || r.exp.status === 'lost') {
@@ -478,12 +499,18 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     }
   }
 
-  // Sprejmi nove odprave — pop se zmanjša, ker gredo na pot
+  // Sprejmi nove odprave — pop se zmanjša + hrana za pot se odšteje iz zalog kampa
   for (const inp of incomingExps) {
     if (!inp.path || inp.path.length < 2) continue;
     if (inp.assigned < 1) continue;
     const [idRoll, rngId] = rngInt(rng, 1000, 9999); rng = rngId;
     population -= inp.assigned;
+    // Hrana za celotno pot vzeta iz zalog upfront
+    const months = Math.max(1, inp.path.length - 1);
+    const eTier = RATIONS_LEVELS[inp.rations] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
+    const foodPack = Math.round(inp.assigned * months * eTier.foodMult);
+    survival = Math.max(0, survival - foodPack);
+    expeditionEvents.push(`🎒 Odprava (${inp.assigned} ljudi, ${months}m) vzela ${foodPack} hrane s seboj.`);
     tickedExps.push({
       id: `exp_${state.totalRounds}_${idRoll}`,
       kind: inp.kind,
@@ -518,11 +545,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   for (const m of oldMissions) {
     // Posodobi obroke misije iz trenutne izbire (default na prejšnje)
     const mRationsLvl = missionRationsMap[m.weakPointId] ?? m.rations ?? DEFAULT_RATIONS;
-    const mTier = RATIONS_LEVELS[mRationsLvl] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
-
-    // Strošek hrane za misijo (poje iz skupne zaloge)
-    const mFoodCost = Math.round(m.assigned * SURVIVAL_PER_PERSON_PER_ROUND * mTier.foodMult);
-    survival = Math.max(0, survival - mFoodCost);
+    // Misija ima svojo hrano za celotno trajanje (vzeto upfront ob startu) — brez dodatnih odbitkov tukaj
 
     // Encounter roll vsak mesec
     const encP = missionEncounterProbability(state, m.assigned);
@@ -579,9 +602,10 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     const dur = MISSION_DURATION_MONTHS[wpId] ?? 4;
     const mRationsLvl = missionRationsMap[wpId] ?? DEFAULT_RATIONS;
     const mTier = RATIONS_LEVELS[mRationsLvl] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
-    // Strošek hrane tudi pri startu
-    const mFoodCost = Math.round(ppl * SURVIVAL_PER_PERSON_PER_ROUND * mTier.foodMult);
+    // Hrana za celotno trajanje misije vzeta upfront
+    const mFoodCost = Math.round(ppl * dur * mTier.foodMult);
     survival = Math.max(0, survival - mFoodCost);
+    expeditionEvents.push(`🎒 Misija (${ppl} ljudi, ${dur}m) vzela ${mFoodCost} hrane s seboj.`);
     const sp = missionSuccessProbability({ ...state, resources: { ...state.resources, intelligence } }, wpId, ppl, mRationsLvl);
     tickedMissions.push({ weakPointId: wpId, assigned: ppl, monthsTotal: dur, monthsRemaining: dur,
       successProbability: sp, rations: mRationsLvl, status: 'in_progress' });
@@ -678,7 +702,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     totalRounds: state.totalRounds + 1,
     population: finalPopulation,
     maxPopulation: finalMaxPopulation,
-    resources: { survival, combat, intelligence, material },
+    resources: { survival, combat, intelligence, material, artifacts },
     aiPhaseProgress: phaseComplete ? 0 : aiPhaseProgress,
     aiRobots,
     aiKnowledge: finalAiKnowledge,

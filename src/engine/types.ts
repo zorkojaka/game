@@ -33,9 +33,10 @@ export interface AIWeakPoint {
 
 export interface Resources {
   survival: number;     // voda + hrana
-  combat: number;       // orožje (1 = ena oseba lahko bije)
+  combat: number;       // orožje
   intelligence: number; // intel
-  material: number;     // elementi iz uničenih robotov — surovina za orožja in zidove
+  material: number;     // surovina iz robotov
+  artifacts: number;    // redki artefakti — vsak lahko uniči eno šibko točko
 }
 
 // ─── Assignment — kako razporediš populacijo ta mesec ─────────────────────────
@@ -100,6 +101,8 @@ export interface Assignment {
   missionRations?: Record<string, number>;
   scoutPlan?: ScoutPlan;
   newExpeditions?: NewExpeditionInput[];
+  // Uporabi 1 artefakt za uničenje izbrane šibke točke
+  useArtifactOnWpId?: string;
   // Legacy (ne uporabljati — ohranjeno za stara state-a)
   dayGuard?: number;
   nightGuard?: number;

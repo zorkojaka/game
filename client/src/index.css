@@ -1483,3 +1483,11 @@ input[type=range]::-moz-range-thumb {
   border-bottom: 1px dashed var(--border);
 }
 .pending-exp-row:last-child { border-bottom: none; }
+
+.artifact-btn {
+  background: #14110a; border: 1px solid; padding: 5px 10px;
+  font-family: var(--font); font-size: .76rem; cursor: pointer;
+  letter-spacing: .04em; margin-bottom: 4px;
+  width: 100%; text-align: left;
+}
+.artifact-btn:hover { background: #1a1500; }

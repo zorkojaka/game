@@ -24,6 +24,7 @@ export interface Resources {
   combat: number;
   intelligence: number;
   material: number;
+  artifacts: number;
 }
 
 export interface HexTile {
@@ -84,6 +85,7 @@ export interface Assignment {
   missionRations?: Record<string, number>;
   scoutPlan?: ScoutPlan;
   newExpeditions?: NewExpeditionInput[];
+  useArtifactOnWpId?: string;
   dayGuard?: number;
   nightGuard?: number;
 }

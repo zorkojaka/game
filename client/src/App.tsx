@@ -213,12 +213,15 @@ function ClanStatus({ game, inMissions }: { game: GameState; inMissions: number 
       </div>
       {/* Ostali viri grafično — velike ikone, brez bar-ov */}
       <div className="cs-resources">
-        <BigStat icon="🍞" label="Hrana/Voda" value={r.survival}     color="#cc8800" />
-        <BigStat icon="⚔"  label="Orožje"     value={r.combat}       color="#cc4433" />
+        <BigStat icon="🍞" label="Hrana/Voda" value={r.survival}      color="#cc8800" />
+        <BigStat icon="⚔"  label="Orožje"     value={r.combat}        color="#cc4433" />
         <BigStat icon="⚙"  label="Material"   value={r.material ?? 0} color="#88aabb" />
-        <BigStat icon="👁"  label="Intel"      value={r.intelligence} color="#3388cc" />
+        <BigStat icon="👁"  label="Intel"      value={r.intelligence}  color="#3388cc" />
+        {(r.artifacts ?? 0) > 0 && (
+          <BigStat icon="💎" label="Artefakti" value={r.artifacts}     color="#ffd84a" />
+        )}
         {(game.wallsBuilt ?? 0) > 0 && (
-          <BigStat icon="🧱" label="Zidovi"   value={game.wallsBuilt}  color="#aabb88" />
+          <BigStat icon="🧱" label="Zidovi"    value={game.wallsBuilt} color="#aabb88" />
         )}
       </div>
     </div>
@@ -472,7 +475,7 @@ function MissionRationsButtons({ value, onChange }: { value: number; onChange: (
 }
 
 /** Misije proti šibkim točkam AI */
-function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsChange, odds, availablePop, selectedWpId }: {
+function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsChange, odds, availablePop, selectedWpId, artifacts, onUseArtifact, artifactTargetWpId }: {
   wps: AIWeakPoint[]; aiTree: AITreeNode[];
   active: Mission[];
   plan: Record<string, number>;
@@ -482,6 +485,9 @@ function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsCha
   odds: OddsPreview | null;
   availablePop: number;
   selectedWpId?: string;
+  artifacts: number;
+  onUseArtifact: (wpId: string) => void;
+  artifactTargetWpId: string;
 }) {
   return (
     <div className="panel">
@@ -533,6 +539,13 @@ function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsCha
               )}
               {fog === 'known' && !wp.exploited && !activeM && (
                 <>
+                  {artifacts > 0 && (
+                    <button className="artifact-btn"
+                      style={{ borderColor: artifactTargetWpId === wp.id ? '#ffd84a' : '#553a00', color: '#ffd84a' }}
+                      onClick={() => onUseArtifact(artifactTargetWpId === wp.id ? '' : wp.id)}>
+                      💎 {artifactTargetWpId === wp.id ? '✓ Uniči z artefaktom (ob izvedbi)' : `Uniči z artefaktom (1 / ${artifacts})`}
+                    </button>
+                  )}
                   <div className="mission-setup">
                     <input type="number" min={0} max={availablePop} value={planned}
                       onChange={e => onPlanChange(wp.id, +e.target.value)}
@@ -1085,7 +1098,11 @@ function BalanceTrend({ entries }: { entries: EventEntry[] }) {
 }
 
 function EventLog({ entries }: { entries: EventEntry[] }) {
-  const [openTs, setOpenTs] = useState<number | null>(null);
+  const [openTs, setOpenTs] = useState<number | null>(entries[0]?.ts ?? null);
+  // Avto-odpri najnovejši dogodek, ko se pojavi
+  useEffect(() => {
+    if (entries[0]) setOpenTs(entries[0].ts);
+  }, [entries[0]?.ts]);
   return (
     <div className="panel event-log-panel">
       <div className="panel-head">
@@ -1752,6 +1769,7 @@ export default function App() {
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
   const [draftPeople,  setDraftPeople]  = useState(5);
   const [pendingExpeditions, setPendingExpeditions] = useState<NewExpeditionInput[]>([]);
+  const [artifactTargetWp, setArtifactTargetWp] = useState<string>('');
   const [targetWP,   setTargetWP]   = useState('');
   const [rations,    setRations]    = useState(3);
   const [odds,         setOdds]         = useState<OddsPreview | null>(null);
@@ -1870,7 +1888,7 @@ export default function App() {
       const g = await createGame();
       setGame(g);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('hiding'); setCombatants(0); setDefenders(15); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('weapon_dev'); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setPendingExpeditions([]);
+      setAxis('hiding'); setCombatants(0); setDefenders(15); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('weapon_dev'); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setPendingExpeditions([]); setArtifactTargetWp('');
     } finally { setLoading(false); }
   };
 
@@ -1887,12 +1905,14 @@ export default function App() {
         assignment: { axis, combatants, defenders, foragers, scouts, rations,
           missionAssignments: missions, missionRations: missionR,
           scoutPlan: { objective: scoutObj, targetTileIds: Array.from(scoutTargets) },
-          newExpeditions: newExps.length > 0 ? newExps : undefined },
+          newExpeditions: newExps.length > 0 ? newExps : undefined,
+          useArtifactOnWpId: artifactTargetWp || undefined },
         targetWeakPoint: targetWP || undefined,
       });
       setMissions({});
       setScoutTargets(new Set());
       setPendingExpeditions([]);
+      setArtifactTargetWp('');
       const clan = state.mapTiles?.find((t: HexTile) => t.isClanCamp);
       setDraftPath(clan ? [{ q: clan.q, r: clan.r }] : []);
       setGame(state);
@@ -2035,17 +2055,28 @@ export default function App() {
 
   const rTier = RATIONS[rations];
   const foragerYield = Math.floor(foragers * 4 * rTier.strengthMult);
-  const scoutIntel   = Math.floor(scouts   * 8 * rTier.strengthMult);
-  // Populacija, ki je v kampu (brez aktivnih odprav in misij — tisti ne jedo iz domačega skladišča neposredno)
+  const scoutIntelBase = Math.floor(scouts * 8 * rTier.strengthMult);
+  const scoutIntelBonus = scoutObj === 'ai_robots' ? Math.floor(scouts * 8 * 3 * rTier.strengthMult) : 0;
+  const scoutIntel   = scoutIntelBase + scoutIntelBonus;
   const inCampPop    = Math.max(0, game.population);
   const campFoodCost = Math.round(inCampPop * rTier.foodMult);
-  // Aktivne misije: vsaka ekipa porabi hrano iz kampnega skladišča po svojem nivoju obrokov
-  const missionFoodCost = (game.activeMissions ?? []).reduce((s, m) => {
-    const mTier = RATIONS[m.rations ?? 3] ?? RATIONS[3];
-    return s + Math.round(m.assigned * mTier.foodMult);
+  // Aktivne misije/odprave: ne jedo iz kampa (so vzele upfront)
+  // Nove odprave/misije, ki bodo poslane TA mesec, vzamejo hrano s seboj iz kampa
+  const pendingExpFood = pendingExpeditions.reduce((s, e) => {
+    const months = Math.max(1, e.path.length - 1);
+    const t = RATIONS[e.rations] ?? RATIONS[3];
+    return s + Math.round(e.assigned * months * t.foodMult);
   }, 0);
-  // Aktivne odprave: za zdaj NE jejo iz kampa (so na poti, samostojne)
-  const foodCost     = campFoodCost + missionFoodCost;
+  const draftExpFood = (draftPath.length >= 2 && draftPeople > 0)
+    ? Math.round(draftPeople * (draftPath.length - 1) * rTier.foodMult) : 0;
+  const newMissionFood = Object.entries(missions).reduce((s, [wpId, ppl]) => {
+    // misije imajo fiksno trajanje per wp
+    const dur = wpId === 'wp_power' ? 4 : wpId === 'wp_comm' ? 5 : wpId === 'wp_core' ? 6 : 4;
+    const r = missionR[wpId] ?? 3;
+    const t = RATIONS[r] ?? RATIONS[3];
+    return s + Math.round(ppl * dur * t.foodMult);
+  }, 0);
+  const foodCost     = campFoodCost + pendingExpFood + draftExpFood + newMissionFood;
   const survBalance  = foragerYield - foodCost;
 
   return (
@@ -2293,7 +2324,10 @@ export default function App() {
         <Missions wps={game.aiWeakPoints} aiTree={game.aiTree}
           active={game.activeMissions ?? []} plan={missions} planR={missionR}
           onPlanChange={setMissionAssignment} onRationsChange={setMissionRations}
-          odds={odds} availablePop={availablePop} selectedWpId={targetWP} />
+          odds={odds} availablePop={availablePop} selectedWpId={targetWP}
+          artifacts={game.resources.artifacts ?? 0}
+          onUseArtifact={setArtifactTargetWp}
+          artifactTargetWpId={artifactTargetWp} />
       </div>
     </div>
   );

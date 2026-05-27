@@ -53,33 +53,40 @@ export function pathMonths(path: Array<{ q: number; r: number }>): number {
   return Math.ceil(steps / TILES_PER_MONTH);
 }
 
+// Verjetnosti najdb na neraziskanem polju
+export const FIND_MATERIAL_CHANCE = 0.12;  // mala možnost — 12 %
+export const FIND_WEAPON_CHANCE   = 0.025; // zelo redko — 2.5 %
+export const FIND_ARTIFACT_CHANCE = 0.005; // minimalna — 0.5 %
+
+export interface ExpeditionFinds { material: number; weapons: number; artifacts: number; }
+
 /** Premakni eno odpravo za en mesec. Vrne posodobljeno + nova stanja heksov + RNG. */
 export function tickExpedition(
   exp: Expedition,
   tiles: HexTile[],
   aiKnowledge: number,
   rng: RNGState,
-): { exp: Expedition; tiles: HexTile[]; rng: RNGState; populationDelta: number; events: string[] } {
-  if (exp.status !== 'traveling') return { exp, tiles, rng, populationDelta: 0, events: [] };
+): { exp: Expedition; tiles: HexTile[]; rng: RNGState; populationDelta: number; events: string[]; finds: ExpeditionFinds } {
+  if (exp.status !== 'traveling') return { exp, tiles, rng, populationDelta: 0, events: [], finds: { material: 0, weapons: 0, artifacts: 0 } };
 
   let newTiles = [...tiles];
   let popLoss = 0;
   let lostAll = false;
   const events: string[] = [];
+  const finds: ExpeditionFinds = { material: 0, weapons: 0, artifacts: 0 };
   let curIdx = exp.currentIndex;
   let assignedNow = exp.assigned;
 
   for (let stepsThisMonth = 0; stepsThisMonth < TILES_PER_MONTH; stepsThisMonth++) {
-    if (curIdx >= exp.path.length - 1) break;  // na cilju
+    if (curIdx >= exp.path.length - 1) break;
     const nextStep = exp.path[curIdx + 1];
     const tIdx = newTiles.findIndex(t => t.q === nextStep.q && t.r === nextStep.r);
     if (tIdx < 0) break;
     const tile = newTiles[tIdx];
+    const wasUnresearched = tile.researchProgress < 1;
 
-    // Premik
     curIdx++;
 
-    // Razkrije polje
     const addProg = researchPerVisit(assignedNow);
     const newProg = Math.min(1, tile.researchProgress + addProg);
     newTiles[tIdx] = { ...tile, researchProgress: newProg, visibility: visibilityFromProgress(newProg) };
@@ -97,6 +104,24 @@ export function tickExpedition(
       if (assignedNow < 1) {
         lostAll = true;
         break;
+      }
+    }
+
+    // Najdbe — samo na poljih, ki še niso bila popolnoma raziskana
+    if (wasUnresearched) {
+      const [findRoll, rngF] = rngNext(rng); rng = rngF;
+      // Sestavi prag po prioriteti: prva najdba ki preseže prag
+      if (findRoll < FIND_ARTIFACT_CHANCE) {
+        finds.artifacts += 1;
+        events.push(`💎 Artefakt najden na (${tile.q},${tile.r})!`);
+      } else if (findRoll < FIND_ARTIFACT_CHANCE + FIND_WEAPON_CHANCE) {
+        const [w, rngW] = rngInt(rng, 1, 3); rng = rngW;
+        finds.weapons += w;
+        events.push(`⚔ ${w} orožja najdenega na (${tile.q},${tile.r}).`);
+      } else if (findRoll < FIND_ARTIFACT_CHANCE + FIND_WEAPON_CHANCE + FIND_MATERIAL_CHANCE) {
+        const [m, rngM] = rngInt(rng, 1, 4); rng = rngM;
+        finds.material += m;
+        events.push(`⚙ ${m} materiala najdenega na (${tile.q},${tile.r}).`);
       }
     }
   }
@@ -118,5 +143,6 @@ export function tickExpedition(
     rng,
     populationDelta: -popLoss,
     events,
+    finds,
   };
 }
