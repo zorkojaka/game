@@ -1545,47 +1545,66 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
           </g>
         )}
 
-        {/* Veliki kamp z obzidjem + 3 notranji oddelki + branilci na obzidju */}
+        {/* Veliki kamp: obzidje + 3 barvna območja + branilci na obzidju */}
         {(() => {
           const clan = tiles.find(t => t.isClanCamp);
           if (!clan) return null;
           const p = shift(hexToPixel(clan.q, clan.r, SIZE));
-          const R = SIZE * 1.9;
+          const R = SIZE * 2.0;
+          const innerR = R * 0.9;
+          // 3 vodoravna območja znotraj kampa
           const sections = [
-            { icon: '🔬', label: 'Raziskava', val: camp.researchers, color: '#3377cc' },
-            { icon: '🔨', label: 'Delavnica', val: camp.workers,     color: '#cc7733' },
-            { icon: '🌾', label: 'Hrana',     val: camp.foragers,    color: '#6aa630' },
+            { icon: '🔬', label: 'RAZISKAVE', val: camp.researchers, color: '#3377cc', bg: '#0a1426' },
+            { icon: '🔨', label: 'DELAVNICE', val: camp.workers,     color: '#cc7733', bg: '#1a1206' },
+            { icon: '🌾', label: 'PREHRANA',  val: camp.foragers,    color: '#6aa630', bg: '#0e1606' },
           ];
+          const top = p.y - innerR, bandH = (innerR * 2) / 3;
+          const clipId = 'campClip';
+          // Branilci kot ščitki po obzidju (max 12 ikon, ostalo številka)
+          const shieldCount = Math.min(12, camp.defenders);
           return (
             <g className="camp-graphic" pointerEvents="none">
-              {/* Notranjost kampa */}
-              <path d={hexPath(p.x, p.y, R)} fill="#0a1a14" stroke="#0a1a14" strokeWidth="1" />
-              {/* Obzidje (debela obroba) */}
-              <path d={hexPath(p.x, p.y, R)} fill="none" stroke="#22aa88" strokeWidth="4" />
-              <path d={hexPath(p.x, p.y, R * 0.92)} fill="none" stroke="#1a6a55" strokeWidth="1.5" strokeDasharray="3 2" />
-              {/* Naslov */}
-              <text x={p.x} y={p.y - R * 0.55} textAnchor="middle" fontSize="9" fill="#66ccaa"
-                fontFamily="'Courier New', monospace" fontWeight="bold" letterSpacing="1">⌂ KAMP</text>
-              {/* 3 notranji oddelki */}
+              <defs>
+                <clipPath id={clipId}><path d={hexPath(p.x, p.y, innerR)} /></clipPath>
+              </defs>
+              {/* 3 barvni pasovi (clip na heks) */}
+              <g clipPath={`url(#${clipId})`}>
+                {sections.map((s, i) => (
+                  <g key={i}>
+                    <rect x={p.x - innerR} y={top + i * bandH} width={innerR * 2} height={bandH}
+                      fill={s.bg} />
+                    {i > 0 && <line x1={p.x - innerR} y1={top + i * bandH} x2={p.x + innerR} y2={top + i * bandH}
+                      stroke="#22aa88" strokeWidth="0.8" strokeOpacity="0.4" strokeDasharray="3 2" />}
+                  </g>
+                ))}
+              </g>
+              {/* Vsebina pasov */}
               {sections.map((s, i) => {
-                const y = p.y - R * 0.22 + i * (R * 0.34);
+                const cy = top + i * bandH + bandH / 2;
                 return (
                   <g key={i}>
-                    <text x={p.x} y={y} textAnchor="middle" fontSize="13" fill={s.color}
-                      fontFamily="'Courier New', monospace" fontWeight="bold">
-                      {s.icon} {s.val}
-                    </text>
-                    <text x={p.x} y={y + 9} textAnchor="middle" fontSize="6.5" fill="#7a9a8a"
-                      fontFamily="'Courier New', monospace">{s.label}</text>
+                    <text x={p.x} y={cy - 1} textAnchor="middle" fontSize="14" fill={s.color}
+                      fontFamily="'Courier New', monospace" fontWeight="bold">{s.icon} {s.val}</text>
+                    <text x={p.x} y={cy + 10} textAnchor="middle" fontSize="6" fill="#88a596"
+                      fontFamily="'Courier New', monospace" letterSpacing="0.5">{s.label}</text>
                   </g>
                 );
               })}
-              {/* Branilci na obzidju (spodaj na zidu) */}
+              {/* Obzidje (debela obroba) */}
+              <path d={hexPath(p.x, p.y, R)} fill="none" stroke="#22aa88" strokeWidth="5" />
+              <path d={hexPath(p.x, p.y, innerR)} fill="none" stroke="#1a6a55" strokeWidth="1.5" />
+              {/* Branilci na obzidju — ščitki vrhu zidu + badge */}
               <g>
-                <rect x={p.x - 26} y={p.y + R * 0.66} width="52" height="15" rx="2"
-                  fill="#0a1a14" stroke="#66aabb" strokeWidth="1.5" />
-                <text x={p.x} y={p.y + R * 0.66 + 11} textAnchor="middle" fontSize="9.5" fill="#88ccdd"
-                  fontFamily="'Courier New', monospace" fontWeight="bold">🛡 {camp.defenders}</text>
+                {Array.from({ length: shieldCount }, (_, i) => {
+                  const a = (-Math.PI / 2) + (i - (shieldCount - 1) / 2) * 0.22;
+                  const sx = p.x + R * Math.cos(a);
+                  const sy = p.y + R * Math.sin(a);
+                  return <text key={i} x={sx} y={sy + 3} textAnchor="middle" fontSize="9">🛡</text>;
+                })}
+                <rect x={p.x - 28} y={p.y - R - 8} width="56" height="16" rx="3"
+                  fill="#06120e" stroke="#66aabb" strokeWidth="1.5" />
+                <text x={p.x} y={p.y - R + 4} textAnchor="middle" fontSize="10" fill="#88ccdd"
+                  fontFamily="'Courier New', monospace" fontWeight="bold">🛡 OBRAMBA {camp.defenders}</text>
               </g>
             </g>
           );
