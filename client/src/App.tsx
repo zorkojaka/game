@@ -1331,6 +1331,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
   drawingMode: boolean;
   camp: { defenders: number; researchers: number; workers: number; foragers: number };
   onCampAdjust: (which: 'd' | 'f' | 'w' | 'r', delta: number) => void;
+  repelProbability: number;  // 0–1, za polnjenje obrambne linije
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
@@ -1566,13 +1567,71 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
           </g>
         )}
 
-        {/* KAMP — 3 hex zoni z +/- gumbi */}
+        {/* KAMP — obrambna linija okoli grozda, polna glede na verjetnost odbijanja */}
+        {(() => {
+          // Robovi heksa → sosednja smer (pointy-top)
+          const edgeToDir = [ {q:+1,r:0}, {q:0,r:+1}, {q:-1,r:+1}, {q:-1,r:0}, {q:0,r:-1}, {q:+1,r:-1} ];
+          const vtx = (cx: number, cy: number, k: number): [number, number] => {
+            const a = (Math.PI / 180) * (60 * k - 30);
+            return [cx + SIZE * Math.cos(a), cy + SIZE * Math.sin(a)];
+          };
+          // Zberi zunanje robove
+          const segs: Array<[[number,number],[number,number]]> = [];
+          for (const z of CAMP_ZONES) {
+            const p = shift(hexToPixel(z.q, z.r, SIZE));
+            for (let k = 0; k < 6; k++) {
+              const d = edgeToDir[k];
+              const nb = `${z.q + d.q},${z.r + d.r}`;
+              if (!campZoneIds.has(nb)) segs.push([vtx(p.x, p.y, k), vtx(p.x, p.y, (k + 1) % 6)]);
+            }
+          }
+          // Veriži v zaprto pot
+          const eq = (a: [number,number], b: [number,number]) => Math.abs(a[0]-b[0]) < 0.6 && Math.abs(a[1]-b[1]) < 0.6;
+          const used = new Array(segs.length).fill(false);
+          const loop: Array<[number,number]> = [];
+          if (segs.length) {
+            used[0] = true; loop.push(segs[0][0], segs[0][1]);
+            let cur = segs[0][1];
+            for (let guard = 0; guard < segs.length + 2; guard++) {
+              let found = -1, nextPt: [number,number] | null = null;
+              for (let i = 0; i < segs.length; i++) {
+                if (used[i]) continue;
+                if (eq(segs[i][0], cur)) { found = i; nextPt = segs[i][1]; break; }
+                if (eq(segs[i][1], cur)) { found = i; nextPt = segs[i][0]; break; }
+              }
+              if (found < 0 || !nextPt) break;
+              used[found] = true; loop.push(nextPt); cur = nextPt;
+            }
+          }
+          const pathD = loop.length ? `M ${loop.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' L ')} Z` : '';
+          // Skupna dolžina poti
+          let len = 0;
+          for (let i = 0; i < loop.length; i++) {
+            const a = loop[i], b = loop[(i + 1) % loop.length];
+            len += Math.hypot(b[0]-a[0], b[1]-a[1]);
+          }
+          const fillLen = len * Math.max(0, Math.min(1, repelProbability));
+          const repelColor = repelProbability >= 0.6 ? '#22cc88' : repelProbability >= 0.35 ? '#cc8800' : '#cc3333';
+          return (
+            <g className="camp-wall" pointerEvents="none">
+              {/* temna podlaga linije */}
+              {pathD && <path d={pathD} fill="none" stroke="#16302a" strokeWidth="6" strokeLinejoin="round" />}
+              {/* polnilo sorazmerno z verjetnostjo odbijanja */}
+              {pathD && (
+                <path d={pathD} fill="none" stroke={repelColor} strokeWidth="6" strokeLinejoin="round"
+                  strokeDasharray={`${fillLen.toFixed(1)} ${(len - fillLen).toFixed(1)}`} strokeLinecap="round" />
+              )}
+            </g>
+          );
+        })()}
+
+        {/* KAMP — 4 hex zoni z +/- gumbi (tanke notranje obrobe) */}
         {CAMP_ZONES.map(z => {
           const p = shift(hexToPixel(z.q, z.r, SIZE));
           return (
             <g key={`camp_${z.q}_${z.r}`} className="camp-zone">
-              {/* ozadje + obzidje */}
-              <path d={hexPath(p.x, p.y, SIZE)} fill="#0a1a14" stroke="#22aa88" strokeWidth="3" />
+              {/* ozadje + tanka notranja obroba */}
+              <path d={hexPath(p.x, p.y, SIZE)} fill="#0a1a14" stroke="#1a4a3a" strokeWidth="0.8" />
               {/* ikona + oznaka */}
               <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="16">{z.icon}</text>
               <text x={p.x} y={p.y - SIZE * 0.12} textAnchor="middle" fontSize="6.5" fill="#88a596"
@@ -2236,7 +2295,8 @@ export default function App() {
             expeditions={game.expeditions ?? []}
             wps={game.aiWeakPoints} drawingMode={true}
             camp={{ defenders, researchers, workers, foragers }}
-            onCampAdjust={(which, delta) => bumpRole(which, delta)} />
+            onCampAdjust={(which, delta) => bumpRole(which, delta)}
+            repelProbability={odds?.raidRepelProbability ?? 0} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
