@@ -143,13 +143,144 @@ b      { color: var(--text); }
 .res-label      { font-size: .65rem; color: var(--dim); text-transform: uppercase; flex: 1; }
 .res-value      { font-size: .9rem; font-weight: bold; }
 
-/* ─── HUD layout ───────────────────────────────────────────────────────────── */
-.app-shell { display: flex; align-items: flex-start; gap: .75rem; }
-.app-shell .hud { flex: 1; min-width: 0; }
+/* ─── Celozaslonska postavitev ─────────────────────────────────────────────── */
+#root:has(.app-shell) {
+  max-width: none;
+  width: 100vw;
+  height: 100vh;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.app-shell {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: .5rem;
+  padding: .5rem .6rem;
+}
+
+/* Zgornja vrstica: faza + viri */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.top-bar > :first-child { flex: 1 1 auto; min-width: 0; }
+.top-res {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: .35rem .75rem;
+  background: #11171f;
+  border: 1px solid #232c36;
+  border-radius: 10px;
+}
+
+/* Srednji del: meni+levo / karta / desno */
+.main-cols {
+  display: grid;
+  grid-template-columns: minmax(340px, 400px) minmax(0, 1fr) minmax(300px, 360px);
+  gap: .6rem;
+  min-height: 0;
+}
+.left-col {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: .5rem;
+  min-height: 0;
+}
+.left-panel {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: .25rem;
+}
+.center-col {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  min-height: 0;
+  overflow-y: auto;
+}
+.center-col .map-panel { flex: 0 0 auto; }
+.right-col {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: .5rem;
+  min-height: 0;
+}
+.rc-log {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.rc-log-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: .4rem;
+}
+.rc-actions {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  max-height: 45%;
+  overflow-y: auto;
+}
+
+/* Spodnja vrstica: koraki + naslednji mesec */
+.bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .4rem .75rem;
+  background: #0d1218;
+  border: 1px solid #1d2630;
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+.step-track { display: flex; align-items: center; gap: 1.5rem; }
+.step { display: flex; align-items: center; gap: .45rem; position: relative; }
+.step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  width: 1.5rem;
+  height: 2px;
+  background: #2a3a30;
+  top: 50%;
+}
+.step-dot {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-size: .7rem; font-weight: bold;
+  background: #182218; color: #6a8a6a; border: 1px solid #2a3a30;
+}
+.step.active .step-dot { background: #1f6f3a; color: #eafff0; border-color: #2bbb5e; }
+.step.done .step-dot { background: #14301f; color: #2bbb5e; border-color: #1f6f3a; }
+.step-label { font-size: .72rem; color: #8aa596; }
+.step.active .step-label { color: #e8f5ee; }
+.bottom-actions { display: flex; align-items: center; gap: .75rem; }
+.bottom-actions .exec-btn { margin: 0; width: auto; min-width: 220px; }
+.back-btn {
+  background: none; border: 1px solid #2a3038; border-radius: 8px;
+  color: #9aa4b2; padding: .5rem .9rem; cursor: pointer; font-family: var(--font);
+}
+.back-btn:hover { color: #cdd6e0; border-color: #3a4452; }
+
+@media (max-width: 1100px) {
+  #root:has(.app-shell) { height: auto; overflow: auto; }
+  .app-shell { height: auto; }
+  .main-cols { grid-template-columns: 1fr; }
+  .left-col, .center-col, .right-col { min-height: 0; overflow: visible; }
+  .left-panel, .center-col, .rc-log-scroll, .rc-actions { overflow: visible; max-height: none; }
+}
 
 .side-menu {
-  position: sticky;
-  top: .75rem;
   display: flex;
   flex-direction: column;
   gap: .5rem;
@@ -177,12 +308,6 @@ b      { color: var(--text); }
 }
 .sm-icon { font-size: 1.4rem; line-height: 1; }
 .sm-label { font-size: .68rem; font-weight: 600; }
-
-@media (max-width: 720px) {
-  .app-shell { flex-direction: column; }
-  .side-menu { flex-direction: row; position: static; align-self: stretch; }
-  .sm-btn { flex: 1; width: auto; }
-}
 
 .hud { display: flex; flex-direction: column; gap: .75rem; }
 
