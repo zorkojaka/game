@@ -1335,11 +1335,22 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
   const popExpId = selectedExpId ?? hoveredExpId;
   const SIZE = 36;
+  const CAMP_R = SIZE * 2.0;
+  const CAMP_EXTENT = CAMP_R + 16;  // velik kamp + badge/ščitki nad zidom
   const pts = tiles.map(t => hexToPixel(t.q, t.r, SIZE));
-  const minX = Math.min(...pts.map(p => p.x)) - SIZE;
-  const maxX = Math.max(...pts.map(p => p.x)) + SIZE;
-  const minY = Math.min(...pts.map(p => p.y)) - SIZE;
-  const maxY = Math.max(...pts.map(p => p.y)) + SIZE;
+  let minX = Math.min(...pts.map(p => p.x)) - SIZE;
+  let maxX = Math.max(...pts.map(p => p.x)) + SIZE;
+  let minY = Math.min(...pts.map(p => p.y)) - SIZE;
+  let maxY = Math.max(...pts.map(p => p.y)) + SIZE;
+  // Razširi okvir, da je veliki kamp v celoti viden (ne odreže ga rob)
+  const clanForBounds = tiles.find(t => t.isClanCamp);
+  if (clanForBounds) {
+    const cp = hexToPixel(clanForBounds.q, clanForBounds.r, SIZE);
+    minX = Math.min(minX, cp.x - CAMP_EXTENT);
+    maxX = Math.max(maxX, cp.x + CAMP_EXTENT);
+    minY = Math.min(minY, cp.y - CAMP_EXTENT);
+    maxY = Math.max(maxY, cp.y + CAMP_EXTENT);
+  }
   const W = maxX - minX, H = maxY - minY;
   const shift = (p: { x: number; y: number }) => ({ x: p.x - minX, y: p.y - minY });
 
@@ -1550,7 +1561,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
           const clan = tiles.find(t => t.isClanCamp);
           if (!clan) return null;
           const p = shift(hexToPixel(clan.q, clan.r, SIZE));
-          const R = SIZE * 2.0;
+          const R = CAMP_R;
           const innerR = R * 0.9;
           // 3 vodoravna območja znotraj kampa
           const sections = [
@@ -1567,6 +1578,8 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
               <defs>
                 <clipPath id={clipId}><path d={hexPath(p.x, p.y, innerR)} /></clipPath>
               </defs>
+              {/* Neprosojno ozadje celotnega kampa (pokrije sosednje hekse) */}
+              <path d={hexPath(p.x, p.y, R)} fill="#06120e" />
               {/* 3 barvni pasovi (clip na heks) */}
               <g clipPath={`url(#${clipId})`}>
                 {sections.map((s, i) => (
