@@ -1330,7 +1330,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
   wps: AIWeakPoint[];
   drawingMode: boolean;
   camp: { defenders: number; researchers: number; workers: number; foragers: number };
-  onCampAdjust: (which: 'f' | 'w' | 'r', delta: number) => void;
+  onCampAdjust: (which: 'd' | 'f' | 'w' | 'r', delta: number) => void;
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
@@ -1341,6 +1341,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
     { q: 0, r: 3, icon: '🔬', label: 'RAZISKAVE', count: camp.researchers, color: '#3377cc', adj: 'r' as const },
     { q: 0, r: 4, icon: '🌾', label: 'PREHRANA',  count: camp.foragers,    color: '#6aa630', adj: 'f' as const },
     { q: 1, r: 4, icon: '🔨', label: 'DELAVNICE', count: camp.workers,     color: '#cc7733', adj: 'w' as const },
+    { q: 1, r: 3, icon: '🛡', label: 'OBRAMBA',   count: camp.defenders,   color: '#66aabb', adj: 'd' as const },
   ];
   const campZoneIds = new Set(CAMP_ZONES.map(z => `${z.q},${z.r}`));
   const CAMP_EXTENT = SIZE * 1.4;  // prostor za obrambni badge nad kampom
@@ -1590,22 +1591,6 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
             </g>
           );
         })}
-        {/* Obrambni badge nad kampom (na obzidju) */}
-        {(() => {
-          const top = CAMP_ZONES.reduce((best, z) => {
-            const py = hexToPixel(z.q, z.r, SIZE).y;
-            return py < best.y ? { z, y: py } : best;
-          }, { z: CAMP_ZONES[0], y: Infinity });
-          const p = shift(hexToPixel(top.z.q, top.z.r, SIZE));
-          return (
-            <g pointerEvents="none">
-              <rect x={p.x - 30} y={p.y - SIZE - 10} width="60" height="16" rx="3"
-                fill="#06120e" stroke="#66aabb" strokeWidth="1.5" />
-              <text x={p.x} y={p.y - SIZE + 2} textAnchor="middle" fontSize="9.5" fill="#88ccdd"
-                fontFamily="'Courier New', monospace" fontWeight="bold">🛡 OBRAMBA {camp.defenders}</text>
-            </g>
-          );
-        })()}
 
         {/* Aktivne odprave kot ikone — hover + klik za info */}
         {expPositions.map(({ exp, tile }) => {
