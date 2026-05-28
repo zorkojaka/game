@@ -13,6 +13,7 @@ export const INITIAL_POPULATION = 80;
 export const INITIAL_SURVIVAL = 120;   // meseci hrane/vode
 export const INITIAL_COMBAT = 60;      // enote orožja
 export const INITIAL_INTELLIGENCE = 10; // začetni intel
+export const INITIAL_MATERIAL = 30;     // začetni material za delavnice
 export const INITIAL_AI_ROBOTS = 200;
 export const INITIAL_AI_KNOWLEDGE = 0.1; // AI malo ve o nas na začetku
 export const INITIAL_CLAN_ACTIVITY = 0.60; // drugi klani aktivni — 60 % AI-ja je zaseden

@@ -12,7 +12,7 @@ import { tileId } from './types.js';
 import type { Expedition } from './types.js';
 import { calcAISurveillanceGain, adaptGenome, generateAITree, generateAIWeakPoints, DEFAULT_GENOME } from './ai-brain.js';
 import {
-  INITIAL_POPULATION, INITIAL_SURVIVAL, INITIAL_COMBAT, INITIAL_INTELLIGENCE,
+  INITIAL_POPULATION, INITIAL_SURVIVAL, INITIAL_COMBAT, INITIAL_INTELLIGENCE, INITIAL_MATERIAL,
   INITIAL_AI_ROBOTS, INITIAL_AI_KNOWLEDGE, INITIAL_CLAN_ACTIVITY,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
   SCOUT_INTEL_YIELD, SCOUT_FOG_YIELD, CLAN_ACTIVITY_BY_PHASE, CLAN_ACTIVITY_EXPOSURE_MODIFIER,
@@ -209,7 +209,7 @@ export function newGame(seed?: number): GameState {
       survival: INITIAL_SURVIVAL,
       combat: INITIAL_COMBAT,
       intelligence: INITIAL_INTELLIGENCE,
-      material: 0,
+      material: INITIAL_MATERIAL,
       artifacts: 0,
     },
     aiPhaseProgress: 0,
