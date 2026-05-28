@@ -1588,7 +1588,8 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
           const rp = Math.max(0, Math.min(1, repelProbability));
           const MAX_T = 12;                       // največja debelina obzidja (100 %)
           const wallT = Math.max(1, rp * MAX_T);  // dejanska debelina = sorazmerna z verjetnostjo
-          const repelColor = rp >= 0.6 ? '#22cc66' : rp >= 0.35 ? '#ddaa22' : '#cc3333';
+          // Zvezna barva: rdeča (0 %) → rumena (50 %) → zelena (100 %); vsak branilec malo premakne odtenek
+          const repelColor = `hsl(${Math.round(rp * 120)}, 75%, 52%)`;
           return (
             <g className="camp-wall" pointerEvents="none">
               {/* Oznaka NAJVEČJE možne debeline (prosojno, v barvi verjetnosti) */}
