@@ -245,6 +245,11 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   let rng: RNGState = { seed: state.rngSeed, calls: state.rngCallCount };
   const { assignment: rawAssignment, targetWeakPoint } = action;
 
+  // Celotna velikost klana PRED rundo (kamp + misije + odprave) — za pravi populationDelta
+  const totalClanBefore = state.population
+    + (state.activeMissions ?? []).reduce((s, m) => s + m.assigned, 0)
+    + (state.expeditions ?? []).reduce((s, e) => s + e.assigned, 0);
+
   // Normaliziraj — backward compat (dayGuard+nightGuard → defenders) + clamp na orožje
   const cap = Math.floor(state.resources.combat);
   const wantedDefenders = (rawAssignment.defenders ?? 0)
@@ -547,17 +552,17 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     const mRationsLvl = missionRationsMap[m.weakPointId] ?? m.rations ?? DEFAULT_RATIONS;
     // Misija ima svojo hrano za celotno trajanje (vzeto upfront ob startu) — brez dodatnih odbitkov tukaj
 
-    // Encounter roll vsak mesec
+    // Encounter roll vsak mesec — člani misije so že odšteti iz pop., zato izgube ne tičejo pop.
     const encP = missionEncounterProbability(state, m.assigned);
     const [encRoll, rngM] = rngNext(rng); rng = rngM;
     let assignedNow = m.assigned;
     if (encRoll < encP) {
       const [lossPct, rngMl] = rngInt(rng, 20, 60); rng = rngMl;
       const lost = Math.floor(m.assigned * lossPct / 100);
-      population -= lost;
       combat = Math.max(0, combat - lost);
       assignedNow = Math.max(0, m.assigned - lost);
       if (assignedNow < MISSION_MIN_TEAM) {
+        population += assignedNow;  // preživeli se vrnejo v kamp
         newlyCompleted.push({ ...m, assigned: assignedNow, monthsRemaining: 0, rations: mRationsLvl, status: 'aborted',
           resultNarrative: `Odprava prekinjena — AI je razkril ekipo, ${lost} mrtvih.` });
         continue;
@@ -568,6 +573,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       const finalP = missionSuccessProbability({ ...state, resources: { ...state.resources, intelligence } }, m.weakPointId, assignedNow, mRationsLvl);
       const [fRoll, rngF] = rngNext(rng); rng = rngF;
       if (fRoll < finalP) {
+        population += assignedNow;  // preživeli se vrnejo
         newlyCompleted.push({ ...m, assigned: assignedNow, monthsRemaining: 0, rations: mRationsLvl, status: 'success',
           resultNarrative: `Odprava na ${m.weakPointId} uspela.` });
         const idx = aiWeakPoints.findIndex(wp => wp.id === m.weakPointId);
@@ -579,9 +585,10 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       } else {
         const [lossPct, rngL] = rngInt(rng, 30, 70); rng = rngL;
         const lost = Math.floor(assignedNow * lossPct / 100);
-        population -= lost;
         combat = Math.max(0, combat - lost);
-        newlyCompleted.push({ ...m, assigned: Math.max(0, assignedNow - lost), monthsRemaining: 0, rations: mRationsLvl, status: 'failed',
+        const survivors = Math.max(0, assignedNow - lost);
+        population += survivors;  // preživeli se vrnejo
+        newlyCompleted.push({ ...m, assigned: survivors, monthsRemaining: 0, rations: mRationsLvl, status: 'failed',
           resultNarrative: `Odprava na ${m.weakPointId} ni uspela — ${lost} padlih.` });
       }
       continue;
@@ -605,6 +612,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     // Hrana za celotno trajanje misije vzeta upfront
     const mFoodCost = Math.round(ppl * dur * mTier.foodMult);
     survival = Math.max(0, survival - mFoodCost);
+    population -= ppl;  // ekipa zapusti kamp (kot pri odpravah)
     expeditionEvents.push(`🎒 Misija (${ppl} ljudi, ${dur}m) vzela ${mFoodCost} hrane s seboj.`);
     const sp = missionSuccessProbability({ ...state, resources: { ...state.resources, intelligence } }, wpId, ppl, mRationsLvl);
     tickedMissions.push({ weakPointId: wpId, assigned: ppl, monthsTotal: dur, monthsRemaining: dur,
@@ -650,9 +658,12 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     }
   }
 
-  // 10. Statusni check
+  // 10. Statusni check — izumrtje le če je CEL klan mrtev (kamp + misije + odprave)
+  const totalClanAfter = finalPopulation
+    + tickedMissions.reduce((s, m) => s + m.assigned, 0)
+    + tickedExps.reduce((s, e) => s + e.assigned, 0);
   let status: GameState['status'] = state.status;
-  if (finalPopulation <= 0) status = 'defeat_extinction';
+  if (totalClanAfter <= 0) status = 'defeat_extinction';
   else if (finalAiKnowledge >= 1.0 && state.phase === 'eliminate') {
     status = 'defeat_overwhelmed';
   }
@@ -688,7 +699,10 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       intelligence: intelligence - state.resources.intelligence,
       material: material - (state.resources.material ?? 0),
     },
-    populationDelta: finalPopulation - state.population,
+    populationDelta: (finalPopulation
+      + tickedMissions.reduce((s, m) => s + m.assigned, 0)
+      + tickedExps.reduce((s, e) => s + e.assigned, 0)
+    ) - totalClanBefore,  // pravi delta klana (samo smrti/rojstva, ne premiki)
     clanActivityDelta: clanActivity - state.clanActivity,
     aiKnowledgeDelta: finalAiKnowledge - state.aiKnowledge,
     revealedNodes: revealed,
