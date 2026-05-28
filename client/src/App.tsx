@@ -1614,6 +1614,12 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
           const p = shift(hexToPixel(z.q, z.r, SIZE));
           return (
             <g key={`camp_${z.q}_${z.r}`} className="camp-zone">
+              <title>{
+                z.adj === 'f' ? 'Prehrana — nabiralci zbirajo hrano' :
+                z.adj === 'w' ? 'Delavnice — delavci izdelujejo orožje ali gradijo zid' :
+                z.adj === 'r' ? 'Raziskave — raziskovalci zbirajo intel / razkrivajo AI' :
+                'Obramba — branilci ščitijo kamp pred napadi'
+              }</title>
               {/* ozadje + tanka notranja obroba */}
               <path d={hexPath(p.x, p.y, SIZE)} fill="#0a1a14" stroke="#1a4a3a" strokeWidth="0.8" />
               {/* ikona + oznaka */}
@@ -1627,6 +1633,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
                 return (
                   <>
                     <g className="cz-minus" style={{ cursor: 'pointer' }} onClick={() => onCampAdjust(z.adj, -1)}>
+                      <title>Odstrani osebo iz: {z.label}</title>
                       <circle cx={p.x - bx} cy={cy} r="7.5" fill="#101a16" stroke={z.color} strokeWidth="1.2" />
                       <text x={p.x - bx} y={cy} textAnchor="middle" dominantBaseline="central"
                         fontSize="12" fill={z.color} fontWeight="bold" fontFamily="'Courier New', monospace">−</text>
@@ -1634,6 +1641,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
                     <text x={p.x} y={cy} textAnchor="middle" dominantBaseline="central"
                       fontSize="14" fill={z.color} fontFamily="'Courier New', monospace" fontWeight="bold">{z.count}</text>
                     <g className="cz-plus" style={{ cursor: 'pointer' }} onClick={() => onCampAdjust(z.adj, +1)}>
+                      <title>Dodaj osebo v: {z.label} (iz prostih)</title>
                       <circle cx={p.x + bx} cy={cy} r="7.5" fill="#101a16" stroke={z.color} strokeWidth="1.2" />
                       <text x={p.x + bx} y={cy} textAnchor="middle" dominantBaseline="central"
                         fontSize="12" fill={z.color} fontWeight="bold" fontFamily="'Courier New', monospace">+</text>
@@ -1659,19 +1667,26 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
             const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
             const px = -dy, py = dx;  // pravokotno za razporeditev gumbov
             // Definiraj gumbe glede na zono
-            type Btn = { label: string; active: boolean; onClick: () => void };
+            type Btn = { label: string; active: boolean; onClick: () => void; title: string };
             let btns: Btn[] = [];
             if (z.adj === 'f') {
-              btns = [1,2,3,4,5].map(lvl => ({ label: RATIONS_EMOJI[lvl]!, active: rations === lvl, onClick: () => onRations(lvl) }));
+              btns = [1,2,3,4,5].map(lvl => {
+                const t = RATIONS[lvl];
+                const popHint = t.popMin === 0 && t.popMax === 0 ? '±0' : `${t.popMin}…${t.popMax}`;
+                return {
+                  label: RATIONS_EMOJI[lvl]!, active: rations === lvl, onClick: () => onRations(lvl),
+                  title: `Obroki: ${t.label} — hrana ×${t.foodMult}, moč ×${t.strengthMult}, ljudje ${popHint}`,
+                };
+              });
             } else if (z.adj === 'w') {
               btns = [
-                { label: '🔨', active: workshopObj === 'weapon', onClick: () => onWorkshop('weapon') },
-                { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall') },
+                { label: '🔨', active: workshopObj === 'weapon', onClick: () => onWorkshop('weapon'), title: 'Orožje: vsaka 2 meseca +orožje na delavca, porabi enako materiala' },
+                { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),   title: 'Zid: 6 delavec-mesecev za 1 zid, porabi material. +20 % obrambe' },
               ];
             } else if (z.adj === 'r') {
               btns = [
-                { label: '🤖', active: researchObj === 'robots',     onClick: () => onResearch('robots') },
-                { label: '🎯', active: researchObj === 'weakpoints', onClick: () => onResearch('weakpoints') },
+                { label: '🤖', active: researchObj === 'robots',     onClick: () => onResearch('robots'),     title: 'AI roboti: +veliko intela → boljši % v vseh bojih' },
+                { label: '🎯', active: researchObj === 'weakpoints', onClick: () => onResearch('weakpoints'), title: 'Ranljivosti: razkrij vozlišča AI načrtovalnega drevesa' },
               ];
             }
             if (!btns.length) return null;
@@ -1685,6 +1700,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
                   const bxp = baseX + px * off, byp = baseY + py * off;
                   return (
                     <g key={i} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); b.onClick(); }}>
+                      <title>{b.title}</title>
                       <circle cx={bxp} cy={byp} r="7.5"
                         fill={b.active ? z.color : '#0a0a0a'}
                         stroke={z.color} strokeWidth={b.active ? 2 : 1} />
