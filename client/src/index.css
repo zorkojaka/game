@@ -1498,3 +1498,5 @@ input[type=range]::-moz-range-thumb {
   gap: .75rem;
   min-width: 0;
 }
+
+.bs-note { font-size: .72rem; font-weight: normal; }

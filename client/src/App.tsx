@@ -71,13 +71,16 @@ function Bar({ ratio, color, height = 6 }: { ratio: number; color?: string; heig
 }
 
 /** Velika grafična kartica za en resurs: ikona + oznaka + številka (brez bar-a) */
-function BigStat({ icon, label, value, color, unit }: { icon: string; label: string; value: number | string; color: string; unit?: string }) {
+function BigStat({ icon, label, value, color, unit, note, noteColor }: { icon: string; label: string; value: number | string; color: string; unit?: string; note?: string; noteColor?: string }) {
   return (
     <div className="big-stat" style={{ borderColor: color }}>
       <div className="bs-icon" style={{ color }}>{icon}</div>
       <div className="bs-body">
         <div className="bs-label dim small">{label}</div>
-        <div className="bs-val" style={{ color }}>{value}{unit && <span className="bs-unit">{unit}</span>}</div>
+        <div className="bs-val" style={{ color }}>
+          {value}{unit && <span className="bs-unit">{unit}</span>}
+          {note && <span className="bs-note" style={{ color: noteColor ?? 'var(--dim)' }}> {note}</span>}
+        </div>
       </div>
     </div>
   );
@@ -183,7 +186,7 @@ function ResourceRow({ game, eventLog }: { game: GameState; eventLog: EventEntry
 }
 
 /** Klan status — populacija s prikazom kamp/odprave, hrana, orožje, intel */
-function ClanStatus({ game, inMissions }: { game: GameState; inMissions: number }) {
+function ClanStatus({ game, inMissions, foodDelta }: { game: GameState; inMissions: number; foodDelta: number }) {
   const r = game.resources;
   const inCamp = Math.max(0, game.population - inMissions);
   return (
@@ -213,7 +216,9 @@ function ClanStatus({ game, inMissions }: { game: GameState; inMissions: number 
       </div>
       {/* Ostali viri grafično — velike ikone, brez bar-ov */}
       <div className="cs-resources">
-        <BigStat icon="🍞" label="Hrana/Voda" value={r.survival}      color="#cc8800" />
+        <BigStat icon="🍞" label="Hrana/Voda" value={r.survival}      color="#cc8800"
+          note={`(→ ${Math.max(0, r.survival + foodDelta)})`}
+          noteColor={(r.survival + foodDelta) <= 0 ? '#cc2222' : foodDelta >= 0 ? '#22cc88' : '#cc8800'} />
         <BigStat icon="⚔"  label="Orožje"     value={r.combat}        color="#cc4433" />
         <BigStat icon="⚙"  label="Material"   value={r.material ?? 0} color="#88aabb" />
         <BigStat icon="👁"  label="Intel"      value={r.intelligence}  color="#3388cc" />
@@ -2217,7 +2222,7 @@ export default function App() {
           </span>
         </div>
 
-        <ClanStatus game={game} inMissions={inMissions} />
+        <ClanStatus game={game} inMissions={inMissions} foodDelta={survBalance} />
 
         {overArmed && (
           <div className="weapon-warning">
