@@ -186,7 +186,10 @@ function ResourceRow({ game, eventLog }: { game: GameState; eventLog: EventEntry
 }
 
 /** Klan status — populacija s prikazom kamp/odprave, hrana, orožje, intel */
-function ClanStatus({ game, inMissions, foodDelta }: { game: GameState; inMissions: number; foodDelta: number }) {
+function ClanStatus({ game, inMissions, food }: {
+  game: GameState; inMissions: number;
+  food: { consumption: number; production: number; packs: number; foodMult: number; nextMonth: number };
+}) {
   const r = game.resources;
   const inCamp = Math.max(0, game.population - inMissions);
   return (
@@ -217,8 +220,8 @@ function ClanStatus({ game, inMissions, foodDelta }: { game: GameState; inMissio
       {/* Ostali viri grafično — velike ikone, brez bar-ov */}
       <div className="cs-resources">
         <BigStat icon="🍞" label="Hrana/Voda" value={r.survival}      color="#cc8800"
-          note={`(→ ${Math.max(0, r.survival + foodDelta)})`}
-          noteColor={(r.survival + foodDelta) <= 0 ? '#cc2222' : foodDelta >= 0 ? '#22cc88' : '#cc8800'} />
+          note={`(→ ${food.nextMonth})`}
+          noteColor={food.nextMonth <= 0 ? '#cc2222' : food.nextMonth >= r.survival ? '#22cc88' : '#cc8800'} />
         <BigStat icon="⚔"  label="Orožje"     value={r.combat}        color="#cc4433" />
         <BigStat icon="⚙"  label="Material"   value={r.material ?? 0} color="#88aabb" />
         <BigStat icon="👁"  label="Intel"      value={r.intelligence}  color="#3388cc" />
@@ -228,6 +231,17 @@ function ClanStatus({ game, inMissions, foodDelta }: { game: GameState; inMissio
         {(game.wallsBuilt ?? 0) > 0 && (
           <BigStat icon="🧱" label="Zidovi"    value={game.wallsBuilt} color="#aabb88" />
         )}
+      </div>
+      {/* Razčlenitev izračuna hrane za naslednji mesec */}
+      <div className="food-breakdown small">
+        <span className="dim">Hrana naslednji mesec:</span>
+        <span>{r.survival}</span>
+        <span style={{ color: '#cc4444' }}>− {food.consumption} poraba (×{food.foodMult})</span>
+        <span style={{ color: '#22cc88' }}>+ {food.production} pridelek</span>
+        {food.packs > 0 && <span style={{ color: '#ffd84a' }}>− {food.packs} odprave</span>}
+        <span className="dim">=</span>
+        <b style={{ color: food.nextMonth <= 0 ? '#cc2222' : '#d8d8d8' }}>{food.nextMonth}</b>
+        {food.nextMonth <= 0 && <span style={{ color: '#cc2222' }}>⚠ LAKOTA</span>}
       </div>
     </div>
   );
@@ -2099,8 +2113,13 @@ export default function App() {
     const t = RATIONS[r] ?? RATIONS[3];
     return s + Math.round(ppl * dur * t.foodMult);
   }, 0);
-  const foodCost     = campFoodCost + pendingExpFood + draftExpFood + newMissionFood;
+  const expPacksFood = pendingExpFood + draftExpFood + newMissionFood;
+  const foodCost     = campFoodCost + expPacksFood;
   const survBalance  = foragerYield - foodCost;
+  // Projekcija z istim klampanjem kot engine (survival ne gre pod 0)
+  const _curSurv     = game.resources.survival;
+  const _afterCamp   = Math.max(0, _curSurv - campFoodCost + foragerYield);
+  const foodNextMonth = Math.max(0, _afterCamp - expPacksFood);
 
   return (
     <div className="hud">
@@ -2222,7 +2241,8 @@ export default function App() {
           </span>
         </div>
 
-        <ClanStatus game={game} inMissions={inMissions} foodDelta={survBalance} />
+        <ClanStatus game={game} inMissions={inMissions}
+          food={{ consumption: campFoodCost, production: foragerYield, packs: expPacksFood, foodMult: rTier.foodMult, nextMonth: foodNextMonth }} />
 
         {overArmed && (
           <div className="weapon-warning">

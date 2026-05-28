@@ -1500,3 +1500,11 @@ input[type=range]::-moz-range-thumb {
 }
 
 .bs-note { font-size: .72rem; font-weight: normal; }
+
+/* ─── Food breakdown line ───────────────────────────────────────────────── */
+.food-breakdown {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline;
+  margin-top: 8px; padding: 6px 10px;
+  background: #0a0a0a; border-left: 2px solid #cc8800;
+  font-size: .74rem;
+}
