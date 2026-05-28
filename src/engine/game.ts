@@ -342,28 +342,37 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     const intelBonus = Math.floor(effectiveScouts * SCOUT_INTEL_YIELD * 3 * rations.strengthMult * scoutResult.effectivenessMult);
     intelligence += intelBonus;
   } else if (scoutObjective === 'weapon_dev' && effectiveScouts > 0) {
-    // Delavnica orožja — vsaki 2 scout-meseca = 1 orožje (z 1 materialom za vsak)
-    if (weaponWorkshopScouts !== effectiveScouts) {
-      weaponWorkshopScouts = effectiveScouts;  // posodobi referenco
-    }
-    weaponWorkshopProgress += 1;  // +1 mesec dela
-    // Ko se nakopiči ≥ 2 mesecev: producirj orožja (število = scoutsAtCycleStart, limitirano z materialom)
-    if (weaponWorkshopProgress >= 2) {
-      const possible = Math.min(weaponWorkshopScouts, material);
-      combat += possible;
-      material -= possible;
-      workshopEvents.push(`🔨 Delavnica orožja: +${possible} orožja (porabljeno ${possible} materiala).`);
-      weaponWorkshopProgress = 0;
+    // Delavnica orožja — vsaki 2 scout-meseca = 1 orožje na scout (z 1 materialom za vsak)
+    if (material <= 0) {
+      workshopEvents.push(`🔨 Delavnica orožja stoji — ni materiala.`);
+    } else {
+      weaponWorkshopScouts = effectiveScouts;
+      weaponWorkshopProgress += 1;
+      if (weaponWorkshopProgress >= 2) {
+        const possible = Math.min(weaponWorkshopScouts, material);
+        combat += possible;
+        material -= possible;
+        workshopEvents.push(`🔨 Delavnica orožja: +${possible} orožja (−${possible} materiala).`);
+        weaponWorkshopProgress = 0;
+      } else {
+        workshopEvents.push(`🔨 Delavnica orožja dela (mesec ${weaponWorkshopProgress}/2)…`);
+      }
     }
   } else if (scoutObjective === 'wall_dev' && effectiveScouts > 0) {
-    // Zid: vsakič +effectiveScouts scout-meseca, prag 6 = 1 zid
-    wallProgress += effectiveScouts;
-    const materialCost = Math.min(material, effectiveScouts * 2);
-    material -= materialCost;
-    if (wallProgress >= 6) {
-      wallsBuilt += 1;
-      wallProgress = 0;
-      workshopEvents.push(`🧱 Obrambni zid dograjen! Skupaj ${wallsBuilt} zidov. +bonus obrambi.`);
+    // Zid: prag 6 scout-mesecev = 1 zid; vsak mesec porabi material
+    if (material <= 0) {
+      workshopEvents.push(`🧱 Gradnja zidu stoji — ni materiala.`);
+    } else {
+      wallProgress += effectiveScouts;
+      const materialCost = Math.min(material, effectiveScouts);  // znižan strošek (1/scout namesto 2)
+      material -= materialCost;
+      if (wallProgress >= 6) {
+        wallsBuilt += 1;
+        wallProgress = 0;
+        workshopEvents.push(`🧱 Obrambni zid dograjen! Skupaj ${wallsBuilt} zidov, +20 % obrambe (−${materialCost} materiala).`);
+      } else {
+        workshopEvents.push(`🧱 Gradnja zidu: ${Math.min(6, wallProgress)}/6 (−${materialCost} materiala).`);
+      }
     }
   }
 

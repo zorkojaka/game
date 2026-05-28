@@ -1620,8 +1620,8 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
 /** Izbira cilja izvidnikov — 3 ikone + razlaga izbire */
 function ScoutObjectiveSelector({ value, onChange }: { value: ScoutObjective; onChange: (o: ScoutObjective) => void }) {
   const opts: Array<{ id: ScoutObjective; icon: string; label: string; color: string; desc: string }> = [
-    { id: 'weapon_dev',    icon: '🔨', label: 'Orožje',       color: '#cc4433', desc: 'Razvoj orožja iz materiala (2 meseca cikel).' },
-    { id: 'wall_dev',      icon: '🧱', label: 'Zid',          color: '#aabb88', desc: 'Gradnja obrambnega zidu (6 mesecev).' },
+    { id: 'weapon_dev',    icon: '🔨', label: 'Orožje',       color: '#cc4433', desc: 'Vsaka 2 mes.: +orožje na izvidnika, porabi enako materiala.' },
+    { id: 'wall_dev',      icon: '🧱', label: 'Zid',          color: '#aabb88', desc: 'Zid (6 scout-mes.), porabi material/mesec. +20 % obrambe.' },
     { id: 'ai_robots',     icon: '🤖', label: 'AI roboti',    color: '#cc8800', desc: '+intel → boljši % v vseh bojih.' },
     { id: 'ai_weakpoints', icon: '🎯', label: 'Ranljivosti',  color: '#cc3333', desc: 'Razkrij vozlišča AI načrtovalnega drevesa.' },
   ];
@@ -1800,7 +1800,7 @@ export default function App() {
   const [scouts,       setScouts]       = useState(10);
   const [missions,     setMissions]     = useState<Record<string, number>>({});
   const [missionR,     setMissionR]     = useState<Record<string, number>>({});
-  const [scoutObj,     setScoutObj]     = useState<ScoutObjective>('weapon_dev');
+  const [scoutObj,     setScoutObj]     = useState<ScoutObjective>('ai_weakpoints');
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
@@ -1862,8 +1862,10 @@ export default function App() {
       const dS = log.resourceDelta?.survival     ?? 0;
       const dC = log.resourceDelta?.combat       ?? 0;
       const dI = log.resourceDelta?.intelligence ?? 0;
+      const dMat = (log.resourceDelta as { material?: number })?.material ?? 0;
       if (dS !== 0) ledger.push({ icon: '🍞', label: 'hrana',  value: dS });
       if (dC !== 0) ledger.push({ icon: '⚔',  label: 'orožje', value: dC });
+      if (dMat !== 0) ledger.push({ icon: '⚙', label: 'material', value: dMat });
       if (dI !== 0) ledger.push({ icon: '👁',  label: 'intel',  value: dI });
       const robotsKilled = (log.combat?.aiRobotsDestroyed ?? 0) + (log.raid?.aiRobotsDestroyed ?? 0);
       if (robotsKilled) ledger.push({ icon: '🤖', label: 'AI roboti', value: -robotsKilled });
@@ -1925,7 +1927,7 @@ export default function App() {
       const g = await createGame();
       setGame(g);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('hiding'); setCombatants(0); setDefenders(15); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('weapon_dev'); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setPendingExpeditions([]); setArtifactTargetWp('');
+      setAxis('hiding'); setCombatants(0); setDefenders(15); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('ai_weakpoints'); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setPendingExpeditions([]); setArtifactTargetWp('');
     } finally { setLoading(false); }
   };
 
