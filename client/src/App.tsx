@@ -1319,7 +1319,7 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, drawingMode, camp }: {
+function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, drawingMode, camp, onCampAdjust }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   plannedPaths: Array<Array<{ q: number; r: number }>>;
@@ -1330,13 +1330,20 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
   wps: AIWeakPoint[];
   drawingMode: boolean;
   camp: { defenders: number; researchers: number; workers: number; foragers: number };
+  onCampAdjust: (which: 'f' | 'w' | 'r', delta: number) => void;
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
   const popExpId = selectedExpId ?? hoveredExpId;
   const SIZE = 36;
-  const CAMP_R = SIZE * 2.0;
-  const CAMP_EXTENT = CAMP_R + 16;  // velik kamp + badge/ščitki nad zidom
+  // Kamp = 3 hexagoni (zoni). Vsak je svoje območje.
+  const CAMP_ZONES = [
+    { q: 0, r: 3, icon: '🔬', label: 'RAZISKAVE', count: camp.researchers, color: '#3377cc', adj: 'r' as const },
+    { q: 0, r: 4, icon: '🌾', label: 'PREHRANA',  count: camp.foragers,    color: '#6aa630', adj: 'f' as const },
+    { q: 1, r: 4, icon: '🔨', label: 'DELAVNICE', count: camp.workers,     color: '#cc7733', adj: 'w' as const },
+  ];
+  const campZoneIds = new Set(CAMP_ZONES.map(z => `${z.q},${z.r}`));
+  const CAMP_EXTENT = SIZE * 1.4;  // prostor za obrambni badge nad kampom
   const pts = tiles.map(t => hexToPixel(t.q, t.r, SIZE));
   let minX = Math.min(...pts.map(p => p.x)) - SIZE;
   let maxX = Math.max(...pts.map(p => p.x)) + SIZE;
@@ -1382,6 +1389,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
 
         {tiles.map(t => {
           const id = tileId(t);
+          if (campZoneIds.has(id)) return null;  // kamp zoni se izrišejo posebej
           const p = shift(hexToPixel(t.q, t.r, SIZE));
           const wp = t.hidesWeakPointId ? wpById[t.hidesWeakPointId] : undefined;
           const wpVisible = wp && t.researchProgress >= 0.50;
@@ -1414,8 +1422,9 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
           const isLast = lastStep && lastStep.q === t.q && lastStep.r === t.r;
           if (isInDraft) stroke = '#22ccff';
 
-          const canClickDraw = drawingMode && !t.isClanCamp && (
+          const canClickDraw = drawingMode && !t.isClanCamp && !campZoneIds.has(id) && (
             (lastStep && areNeighbors(lastStep, t)) ||
+            (draftPath.length <= 1 && CAMP_ZONES.some(z => areNeighbors(z, t))) ||  // izhod iz katerekoli kamp zone
             isLast
           );
           const canSelectWp = !!(wpVisible && wp && !wp.exploited && !canClickDraw);
@@ -1556,69 +1565,44 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
           </g>
         )}
 
-        {/* Veliki kamp: obzidje + 3 barvna območja + branilci na obzidju */}
-        {(() => {
-          const clan = tiles.find(t => t.isClanCamp);
-          if (!clan) return null;
-          const p = shift(hexToPixel(clan.q, clan.r, SIZE));
-          const R = CAMP_R;
-          const innerR = R * 0.9;
-          // 3 vodoravna območja znotraj kampa
-          const sections = [
-            { icon: '🔬', label: 'RAZISKAVE', val: camp.researchers, color: '#3377cc', bg: '#0a1426' },
-            { icon: '🔨', label: 'DELAVNICE', val: camp.workers,     color: '#cc7733', bg: '#1a1206' },
-            { icon: '🌾', label: 'PREHRANA',  val: camp.foragers,    color: '#6aa630', bg: '#0e1606' },
-          ];
-          const top = p.y - innerR, bandH = (innerR * 2) / 3;
-          const clipId = 'campClip';
-          // Branilci kot ščitki po obzidju (max 12 ikon, ostalo številka)
-          const shieldCount = Math.min(12, camp.defenders);
+        {/* KAMP — 3 hex zoni z +/- gumbi */}
+        {CAMP_ZONES.map(z => {
+          const p = shift(hexToPixel(z.q, z.r, SIZE));
           return (
-            <g className="camp-graphic" pointerEvents="none">
-              <defs>
-                <clipPath id={clipId}><path d={hexPath(p.x, p.y, innerR)} /></clipPath>
-              </defs>
-              {/* Neprosojno ozadje celotnega kampa (pokrije sosednje hekse) */}
-              <path d={hexPath(p.x, p.y, R)} fill="#06120e" />
-              {/* 3 barvni pasovi (clip na heks) */}
-              <g clipPath={`url(#${clipId})`}>
-                {sections.map((s, i) => (
-                  <g key={i}>
-                    <rect x={p.x - innerR} y={top + i * bandH} width={innerR * 2} height={bandH}
-                      fill={s.bg} />
-                    {i > 0 && <line x1={p.x - innerR} y1={top + i * bandH} x2={p.x + innerR} y2={top + i * bandH}
-                      stroke="#22aa88" strokeWidth="0.8" strokeOpacity="0.4" strokeDasharray="3 2" />}
-                  </g>
-                ))}
+            <g key={`camp_${z.q}_${z.r}`} className="camp-zone">
+              {/* ozadje + obzidje */}
+              <path d={hexPath(p.x, p.y, SIZE)} fill="#0a1a14" stroke="#22aa88" strokeWidth="3" />
+              {/* ikona + oznaka */}
+              <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="16">{z.icon}</text>
+              <text x={p.x} y={p.y - SIZE * 0.12} textAnchor="middle" fontSize="6.5" fill="#88a596"
+                fontFamily="'Courier New', monospace" letterSpacing="0.5">{z.label}</text>
+              {/* − število + */}
+              <g className="cz-minus" style={{ cursor: 'pointer' }} onClick={() => onCampAdjust(z.adj, -1)}>
+                <circle cx={p.x - SIZE * 0.5} cy={p.y + SIZE * 0.32} r="9" fill="#101a16" stroke={z.color} strokeWidth="1.3" />
+                <text x={p.x - SIZE * 0.5} y={p.y + SIZE * 0.32 + 5} textAnchor="middle" fontSize="13" fill={z.color} fontWeight="bold" fontFamily="'Courier New', monospace">−</text>
               </g>
-              {/* Vsebina pasov */}
-              {sections.map((s, i) => {
-                const cy = top + i * bandH + bandH / 2;
-                return (
-                  <g key={i}>
-                    <text x={p.x} y={cy - 1} textAnchor="middle" fontSize="14" fill={s.color}
-                      fontFamily="'Courier New', monospace" fontWeight="bold">{s.icon} {s.val}</text>
-                    <text x={p.x} y={cy + 10} textAnchor="middle" fontSize="6" fill="#88a596"
-                      fontFamily="'Courier New', monospace" letterSpacing="0.5">{s.label}</text>
-                  </g>
-                );
-              })}
-              {/* Obzidje (debela obroba) */}
-              <path d={hexPath(p.x, p.y, R)} fill="none" stroke="#22aa88" strokeWidth="5" />
-              <path d={hexPath(p.x, p.y, innerR)} fill="none" stroke="#1a6a55" strokeWidth="1.5" />
-              {/* Branilci na obzidju — ščitki vrhu zidu + badge */}
-              <g>
-                {Array.from({ length: shieldCount }, (_, i) => {
-                  const a = (-Math.PI / 2) + (i - (shieldCount - 1) / 2) * 0.22;
-                  const sx = p.x + R * Math.cos(a);
-                  const sy = p.y + R * Math.sin(a);
-                  return <text key={i} x={sx} y={sy + 3} textAnchor="middle" fontSize="9">🛡</text>;
-                })}
-                <rect x={p.x - 28} y={p.y - R - 8} width="56" height="16" rx="3"
-                  fill="#06120e" stroke="#66aabb" strokeWidth="1.5" />
-                <text x={p.x} y={p.y - R + 4} textAnchor="middle" fontSize="10" fill="#88ccdd"
-                  fontFamily="'Courier New', monospace" fontWeight="bold">🛡 OBRAMBA {camp.defenders}</text>
+              <text x={p.x} y={p.y + SIZE * 0.32 + 6} textAnchor="middle" fontSize="17" fill={z.color}
+                fontFamily="'Courier New', monospace" fontWeight="bold">{z.count}</text>
+              <g className="cz-plus" style={{ cursor: 'pointer' }} onClick={() => onCampAdjust(z.adj, +1)}>
+                <circle cx={p.x + SIZE * 0.5} cy={p.y + SIZE * 0.32} r="9" fill="#101a16" stroke={z.color} strokeWidth="1.3" />
+                <text x={p.x + SIZE * 0.5} y={p.y + SIZE * 0.32 + 5} textAnchor="middle" fontSize="13" fill={z.color} fontWeight="bold" fontFamily="'Courier New', monospace">+</text>
               </g>
+            </g>
+          );
+        })}
+        {/* Obrambni badge nad kampom (na obzidju) */}
+        {(() => {
+          const top = CAMP_ZONES.reduce((best, z) => {
+            const py = hexToPixel(z.q, z.r, SIZE).y;
+            return py < best.y ? { z, y: py } : best;
+          }, { z: CAMP_ZONES[0], y: Infinity });
+          const p = shift(hexToPixel(top.z.q, top.z.r, SIZE));
+          return (
+            <g pointerEvents="none">
+              <rect x={p.x - 30} y={p.y - SIZE - 10} width="60" height="16" rx="3"
+                fill="#06120e" stroke="#66aabb" strokeWidth="1.5" />
+              <text x={p.x} y={p.y - SIZE + 2} textAnchor="middle" fontSize="9.5" fill="#88ccdd"
+                fontFamily="'Courier New', monospace" fontWeight="bold">🛡 OBRAMBA {camp.defenders}</text>
             </g>
           );
         })()}
@@ -2170,6 +2154,17 @@ export default function App() {
     setPendingExpeditions(pendingExpeditions.filter((_, i) => i !== idx));
   }
 
+  // Prilagodi vlogo za ±1 (povezano z razdelilnikom + kampom). + le če so prosti.
+  function bumpRole(which: 'd' | 'f' | 'w' | 'r', delta: number) {
+    const cur = { d: defenders, f: foragers, w: workers, r: researchers }[which];
+    if (delta > 0 && (assignedHome + plannedTotal) >= availablePop) return;
+    const next = Math.max(0, cur + delta);
+    if (which === 'd') setDefenders(next);
+    else if (which === 'f') setForagers(next);
+    else if (which === 'w') setWorkers(next);
+    else setResearchers(next);
+  }
+
   function autoFitAllocation() {
     if (assigned === 0 || availablePop === 0) return;
     const scale = availablePop / assigned;
@@ -2255,7 +2250,8 @@ export default function App() {
             selectedWpId={targetWP}
             expeditions={game.expeditions ?? []}
             wps={game.aiWeakPoints} drawingMode={true}
-            camp={{ defenders, researchers, workers, foragers }} />
+            camp={{ defenders, researchers, workers, foragers }}
+            onCampAdjust={(which, delta) => bumpRole(which, delta)} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
