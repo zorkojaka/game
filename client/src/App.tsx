@@ -1575,7 +1575,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
             const a = (Math.PI / 180) * (60 * k - 30);
             return [cx + SIZE * Math.cos(a), cy + SIZE * Math.sin(a)];
           };
-          // Zberi zunanje robove
+          // Zberi vse zunanje robove grozda
           const segs: Array<[[number,number],[number,number]]> = [];
           for (const z of CAMP_ZONES) {
             const p = shift(hexToPixel(z.q, z.r, SIZE));
@@ -1585,42 +1585,21 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
               if (!campZoneIds.has(nb)) segs.push([vtx(p.x, p.y, k), vtx(p.x, p.y, (k + 1) % 6)]);
             }
           }
-          // Veriži v zaprto pot
-          const eq = (a: [number,number], b: [number,number]) => Math.abs(a[0]-b[0]) < 0.6 && Math.abs(a[1]-b[1]) < 0.6;
-          const used = new Array(segs.length).fill(false);
-          const loop: Array<[number,number]> = [];
-          if (segs.length) {
-            used[0] = true; loop.push(segs[0][0], segs[0][1]);
-            let cur = segs[0][1];
-            for (let guard = 0; guard < segs.length + 2; guard++) {
-              let found = -1, nextPt: [number,number] | null = null;
-              for (let i = 0; i < segs.length; i++) {
-                if (used[i]) continue;
-                if (eq(segs[i][0], cur)) { found = i; nextPt = segs[i][1]; break; }
-                if (eq(segs[i][1], cur)) { found = i; nextPt = segs[i][0]; break; }
-              }
-              if (found < 0 || !nextPt) break;
-              used[found] = true; loop.push(nextPt); cur = nextPt;
-            }
-          }
-          const pathD = loop.length ? `M ${loop.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' L ')} Z` : '';
-          // Skupna dolžina poti
-          let len = 0;
-          for (let i = 0; i < loop.length; i++) {
-            const a = loop[i], b = loop[(i + 1) % loop.length];
-            len += Math.hypot(b[0]-a[0], b[1]-a[1]);
-          }
-          const fillLen = len * Math.max(0, Math.min(1, repelProbability));
-          const repelColor = repelProbability >= 0.6 ? '#22cc88' : repelProbability >= 0.35 ? '#cc8800' : '#cc3333';
+          const rp = Math.max(0, Math.min(1, repelProbability));
+          const repelColor = rp >= 0.6 ? '#22cc88' : rp >= 0.35 ? '#cc8800' : '#cc3333';
           return (
             <g className="camp-wall" pointerEvents="none">
-              {/* temna podlaga linije */}
-              {pathD && <path d={pathD} fill="none" stroke="#16302a" strokeWidth="6" strokeLinejoin="round" />}
-              {/* polnilo sorazmerno z verjetnostjo odbijanja */}
-              {pathD && (
-                <path d={pathD} fill="none" stroke={repelColor} strokeWidth="6" strokeLinejoin="round"
-                  strokeDasharray={`${fillLen.toFixed(1)} ${(len - fillLen).toFixed(1)}`} strokeLinecap="round" />
-              )}
+              {/* Vidna podlaga obzidja okoli CELEGA kampa */}
+              {segs.map((s, i) => (
+                <line key={`wb${i}`} x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
+                  stroke="#2a5a4a" strokeWidth="5" strokeLinecap="round" />
+              ))}
+              {/* Polnilo: barva + intenziteta sorazmerna z verjetnostjo odbijanja */}
+              {segs.map((s, i) => (
+                <line key={`wf${i}`} x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
+                  stroke={repelColor} strokeWidth="5" strokeLinecap="round"
+                  strokeOpacity={0.25 + 0.75 * rp} />
+              ))}
             </g>
           );
         })()}
