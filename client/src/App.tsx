@@ -26,8 +26,8 @@ const M_OS: Record<string, Record<HumanAxis, number>> = {
 const RATIONS: Record<number, { foodMult: number; popMin: number; popMax: number; strengthMult: number; label: string; emoji: string; color: string }> = {
   1: { foodMult: 0.50, popMin: -5, popMax: -3, strengthMult: 0.55, label: 'Lakota',   emoji: '💀', color: '#cc2222' },
   2: { foodMult: 0.75, popMin: -2, popMax: -1, strengthMult: 0.80, label: 'Skopo',    emoji: '🥄', color: '#cc7700' },
-  3: { foodMult: 1.00, popMin:  0, popMax:  0, strengthMult: 1.00, label: 'Normalno', emoji: '🍚', color: '#888888' },
-  4: { foodMult: 2.50, popMin:  1, popMax:  3, strengthMult: 1.30, label: 'Dobro',    emoji: '🍞', color: '#66aa44' },
+  3: { foodMult: 1.00, popMin:  0, popMax:  0, strengthMult: 1.00, label: 'Normalno', emoji: '🍞', color: '#888888' },
+  4: { foodMult: 2.50, popMin:  1, popMax:  3, strengthMult: 1.30, label: 'Dobro',    emoji: '🥗', color: '#66aa44' },
   5: { foodMult: 5.00, popMin:  3, popMax:  6, strengthMult: 1.60, label: 'Obilje',   emoji: '🥩', color: '#22cc88' },
 };
 
@@ -1338,6 +1338,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const popExpId = selectedExpId ?? hoveredExpId;
   const SIZE = 36;
   // Kamp = 3 hexagoni (zoni). Vsak je svoje območje.
@@ -1379,6 +1380,14 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
 
   return (
     <div className="hex-map">
+      {info && (
+        <div className="map-info-pop" onClick={() => setInfo(null)}>
+          <div className="map-info-box" onClick={e => e.stopPropagation()}>
+            <button className="map-info-close" onClick={() => setInfo(null)}>✕</button>
+            <p>{info}</p>
+          </div>
+        </div>
+      )}
       <svg viewBox={`0 0 ${W} ${H}`} className="hex-svg">
         <defs>
           <pattern id="hatch-red" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
@@ -1612,16 +1621,17 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
         {/* KAMP — 4 hex zoni z +/- gumbi (tanke notranje obrobe) */}
         {CAMP_ZONES.map(z => {
           const p = shift(hexToPixel(z.q, z.r, SIZE));
+          const zoneInfo =
+            z.adj === 'f' ? 'Prehrana — nabiralci zbirajo hrano za kamp.' :
+            z.adj === 'w' ? 'Delavnice — delavci izdelujejo orožje ali gradijo zid (porabijo material).' :
+            z.adj === 'r' ? 'Raziskave — raziskovalci zbirajo intel in razkrivajo AI načrtovalno drevo.' :
+            'Obramba — branilci ščitijo kamp pred napadi AI.';
           return (
             <g key={`camp_${z.q}_${z.r}`} className="camp-zone">
-              <title>{
-                z.adj === 'f' ? 'Prehrana — nabiralci zbirajo hrano' :
-                z.adj === 'w' ? 'Delavnice — delavci izdelujejo orožje ali gradijo zid' :
-                z.adj === 'r' ? 'Raziskave — raziskovalci zbirajo intel / razkrivajo AI' :
-                'Obramba — branilci ščitijo kamp pred napadi'
-              }</title>
-              {/* ozadje + tanka notranja obroba */}
-              <path d={hexPath(p.x, p.y, SIZE)} fill="#0a1a14" stroke="#1a4a3a" strokeWidth="0.8" />
+              <title>{zoneInfo}</title>
+              {/* ozadje + tanka notranja obroba — klik prikaže pojasnilo (mobilno) */}
+              <path d={hexPath(p.x, p.y, SIZE)} fill="#0a1a14" stroke="#1a4a3a" strokeWidth="0.8"
+                style={{ cursor: 'pointer' }} onClick={() => setInfo(zoneInfo)} />
               {/* ikona + oznaka */}
               <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="16">{z.icon}</text>
               <text x={p.x} y={p.y - SIZE * 0.12} textAnchor="middle" fontSize="6.5" fill="#88a596"
@@ -1632,7 +1642,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
                 const bx = SIZE * 0.46;          // znotraj apoteme (~0.87 R)
                 return (
                   <>
-                    <g className="cz-minus" style={{ cursor: 'pointer' }} onClick={() => onCampAdjust(z.adj, -1)}>
+                    <g className="cz-minus" style={{ cursor: 'pointer' }} onClick={() => { onCampAdjust(z.adj, -1); setInfo(`Odstrani osebo iz območja: ${z.label}.`); }}>
                       <title>Odstrani osebo iz: {z.label}</title>
                       <circle cx={p.x - bx} cy={cy} r="7.5" fill="#101a16" stroke={z.color} strokeWidth="1.2" />
                       <text x={p.x - bx} y={cy} textAnchor="middle" dominantBaseline="central"
@@ -1640,7 +1650,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
                     </g>
                     <text x={p.x} y={cy} textAnchor="middle" dominantBaseline="central"
                       fontSize="14" fill={z.color} fontFamily="'Courier New', monospace" fontWeight="bold">{z.count}</text>
-                    <g className="cz-plus" style={{ cursor: 'pointer' }} onClick={() => onCampAdjust(z.adj, +1)}>
+                    <g className="cz-plus" style={{ cursor: 'pointer' }} onClick={() => { onCampAdjust(z.adj, +1); setInfo(`Dodaj prosto osebo v območje: ${z.label}.`); }}>
                       <title>Dodaj osebo v: {z.label} (iz prostih)</title>
                       <circle cx={p.x + bx} cy={cy} r="7.5" fill="#101a16" stroke={z.color} strokeWidth="1.2" />
                       <text x={p.x + bx} y={cy} textAnchor="middle" dominantBaseline="central"
@@ -1659,7 +1669,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
           const cs = CAMP_ZONES.map(z => shift(hexToPixel(z.q, z.r, SIZE)));
           const cx = cs.reduce((s, p) => s + p.x, 0) / cs.length;
           const cy = cs.reduce((s, p) => s + p.y, 0) / cs.length;
-          const RATIONS_EMOJI = [null, '💀', '🥄', '🍚', '🍞', '🥩'];
+          const RATIONS_EMOJI = [null, '💀', '🥄', '🍞', '🥗', '🥩'];
 
           return CAMP_ZONES.map(z => {
             const p = shift(hexToPixel(z.q, z.r, SIZE));
@@ -1699,7 +1709,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
                   const off = (i - (btns.length - 1) / 2) * sp;
                   const bxp = baseX + px * off, byp = baseY + py * off;
                   return (
-                    <g key={i} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); b.onClick(); }}>
+                    <g key={i} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); b.onClick(); setInfo(b.title); }}>
                       <title>{b.title}</title>
                       <circle cx={bxp} cy={byp} r="7.5"
                         fill={b.active ? z.color : '#0a0a0a'}

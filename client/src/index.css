@@ -1000,6 +1000,46 @@ input[type=range]::-moz-range-thumb {
 
 /* ─── Map: popup ob hover/klik na odpravo ────────────────────────────────── */
 .hex-map { position: relative; }
+
+.map-info-pop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .55);
+  z-index: 20;
+  padding: 1rem;
+}
+.map-info-box {
+  position: relative;
+  max-width: 320px;
+  background: #11171f;
+  border: 1px solid #2a3a4a;
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .6);
+}
+.map-info-box p {
+  margin: 0;
+  padding-right: 1.2rem;
+  font-size: .9rem;
+  line-height: 1.4;
+  color: #d7e0ea;
+}
+.map-info-close {
+  position: absolute;
+  top: .35rem;
+  right: .45rem;
+  background: none;
+  border: none;
+  color: #8a97a6;
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.map-info-close:hover { color: #f0f6fc; }
+
 .exp-marker { cursor: pointer; }
 .exp-marker:hover circle { filter: drop-shadow(0 0 4px currentColor); }
 
