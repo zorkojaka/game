@@ -1300,9 +1300,10 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, onPathClick, onWpSelect, selectedWpId, expeditions, wps, drawingMode }: {
+function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, drawingMode }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
+  plannedPaths: Array<Array<{ q: number; r: number }>>;
   onPathClick: (tile: { q: number; r: number }) => void;
   onWpSelect: (wpId: string) => void;
   selectedWpId: string;
@@ -1494,6 +1495,23 @@ function HexMap({ tiles, draftPath, onPathClick, onWpSelect, selectedWpId, exped
             </g>
           );
         })}
+
+        {/* Načrtovane (potrjene, a še ne sproženo) odprave — zlata črtkana */}
+        {plannedPaths.map((pp, pi) => (
+          <g key={`planned_${pi}`} className="path-lines" pointerEvents="none">
+            {pp.slice(0, -1).map((s, i) => {
+              const a = shift(hexToPixel(s.q, s.r, SIZE));
+              const b = shift(hexToPixel(pp[i + 1].q, pp[i + 1].r, SIZE));
+              return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                stroke="#ffd84a" strokeWidth="1.8" strokeDasharray="2 3" strokeOpacity="0.7" />;
+            })}
+            {pp.length > 0 && (() => {
+              const t = pp[pp.length - 1];
+              const p = shift(hexToPixel(t.q, t.r, SIZE));
+              return <circle cx={p.x} cy={p.y} r="3.5" fill="#ffd84a" fillOpacity="0.7" />;
+            })()}
+          </g>
+        ))}
 
         {/* Draft path (igralec gradi novo odpravo) — NAD tile fillom */}
         {draftPath.length > 1 && (
@@ -2105,6 +2123,7 @@ export default function App() {
             </span>
           </div>
           <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
+            plannedPaths={pendingExpeditions.map(e => e.path)}
             onPathClick={handlePathClick}
             onWpSelect={(id) => setTargetWP(targetWP === id ? '' : id)}
             selectedWpId={targetWP}
