@@ -1319,7 +1319,7 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, drawingMode, camp, onCampAdjust, repelProbability }: {
+function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, drawingMode, camp, onCampAdjust, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   plannedPaths: Array<Array<{ q: number; r: number }>>;
@@ -1332,6 +1332,9 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
   camp: { defenders: number; researchers: number; workers: number; foragers: number };
   onCampAdjust: (which: 'd' | 'f' | 'w' | 'r', delta: number) => void;
   repelProbability: number;  // 0–1, za polnjenje obrambne linije
+  rations: number; onRations: (n: number) => void;
+  workshopObj: WorkshopObjective; onWorkshop: (o: WorkshopObjective) => void;
+  researchObj: ResearchObjective; onResearch: (o: ResearchObjective) => void;
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
@@ -1345,7 +1348,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
     { q: 1, r: 3, icon: '🛡', label: 'OBRAMBA',   count: camp.defenders,   color: '#66aabb', adj: 'd' as const },
   ];
   const campZoneIds = new Set(CAMP_ZONES.map(z => `${z.q},${z.r}`));
-  const CAMP_EXTENT = SIZE * 1.4;  // prostor za obrambni badge nad kampom
+  const CAMP_EXTENT = SIZE * 2.1;  // prostor za zunanje kontrolne gumbe okoli kampa
   const pts = tiles.map(t => hexToPixel(t.q, t.r, SIZE));
   let minX = Math.min(...pts.map(p => p.x)) - SIZE;
   let maxX = Math.max(...pts.map(p => p.x)) + SIZE;
@@ -1641,6 +1644,59 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
             </g>
           );
         })}
+
+        {/* Zunanji kontrolni gumbi vsake zone (na zunanji strani) */}
+        {(() => {
+          // Centroid kampa za določitev "zunanje" smeri
+          const cs = CAMP_ZONES.map(z => shift(hexToPixel(z.q, z.r, SIZE)));
+          const cx = cs.reduce((s, p) => s + p.x, 0) / cs.length;
+          const cy = cs.reduce((s, p) => s + p.y, 0) / cs.length;
+          const RATIONS_EMOJI = [null, '💀', '🥄', '🍽', '🍞', '🥩'];
+
+          return CAMP_ZONES.map(z => {
+            const p = shift(hexToPixel(z.q, z.r, SIZE));
+            let dx = p.x - cx, dy = p.y - cy;
+            const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
+            const px = -dy, py = dx;  // pravokotno za razporeditev gumbov
+            // Definiraj gumbe glede na zono
+            type Btn = { label: string; active: boolean; onClick: () => void };
+            let btns: Btn[] = [];
+            if (z.adj === 'f') {
+              btns = [1,2,3,4,5].map(lvl => ({ label: RATIONS_EMOJI[lvl]!, active: rations === lvl, onClick: () => onRations(lvl) }));
+            } else if (z.adj === 'w') {
+              btns = [
+                { label: '🔨', active: workshopObj === 'weapon', onClick: () => onWorkshop('weapon') },
+                { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall') },
+              ];
+            } else if (z.adj === 'r') {
+              btns = [
+                { label: '🤖', active: researchObj === 'robots',     onClick: () => onResearch('robots') },
+                { label: '🎯', active: researchObj === 'weakpoints', onClick: () => onResearch('weakpoints') },
+              ];
+            }
+            if (!btns.length) return null;
+            const baseX = p.x + dx * SIZE * 1.02;
+            const baseY = p.y + dy * SIZE * 1.02;
+            const sp = 15;
+            return (
+              <g key={`ctrl_${z.q}_${z.r}`}>
+                {btns.map((b, i) => {
+                  const off = (i - (btns.length - 1) / 2) * sp;
+                  const bxp = baseX + px * off, byp = baseY + py * off;
+                  return (
+                    <g key={i} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); b.onClick(); }}>
+                      <circle cx={bxp} cy={byp} r="7.5"
+                        fill={b.active ? z.color : '#0a0a0a'}
+                        stroke={z.color} strokeWidth={b.active ? 2 : 1} />
+                      <text x={bxp} y={byp} textAnchor="middle" dominantBaseline="central"
+                        fontSize="9" style={{ pointerEvents: 'none' }}>{b.label}</text>
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          });
+        })()}
 
         {/* Aktivne odprave kot ikone — hover + klik za info */}
         {expPositions.map(({ exp, tile }) => {
@@ -2287,7 +2343,10 @@ export default function App() {
             wps={game.aiWeakPoints} drawingMode={true}
             camp={{ defenders, researchers, workers, foragers }}
             onCampAdjust={(which, delta) => bumpRole(which, delta)}
-            repelProbability={odds?.raidRepelProbability ?? 0} />
+            repelProbability={odds?.raidRepelProbability ?? 0}
+            rations={rations} onRations={setRations}
+            workshopObj={workshopObj} onWorkshop={setWorkshopObj}
+            researchObj={researchObj} onResearch={setResearchObj} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
