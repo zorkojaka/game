@@ -999,6 +999,18 @@ input[type=range]::-moz-range-thumb {
 }
 
 /* ─── Map: popup ob hover/klik na odpravo ────────────────────────────────── */
+.player-res-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 1.25rem;
+  align-items: center;
+  justify-content: flex-start;
+  padding: .5rem .75rem;
+  background: #11171f;
+  border: 1px solid #232c36;
+  border-radius: 10px;
+}
+
 .hex-map { position: relative; }
 
 .map-info-pop {

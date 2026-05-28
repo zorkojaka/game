@@ -2369,6 +2369,23 @@ export default function App() {
       {/* ─── PAS 2: Resursi klan ─── */}
       <ResourceRow game={game} eventLog={eventLog} />
 
+      {/* ─── Vrstica virov klana (vedno nad mapo) ─── */}
+      <div className="player-res-row">
+        <BigStat icon="👥" label="Populacija" value={game.population}      color="#d8d8d8" />
+        <BigStat icon="🍞" label="Hrana"      value={game.resources.survival} color="#cc8800"
+          note={`(→ ${foodNextMonth})`}
+          noteColor={foodNextMonth <= 0 ? '#cc2222' : foodNextMonth >= game.resources.survival ? '#22cc88' : '#cc8800'} />
+        <BigStat icon="⚔"  label="Orožje"     value={game.resources.combat}   color="#cc4433" />
+        <BigStat icon="⚙"  label="Material"   value={game.resources.material ?? 0} color="#88aabb" />
+        <BigStat icon="👁"  label="Intel"      value={game.resources.intelligence} color="#3388cc" />
+        {(game.resources.artifacts ?? 0) > 0 && (
+          <BigStat icon="💎" label="Artefakti" value={game.resources.artifacts} color="#ffd84a" />
+        )}
+        {(game.wallsBuilt ?? 0) > 0 && (
+          <BigStat icon="🧱" label="Zidovi"    value={game.wallsBuilt}         color="#aabb88" />
+        )}
+      </div>
+
       {/* ─── PAS 3: Mapa + Časovni trak (log) ─── */}
       <div className="band band-map-log">
         <div className="panel map-panel">
