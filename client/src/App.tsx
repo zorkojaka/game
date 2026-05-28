@@ -1988,6 +1988,38 @@ function GameOverScreen({ game, onNew, loading }: { game: GameState; onNew: () =
   );
 }
 
+/** Pomanjša vsebino, da se vedno prilega višini (brez scrollanja). */
+function FitScale({ children, deps }: { children: React.ReactNode; deps?: unknown[] }) {
+  const outer = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const recompute = () => {
+      const o = outer.current, n = inner.current;
+      if (!o || !n) return;
+      const ih = n.scrollHeight, iw = n.scrollWidth;
+      const oh = o.clientHeight, ow = o.clientWidth;
+      if (ih <= 0 || iw <= 0) return;
+      const s = Math.min(1, oh / ih, ow / iw);
+      setScale(s > 0.2 ? s : 0.2);
+    };
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    if (outer.current) ro.observe(outer.current);
+    if (inner.current) ro.observe(inner.current);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return (
+    <div ref={outer} className="fit-outer">
+      <div ref={inner} className="fit-inner"
+        style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: `${100 / scale}%` }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // ─── Glavna komponenta ────────────────────────────────────────────────────────
 
 export default function App() {
@@ -2005,7 +2037,7 @@ export default function App() {
   const [missionR,     setMissionR]     = useState<Record<string, number>>({});
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
-  const [tab,          setTab]          = useState<'camp' | 'skills' | 'missions' | 'log'>('camp');
+  const [tab,          setTab]          = useState<'defense' | 'food' | 'workshop' | 'research' | 'map' | 'attack' | 'tree' | 'missions'>('food');
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
   const [draftPeople,  setDraftPeople]  = useState(5);
   const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
@@ -2171,6 +2203,7 @@ export default function App() {
   const plannedTotal = newMissionPeople + pendingExpPpl + combatants;  // rezervirani za odprave/misije/napad
   const assignedHome = defenders + foragers + workers + researchers;
   const availablePop = Math.max(0, pop - inMissions);
+  const freePeople = Math.max(0, availablePop - assignedHome - plannedTotal);
   const assigned = assignedHome + plannedTotal;
   const over = assigned > availablePop;
 
@@ -2372,9 +2405,14 @@ export default function App() {
       <aside className="left-col">
         <nav className="side-menu">
           {([
-            { id: 'camp',     icon: '🏕', label: 'Kamp' },
-            { id: 'skills',   icon: '🌳', label: 'Drevesa' },
+            { id: 'defense',  icon: '🛡', label: 'Obramba' },
+            { id: 'food',     icon: '🌾', label: 'Prehrana' },
+            { id: 'workshop', icon: '🔨', label: 'Delavnice' },
+            { id: 'research', icon: '🔬', label: 'Raziskave' },
+            { id: 'map',      icon: '🗺', label: 'Izvidniki' },
+            { id: 'attack',   icon: '⚔', label: 'Napad' },
             { id: 'missions', icon: '🎯', label: 'Misije' },
+            { id: 'tree',     icon: '🔬', label: 'Drevo' },
           ] as const).map(m => (
             <button key={m.id} className={`sm-btn ${tab === m.id ? 'active' : ''}`}
               onClick={() => setTab(m.id)} title={m.label}>
@@ -2385,82 +2423,177 @@ export default function App() {
         </nav>
 
         <div className="left-panel">
-          {/* ─── ZAVIHEK: Kamp (ljudje & hrana) ─── */}
-          {tab === 'camp' && (
-          <div className="panel command-panel">
-            <div className="panel-head">
-              <h3>RAZPOREDI ENOTE</h3>
-              <span className="dim small">
-                {availablePop} razpoložljivih
-                {inMissions > 0 && ` · ${inMissions} na odpravah/misijah`}
-              </span>
+         <FitScale deps={[tab, game, defenders, foragers, workers, researchers, combatants, draftPath.length, pendingExpeditions.length]}>
+          {/* Vrstica prostih ljudi (vsi people-zavihki) */}
+          {(tab === 'defense' || tab === 'food' || tab === 'workshop' || tab === 'research') && (
+            <div className="free-people">
+              <span className="dim small">Prosti ljudje:</span>
+              <b style={{ color: freePeople > 0 ? '#66cc88' : '#888' }}>{freePeople}</b>
+              <span className="dim small">/ {availablePop}</span>
             </div>
+          )}
 
-            <ClanStatus game={game} inMissions={inMissions}
-              food={{ consumption: campFoodCost, production: foragerYield, packs: expPacksFood, foodMult: rTier.foodMult, nextMonth: foodNextMonth }} />
-
-            {overArmed && (
-              <div className="weapon-warning">
-                ⚠ Premalo orožja: imaš {weaponCap}, v boju {armedTotal} (napad+obramba). Engine skrči.
+          {/* ─── OBRAMBA ─── */}
+          {tab === 'defense' && (
+          <div className="panel command-panel">
+            <div className="panel-head"><h3>🛡 OBRAMBA</h3><span className="dim small">{defenders} branilcev</span></div>
+            <div className="field-stats">
+              <div className="ps-row">
+                <span className="dim small">🛡 Branilci</span>
+                <span className="pa-pm">
+                  <button className="pa-btn" disabled={defenders <= 0} onClick={() => bumpRole('d', -1)}>−</button>
+                  <b className="pa-count">{defenders}</b>
+                  <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('d', 1)}>+</button>
+                </span>
               </div>
+              <div className="ps-row"><span className="dim small">⚠ Verjetnost napada AI:</span>
+                <b style={{ color: probColor(1 - (odds?.raidProbability ?? 0)) }}>{odds ? Math.round(odds.raidProbability * 100) + '%' : '–'}</b></div>
+              <div className="ps-row"><span className="dim small">✓ Obramba odbije napad:</span>
+                <b style={{ color: probColor(odds?.raidRepelProbability ?? 0) }}>{defenders > 0 && odds ? Math.round(odds.raidRepelProbability * 100) + '%' : '–'}</b></div>
+              <div className="ps-row"><span className="dim small">🧱 Zgrajeni zidovi:</span><b>{game.wallsBuilt ?? 0}</b></div>
+              <div className="ps-row"><span className="dim small">⚔ Orožje (kapaciteta boja):</span><b>{weaponCap}</b></div>
+            </div>
+            {overArmed && (
+              <div className="weapon-warning">⚠ Premalo orožja: imaš {weaponCap}, v boju {armedTotal}. Engine skrči.</div>
             )}
+            <p className="field-note dim small">Branilci ščitijo kamp pred napadi AI. Več branilcev in zidov → višja verjetnost odbitja.</p>
+          </div>
+          )}
 
-            <div className="cmd-section">
-              {/* Vizualni razdelilnik ljudi po vlogah */}
-              <PeopleAllocator
-                available={availablePop}
-                inMissions={inMissions}
-                newMission={newMissionPeople}
-                roles={[
-                  { key: 'd', label: 'Obramba', icon: '🛡', color: '#66aabb', count: defenders,
-                    yieldText: `${defenders} stražarjev · ${defenders} orožja`,
-                    contextTop: (
-                      <div className="pa-ctx pa-ctx-defense">
-                        <div className="pa-ctx-line">
-                          <span className="dim small">⚠ Napad AI:</span>
-                          <b className="pa-ctx-val-sm" style={{ color: probColor(1 - (odds?.raidProbability ?? 0)) }}>
-                            {odds ? Math.round(odds.raidProbability * 100) + '%' : '–'}
-                          </b>
-                        </div>
-                        <div className="pa-ctx-line">
-                          <span className="dim small">✓ Obramba odbije:</span>
-                          <b className="pa-ctx-val-sm" style={{ color: probColor(odds?.raidRepelProbability ?? 0) }}>
-                            {defenders > 0 && odds ? Math.round(odds.raidRepelProbability * 100) + '%' : '–'}
-                          </b>
-                        </div>
-                      </div>
-                    ) },
-                  { key: 'f', label: 'Nabiralci', icon: '🌾', color: '#6aa630', count: foragers,
-                    yieldText: `${survBalance >= 0 ? '+' : ''}${survBalance} hrana`,
-                    probLabel: 'Brez izgub', prob: odds?.forageSafetyProbability,
-                    contextTop: <RationsMini value={rations} onChange={setRations} /> },
-                  { key: 'w', label: 'Delavci', icon: '🔧', color: '#cc7733', count: workers,
-                    yieldText: workshopObj === 'weapon' ? 'razvoj orožja' : 'gradnja zidu',
-                    contextTop: <WorkshopSelector value={workshopObj} onChange={setWorkshopObj} /> },
-                  { key: 'r', label: 'Raziskovalci', icon: '🔬', color: '#3377cc', count: researchers,
-                    yieldText: `+${researchIntel} intel`,
-                    contextTop: <ResearchSelector value={researchObj} onChange={setResearchObj} /> },
-                  { key: '_', label: plannedTotal > 0 ? `Prosti (${plannedTotal} načrt.)` : 'Prosti',
-                    icon: '·', color: '#888888',
-                    count: Math.max(0, availablePop - defenders - foragers - workers - researchers),
-                    markedCount: plannedTotal,
-                    markedIcon: '↑',
-                    markedTitle: 'načrtovan za odpravo' },
-                ]}
-                onTransfer={(nc) => {
-                  const [nD, nF, nW, nR] = nc;
-                  setDefenders(nD); setForagers(nF); setWorkers(nW); setResearchers(nR);
-                }}
-              />
+          {/* ─── PREHRANA ─── */}
+          {tab === 'food' && (
+          <div className="panel command-panel">
+            <div className="panel-head"><h3>🌾 PREHRANA</h3><span className="dim small">{foragers} nabiralcev</span></div>
+            <div className="field-stats">
+              <div className="ps-row">
+                <span className="dim small">🌾 Nabiralci</span>
+                <span className="pa-pm">
+                  <button className="pa-btn" disabled={foragers <= 0} onClick={() => bumpRole('f', -1)}>−</button>
+                  <b className="pa-count">{foragers}</b>
+                  <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('f', 1)}>+</button>
+                </span>
+              </div>
+              <div className="ps-row"><span className="dim small">Obroki:</span><RationsMini value={rations} onChange={setRations} /></div>
+              <div className="ps-row"><span className="dim small">Pridelek:</span><b style={{ color: '#22cc88' }}>+{foragerYield}</b></div>
+              <div className="ps-row"><span className="dim small">Poraba kampa (×{rTier.foodMult}):</span><b style={{ color: '#cc4444' }}>−{campFoodCost}</b></div>
+              <div className="ps-row"><span className="dim small">Zaloga zdaj:</span><b>{game.resources.survival}</b></div>
+              <div className="ps-row"><span className="dim small">Naslednji mesec:</span>
+                <b style={{ color: foodNextMonth <= 0 ? '#cc2222' : '#d8d8d8' }}>{foodNextMonth}{foodNextMonth <= 0 && ' ⚠'}</b></div>
+              <div className="ps-row"><span className="dim small">Brez izgub pri nabiranju:</span>
+                <b style={{ color: probColor(odds?.forageSafetyProbability ?? 0) }}>{odds ? Math.round((odds.forageSafetyProbability ?? 0) * 100) + '%' : '–'}</b></div>
+            </div>
+            <p className="field-note dim small">Nabiralci zbirajo hrano. Višji obroki dajo več moči, a porabijo več hrane.</p>
+          </div>
+          )}
 
-              {over && (
-                <button className="autofit-btn" onClick={autoFitAllocation}>
-                  ✓ Avto-popravi razporeditev
-                </button>
+          {/* ─── DELAVNICE ─── */}
+          {tab === 'workshop' && (
+          <div className="panel command-panel">
+            <div className="panel-head"><h3>🔨 DELAVNICE</h3><span className="dim small">{workers} delavcev</span></div>
+            <div className="field-stats">
+              <div className="ps-row">
+                <span className="dim small">🔨 Delavci</span>
+                <span className="pa-pm">
+                  <button className="pa-btn" disabled={workers <= 0} onClick={() => bumpRole('w', -1)}>−</button>
+                  <b className="pa-count">{workers}</b>
+                  <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('w', 1)}>+</button>
+                </span>
+              </div>
+              <div className="ps-row"><span className="dim small">Cilj:</span><WorkshopSelector value={workshopObj} onChange={setWorkshopObj} /></div>
+              <div className="ps-row"><span className="dim small">⚙ Material:</span><b>{game.resources.material ?? 0}</b></div>
+              <div className="ps-row"><span className="dim small">⚔ Orožje:</span><b>{game.resources.combat}</b></div>
+              <div className="ps-row"><span className="dim small">🧱 Zidovi:</span><b>{game.wallsBuilt ?? 0}</b></div>
+            </div>
+            <p className="field-note dim small">Delavci iz materiala izdelujejo orožje ali gradijo zid (obramba).</p>
+          </div>
+          )}
+
+          {/* ─── RAZISKAVE ─── */}
+          {tab === 'research' && (
+          <div className="panel command-panel">
+            <div className="panel-head"><h3>🔬 RAZISKAVE</h3><span className="dim small">{researchers} raziskovalcev</span></div>
+            <div className="field-stats">
+              <div className="ps-row">
+                <span className="dim small">🔬 Raziskovalci</span>
+                <span className="pa-pm">
+                  <button className="pa-btn" disabled={researchers <= 0} onClick={() => bumpRole('r', -1)}>−</button>
+                  <b className="pa-count">{researchers}</b>
+                  <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('r', 1)}>+</button>
+                </span>
+              </div>
+              <div className="ps-row"><span className="dim small">Cilj:</span><ResearchSelector value={researchObj} onChange={setResearchObj} /></div>
+              <div className="ps-row"><span className="dim small">+ Intel / mesec:</span><b style={{ color: '#3388cc' }}>+{researchIntel}</b></div>
+              <div className="ps-row"><span className="dim small">👁 Intel zaloga:</span><b>{game.resources.intelligence}</b></div>
+            </div>
+            <p className="field-note dim small">Raziskovalci zbirajo intel. Cilj „roboti" izboljša boje, „ranljivosti" razkriva AI načrt.</p>
+          </div>
+          )}
+
+          {/* ─── IZVIDNIKI / MAPA — nova odprava + aktivne odprave ─── */}
+          {tab === 'map' && (
+          <div className="panel">
+            <div className="panel-head">
+              <h3>🗺 NOVA ODPRAVA</h3>
+              {pendingExpeditions.length > 0 && (
+                <span className="panel-badge">{pendingExpeditions.length} potrjenih · {pendingExpPpl} ljudi</span>
               )}
             </div>
-
-            {/* Aktivne odprave */}
+            <div className="path-builder">
+              <div className="pb-instr dim small">
+                Klikni sosednji heks na mapi za gradnjo poti. Klik na zadnji heks = odznači.
+              </div>
+              {draftPath.length < 2 ? (
+                <div className="map-hint">Pot je prazna. Začni s klikom na sosednji heks ⌂ klana.</div>
+              ) : (
+                <>
+                  <div className="path-stats">
+                    <div className="ps-row"><span className="dim small">Korakov:</span><b>{draftPath.length - 1}</b></div>
+                    <div className="ps-row"><span className="dim small">Trajanje:</span><b style={{ color: '#cc8800' }}>{draftPathMonths} mesec(ev)</b></div>
+                    <div className="ps-row"><span className="dim small">Tveganje srečanja:</span><b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b></div>
+                    <div className="ps-row">
+                      <span className="dim small">Ljudje za to odpravo:</span>
+                      <span className="pa-pm">
+                        <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
+                        <b className="pa-count">{draftPeople}</b>
+                        <button className="pa-btn" disabled={assignedHome + plannedTotal + draftPeople >= availablePop}
+                          onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="exp-rations">
+                    <span className="dim small">Obroki odprave:</span>
+                    <RationsMini value={draftRations} onChange={setDraftRations} />
+                  </div>
+                  <div className="exp-takealong">
+                    <div className="dim small" style={{ marginBottom: 2 }}>Vzamejo s seboj iz kampa:</div>
+                    <div className="eta-row">
+                      <span>🍞 <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane</span>
+                      <span className="dim small">({draftPeople} × {draftPath.length - 1}m × ×{draftRTier.foodMult})</span>
+                    </div>
+                    <div className="eta-row dim small">moč ekipe ×{draftRTier.strengthMult} (vpliva na preživetje srečanj)</div>
+                  </div>
+                  <button className="autofit-btn" disabled={!canConfirmDraft} onClick={confirmDraftExpedition}>
+                    ✓ Potrdi odpravo in nariši novo
+                  </button>
+                </>
+              )}
+              {pendingExpeditions.length > 0 && (
+                <div className="pending-exps">
+                  <div className="dim small" style={{ marginBottom: 4 }}>Potrjene odprave (sproži ob izvedbi meseca):</div>
+                  {pendingExpeditions.map((e, i) => {
+                    const months = e.path.length - 1;
+                    const t = RATIONS[e.rations] ?? RATIONS[3];
+                    const food = Math.round(e.assigned * months * t.foodMult);
+                    return (
+                      <div key={i} className="pending-exp-row">
+                        <span>🔭 {e.assigned} · {months}m · {t.emoji} 🍞{food}</span>
+                        <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             {(game.expeditions ?? []).length > 0 && (
               <div className="cmd-section">
                 <div className="cmd-label">Aktivne odprave ({game.expeditions.length})</div>
@@ -2485,9 +2618,7 @@ export default function App() {
                           <span className="dim small">{done} / {steps}</span>
                         </div>
                         {e.encountersLog.length > 0 && (
-                          <div className="exp-events dim small">
-                            {e.encountersLog.slice(-2).join(' · ')}
-                          </div>
+                          <div className="exp-events dim small">{e.encountersLog.slice(-2).join(' · ')}</div>
                         )}
                       </div>
                     );
@@ -2495,13 +2626,50 @@ export default function App() {
                 </div>
               </div>
             )}
+          </div>
+          )}
 
+          {/* ─── NAPAD ─── */}
+          {tab === 'attack' && (
+          <div className="panel">
+            <div className="panel-head">
+              <h3>⚔ NOV NAPAD</h3>
+              {targetWP && <span className="panel-badge" style={{ color: '#ffd84a' }}>cilj izbran</span>}
+            </div>
+            <div className="path-builder">
+              <div className="pb-instr dim small">
+                Pošlji napadalce na AI robote ta mesec. Cilj (šibko točko) izberi s klikom na mapi.
+              </div>
+              <div className="path-stats">
+                <div className="ps-row">
+                  <span className="dim small">Napadalci:</span>
+                  <span className="pa-pm">
+                    <button className="pa-btn" disabled={combatants <= 0} onClick={() => setCombatants(Math.max(0, combatants - 1))}>−</button>
+                    <b className="pa-count">{combatants}</b>
+                    <button className="pa-btn" disabled={assignedHome + plannedTotal + 1 > availablePop || combatants + 1 > weaponCap}
+                      onClick={() => setCombatants(combatants + 1)}>+</button>
+                  </span>
+                </div>
+                <div className="ps-row"><span className="dim small">Moč napada:</span><b style={{ color: '#cc4433' }}>+{(combatants * 1.2 * rTier.strengthMult).toFixed(0)}</b></div>
+                <div className="ps-row"><span className="dim small">Zmaga v napadu:</span>
+                  <b style={{ color: combatants > 0 ? probColor(odds?.successProbability ?? 0) : '#555' }}>
+                    {combatants > 0 && odds ? Math.round(odds.successProbability * 100) + '%' : '–'}
+                  </b></div>
+                <div className="ps-row"><span className="dim small">Cilj:</span>
+                  <b style={{ color: targetWP ? '#ffd84a' : '#888' }}>
+                    {targetWP ? (game.aiWeakPoints.find(w => w.id === targetWP)?.label ?? 'šibka točka') : 'splošni napad na robote'}
+                  </b></div>
+              </div>
+              {combatants > weaponCap && (
+                <div className="weapon-warning">⚠ Premalo orožja ({weaponCap}) za {combatants} napadalcev.</div>
+              )}
+            </div>
             <OddsDisplay odds={odds} combatants={combatants} />
           </div>
           )}
 
-          {/* ─── ZAVIHEK: Skill drevesi ─── */}
-          {tab === 'skills' && (
+          {/* ─── DREVO — naš načrt + AI načrtovalno drevo (skill tree) ─── */}
+          {tab === 'tree' && (
           <div className="band band-trees">
             <HumanTree axisHistory={game.axisHistory} currentAxis={axis} onFocusChange={setAxis} />
             <AITree nodes={game.aiTree} justRevealed={justRevealed} />
@@ -2521,6 +2689,7 @@ export default function App() {
               artifactTargetWpId={artifactTargetWp} />
           </div>
           )}
+         </FitScale>
         </div>
       </aside>
 
@@ -2568,138 +2737,6 @@ export default function App() {
             <EventLog entries={eventLog} />
           </div>
         </div>
-        <div className="rc-actions">
-          {/* Nova odprava */}
-          <div className="panel">
-            <div className="panel-head">
-              <h3>🗺 NOVA ODPRAVA</h3>
-              {pendingExpeditions.length > 0 && (
-                <span className="panel-badge">{pendingExpeditions.length} potrjenih · {pendingExpPpl} ljudi</span>
-              )}
-            </div>
-            <div className="path-builder">
-              <div className="pb-instr dim small">
-                Klikni sosednji heks na mapi za gradnjo poti. Klik na zadnji heks = odznači.
-              </div>
-              {draftPath.length < 2 ? (
-                <div className="map-hint">Pot je prazna. Začni s klikom na sosednji heks ⌂ klana.</div>
-              ) : (
-                <>
-                  <div className="path-stats">
-                    <div className="ps-row">
-                      <span className="dim small">Korakov:</span>
-                      <b>{draftPath.length - 1}</b>
-                    </div>
-                    <div className="ps-row">
-                      <span className="dim small">Trajanje:</span>
-                      <b style={{ color: '#cc8800' }}>{draftPathMonths} mesec(ev)</b>
-                    </div>
-                    <div className="ps-row">
-                      <span className="dim small">Tveganje srečanja:</span>
-                      <b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b>
-                    </div>
-                    <div className="ps-row">
-                      <span className="dim small">Ljudje za to odpravo:</span>
-                      <span className="pa-pm">
-                        <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
-                        <b className="pa-count">{draftPeople}</b>
-                        <button className="pa-btn"
-                          disabled={assignedHome + plannedTotal + draftPeople >= availablePop}
-                          onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Ločeni obroki za odpravo */}
-                  <div className="exp-rations">
-                    <span className="dim small">Obroki odprave:</span>
-                    <RationsMini value={draftRations} onChange={setDraftRations} />
-                  </div>
-
-                  {/* Kaj vzamejo s seboj */}
-                  <div className="exp-takealong">
-                    <div className="dim small" style={{ marginBottom: 2 }}>Vzamejo s seboj iz kampa:</div>
-                    <div className="eta-row">
-                      <span>🍞 <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane</span>
-                      <span className="dim small">({draftPeople} × {draftPath.length - 1}m × ×{draftRTier.foodMult})</span>
-                    </div>
-                    <div className="eta-row dim small">
-                      moč ekipe ×{draftRTier.strengthMult} (vpliva na preživetje srečanj)
-                    </div>
-                  </div>
-
-                  <button className="autofit-btn" disabled={!canConfirmDraft}
-                    onClick={confirmDraftExpedition}>
-                    ✓ Potrdi odpravo in nariši novo
-                  </button>
-                </>
-              )}
-
-              {pendingExpeditions.length > 0 && (
-                <div className="pending-exps">
-                  <div className="dim small" style={{ marginBottom: 4 }}>
-                    Potrjene odprave (sproži ob izvedbi meseca):
-                  </div>
-                  {pendingExpeditions.map((e, i) => {
-                    const months = e.path.length - 1;
-                    const t = RATIONS[e.rations] ?? RATIONS[3];
-                    const food = Math.round(e.assigned * months * t.foodMult);
-                    return (
-                      <div key={i} className="pending-exp-row">
-                        <span>🔭 {e.assigned} · {months}m · {t.emoji} 🍞{food}</span>
-                        <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Nov napad — direkten udar na AI robote ta mesec */}
-          <div className="panel">
-            <div className="panel-head">
-              <h3>⚔ NOV NAPAD</h3>
-              {targetWP && <span className="panel-badge" style={{ color: '#ffd84a' }}>cilj izbran</span>}
-            </div>
-            <div className="path-builder">
-              <div className="pb-instr dim small">
-                Pošlji napadalce na AI robote ta mesec. Cilj (šibko točko) izberi s klikom na mapi.
-              </div>
-              <div className="path-stats">
-                <div className="ps-row">
-                  <span className="dim small">Napadalci:</span>
-                  <span className="pa-pm">
-                    <button className="pa-btn" disabled={combatants <= 0} onClick={() => setCombatants(Math.max(0, combatants - 1))}>−</button>
-                    <b className="pa-count">{combatants}</b>
-                    <button className="pa-btn"
-                      disabled={assignedHome + plannedTotal + 1 > availablePop || combatants + 1 > weaponCap}
-                      onClick={() => setCombatants(combatants + 1)}>+</button>
-                  </span>
-                </div>
-                <div className="ps-row">
-                  <span className="dim small">Moč napada:</span>
-                  <b style={{ color: '#cc4433' }}>+{(combatants * 1.2 * rTier.strengthMult).toFixed(0)}</b>
-                </div>
-                <div className="ps-row">
-                  <span className="dim small">Zmaga v napadu:</span>
-                  <b style={{ color: combatants > 0 ? probColor(odds?.successProbability ?? 0) : '#555' }}>
-                    {combatants > 0 && odds ? Math.round(odds.successProbability * 100) + '%' : '–'}
-                  </b>
-                </div>
-                <div className="ps-row">
-                  <span className="dim small">Cilj:</span>
-                  <b style={{ color: targetWP ? '#ffd84a' : '#888' }}>
-                    {targetWP ? (game.aiWeakPoints.find(w => w.id === targetWP)?.label ?? 'šibka točka') : 'splošni napad na robote'}
-                  </b>
-                </div>
-              </div>
-              {combatants > weaponCap && (
-                <div className="weapon-warning">⚠ Premalo orožja ({weaponCap}) za {combatants} napadalcev.</div>
-              )}
-            </div>
-          </div>
-        </div>
       </aside>
 
       </div>{/* main-cols */}
@@ -2715,7 +2752,7 @@ export default function App() {
           ))}
         </div>
         <div className="bottom-actions">
-          <button className="back-btn" onClick={() => setTab('camp')}>← Nazaj na kamp</button>
+          <button className="back-btn" onClick={() => setTab('food')}>← Nazaj na kamp</button>
           <button className="exec-btn" onClick={handleRound} disabled={loading || over}>
             {loading ? '⟳  Izvajam…' : over ? '⚠  Preveč ljudi razporejenih' : 'NASLEDNJI MESEC →'}
           </button>

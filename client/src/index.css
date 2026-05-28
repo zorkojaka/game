@@ -195,9 +195,10 @@ b      { color: var(--text); }
 }
 .left-panel {
   min-height: 0;
-  overflow-y: auto;
-  padding-right: .25rem;
+  overflow: hidden;
 }
+.fit-outer { height: 100%; width: 100%; overflow: hidden; }
+.fit-inner { transform-origin: top left; }
 .center-col {
   display: flex;
   flex-direction: column;
@@ -226,10 +227,23 @@ b      { color: var(--text); }
 }
 .right-col {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   gap: .5rem;
   min-height: 0;
 }
+
+/* Field panels (levi zavihki) */
+.free-people {
+  display: flex; align-items: baseline; gap: .35rem;
+  padding: .35rem .6rem; margin-bottom: .4rem;
+  background: #11171f; border: 1px solid #232c36; border-radius: 8px;
+}
+.field-stats { display: flex; flex-direction: column; gap: .35rem; margin-top: .5rem; }
+.field-stats .ps-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.field-note { margin-top: .6rem; line-height: 1.4; }
+/* drevesa/misije v ozkem levem panelu — en stolpec */
+.left-panel .band-trees,
+.left-panel .band-missions { grid-template-columns: 1fr; }
 .rc-log {
   display: flex;
   flex-direction: column;
