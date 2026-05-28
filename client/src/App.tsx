@@ -1319,7 +1319,7 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, drawingMode, camp, onCampAdjust }: {
+function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, drawingMode, camp, onCampAdjust, repelProbability }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   plannedPaths: Array<Array<{ q: number; r: number }>>;
