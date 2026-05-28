@@ -24,11 +24,11 @@ const M_OS: Record<string, Record<HumanAxis, number>> = {
 };
 
 const RATIONS: Record<number, { foodMult: number; popMin: number; popMax: number; strengthMult: number; label: string; emoji: string; color: string }> = {
-  1: { foodMult: 0.50, popMin: -5, popMax: -3, strengthMult: 0.60, label: 'Lakota',   emoji: '💀', color: '#cc2222' },
+  1: { foodMult: 0.50, popMin: -5, popMax: -3, strengthMult: 0.55, label: 'Lakota',   emoji: '💀', color: '#cc2222' },
   2: { foodMult: 0.75, popMin: -2, popMax: -1, strengthMult: 0.80, label: 'Skopo',    emoji: '🥄', color: '#cc7700' },
   3: { foodMult: 1.00, popMin:  0, popMax:  0, strengthMult: 1.00, label: 'Normalno', emoji: '🍽', color: '#888888' },
-  4: { foodMult: 1.25, popMin:  1, popMax:  2, strengthMult: 1.15, label: 'Dobro',    emoji: '🍞', color: '#66aa44' },
-  5: { foodMult: 1.50, popMin:  2, popMax:  4, strengthMult: 1.30, label: 'Obilje',   emoji: '🥩', color: '#22cc88' },
+  4: { foodMult: 2.50, popMin:  1, popMax:  3, strengthMult: 1.30, label: 'Dobro',    emoji: '🍞', color: '#66aa44' },
+  5: { foodMult: 5.00, popMin:  3, popMax:  6, strengthMult: 1.60, label: 'Obilje',   emoji: '🥩', color: '#22cc88' },
 };
 
 const STORAGE_KEY = 'avh-runId';
