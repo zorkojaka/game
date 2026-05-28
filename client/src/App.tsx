@@ -1996,6 +1996,7 @@ export default function App() {
   const [missionR,     setMissionR]     = useState<Record<string, number>>({});
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
+  const [tab,          setTab]          = useState<'camp' | 'skills' | 'missions' | 'log'>('camp');
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
   const [draftPeople,  setDraftPeople]  = useState(5);
   const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
@@ -2326,7 +2327,7 @@ export default function App() {
   const foodNextMonth = Math.max(0, _afterCamp - expPacksFood);
 
   return (
-    <div className="hud">
+    <div className="app-shell">
       {phaseTrans && (
         <PhaseTransitionBanner
           fromPhase={phaseTrans.from}
@@ -2335,6 +2336,23 @@ export default function App() {
           onClose={() => setPhaseTrans(null)}
         />
       )}
+      {/* Levi hitri meni */}
+      <nav className="side-menu">
+        {([
+          { id: 'camp',     icon: '🏕', label: 'Kamp' },
+          { id: 'skills',   icon: '🌳', label: 'Drevesa' },
+          { id: 'missions', icon: '🎯', label: 'Misije' },
+          { id: 'log',      icon: '📜', label: 'Log' },
+        ] as const).map(m => (
+          <button key={m.id} className={`sm-btn ${tab === m.id ? 'active' : ''}`}
+            onClick={() => setTab(m.id)} title={m.label}>
+            <span className="sm-icon">{m.icon}</span>
+            <span className="sm-label">{m.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="hud">
       {/* ─── PAS 1: Faza + Nova igra ─── */}
       <PhaseHeader game={game} onNewGame={handleNew} loading={loading} />
 
@@ -2375,8 +2393,7 @@ export default function App() {
           </div>
         </div>
         <div className="map-right-col">
-          <EventLog entries={eventLog} />
-          {/* Nova odprava — premaknjeno pod časovni trak */}
+          {/* Nova odprava */}
           <div className="panel">
             <div className="panel-head">
               <h3>🗺 NOVA ODPRAVA</h3>
@@ -2509,7 +2526,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* ─── PAS 4: Razporedi ljudi ─── */}
+      {/* ─── ZAVIHEK: Kamp (ljudje & hrana) ─── */}
+      {tab === 'camp' && (
       <div className="panel command-panel">
         <div className="panel-head">
           <h3>RAZPOREDI ENOTE</h3>
@@ -2628,14 +2646,18 @@ export default function App() {
           {loading ? '⟳  Izvajam…' : over ? '⚠  Preveč ljudi razporejenih' : '▶  IZVEDI MESEC'}
         </button>
       </div>
+      )}
 
-      {/* ─── PAS 5: Skill drevesi ─── */}
+      {/* ─── ZAVIHEK: Skill drevesi ─── */}
+      {tab === 'skills' && (
       <div className="band band-trees">
         <HumanTree axisHistory={game.axisHistory} currentAxis={axis} onFocusChange={setAxis} />
         <AITree nodes={game.aiTree} justRevealed={justRevealed} />
       </div>
+      )}
 
-      {/* ─── PAS 6: Misije človeštva + Šibke točke AI ─── */}
+      {/* ─── ZAVIHEK: Misije človeštva + Šibke točke AI ─── */}
+      {tab === 'missions' && (
       <div className="band band-missions">
         <HumanMissionsPlaceholder />
         <Missions wps={game.aiWeakPoints} aiTree={game.aiTree}
@@ -2645,6 +2667,15 @@ export default function App() {
           artifacts={game.resources.artifacts ?? 0}
           onUseArtifact={setArtifactTargetWp}
           artifactTargetWpId={artifactTargetWp} />
+      </div>
+      )}
+
+      {/* ─── ZAVIHEK: Log ─── */}
+      {tab === 'log' && (
+      <div className="band">
+        <EventLog entries={eventLog} />
+      </div>
+      )}
       </div>
     </div>
   );
