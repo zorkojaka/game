@@ -1805,6 +1805,7 @@ export default function App() {
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
   const [draftPeople,  setDraftPeople]  = useState(5);
+  const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
   const [pendingExpeditions, setPendingExpeditions] = useState<NewExpeditionInput[]>([]);
   const [artifactTargetWp, setArtifactTargetWp] = useState<string>('');
   const [targetWP,   setTargetWP]   = useState('');
@@ -1927,7 +1928,7 @@ export default function App() {
       const g = await createGame();
       setGame(g);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('hiding'); setCombatants(0); setDefenders(15); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('ai_weakpoints'); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setPendingExpeditions([]); setArtifactTargetWp('');
+      setAxis('hiding'); setCombatants(0); setDefenders(15); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('ai_weakpoints'); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
     } finally { setLoading(false); }
   };
 
@@ -1938,7 +1939,7 @@ export default function App() {
       const newExps: NewExpeditionInput[] = [...pendingExpeditions];
       // Če uporabnik ni potrdil tekoče poti a ima veljaven draft, ga pošlji tudi
       if (draftPath.length >= 2 && draftPeople > 0) {
-        newExps.push({ kind: 'scout', path: draftPath, assigned: draftPeople, rations });
+        newExps.push({ kind: 'scout', path: draftPath, assigned: draftPeople, rations: draftRations });
       }
       const { state } = await playRound(game.runId, {
         assignment: { axis, combatants, defenders, foragers, scouts, rations,
@@ -2063,7 +2064,7 @@ export default function App() {
   function confirmDraftExpedition() {
     if (draftPath.length < 2 || draftPeople < 1) return;
     setPendingExpeditions([...pendingExpeditions, {
-      kind: 'scout', path: draftPath, assigned: draftPeople, rations: rations,
+      kind: 'scout', path: draftPath, assigned: draftPeople, rations: draftRations,
     }]);
     // Resetiraj draft (pot začni iz klanovega heksa)
     const clan = game?.mapTiles?.find(t => t.isClanCamp);
@@ -2108,8 +2109,9 @@ export default function App() {
     const t = RATIONS[e.rations] ?? RATIONS[3];
     return s + Math.round(e.assigned * months * t.foodMult);
   }, 0);
+  const draftRTier = RATIONS[draftRations];
   const draftExpFood = (draftPath.length >= 2 && draftPeople > 0)
-    ? Math.round(draftPeople * (draftPath.length - 1) * rTier.foodMult) : 0;
+    ? Math.round(draftPeople * (draftPath.length - 1) * draftRTier.foodMult) : 0;
   const newMissionFood = Object.entries(missions).reduce((s, [wpId, ppl]) => {
     // misije imajo fiksno trajanje per wp
     const dur = wpId === 'wp_power' ? 4 : wpId === 'wp_comm' ? 5 : wpId === 'wp_core' ? 6 : 4;
@@ -2210,6 +2212,25 @@ export default function App() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Ločeni obroki za odpravo */}
+                  <div className="exp-rations">
+                    <span className="dim small">Obroki odprave:</span>
+                    <RationsMini value={draftRations} onChange={setDraftRations} />
+                  </div>
+
+                  {/* Kaj vzamejo s seboj */}
+                  <div className="exp-takealong">
+                    <div className="dim small" style={{ marginBottom: 2 }}>Vzamejo s seboj iz kampa:</div>
+                    <div className="eta-row">
+                      <span>🍞 <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane</span>
+                      <span className="dim small">({draftPeople} × {draftPath.length - 1}m × ×{draftRTier.foodMult})</span>
+                    </div>
+                    <div className="eta-row dim small">
+                      moč ekipe ×{draftRTier.strengthMult} (vpliva na preživetje srečanj)
+                    </div>
+                  </div>
+
                   <button className="autofit-btn" disabled={!canConfirmDraft}
                     onClick={confirmDraftExpedition}>
                     ✓ Potrdi odpravo in nariši novo
@@ -2222,12 +2243,17 @@ export default function App() {
                   <div className="dim small" style={{ marginBottom: 4 }}>
                     Potrjene odprave (sproži ob izvedbi meseca):
                   </div>
-                  {pendingExpeditions.map((e, i) => (
-                    <div key={i} className="pending-exp-row">
-                      <span>🔭 {e.assigned} ljudi · {e.path.length - 1} korakov</span>
-                      <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
-                    </div>
-                  ))}
+                  {pendingExpeditions.map((e, i) => {
+                    const months = e.path.length - 1;
+                    const t = RATIONS[e.rations] ?? RATIONS[3];
+                    const food = Math.round(e.assigned * months * t.foodMult);
+                    return (
+                      <div key={i} className="pending-exp-row">
+                        <span>🔭 {e.assigned} · {months}m · {t.emoji} 🍞{food}</span>
+                        <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -1508,3 +1508,15 @@ input[type=range]::-moz-range-thumb {
   background: #0a0a0a; border-left: 2px solid #cc8800;
   font-size: .74rem;
 }
+
+/* ─── Odprava: obroki + vzamejo s seboj ─────────────────────────────────── */
+.exp-rations {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 8px; padding: 5px 8px;
+  background: #0a0a0a; border-left: 2px solid #cc8800;
+}
+.exp-takealong {
+  margin-top: 6px; padding: 5px 8px;
+  background: #0a0a0a; border-left: 2px solid #6aa630;
+}
+.eta-row { display: flex; align-items: baseline; gap: 8px; font-size: .78rem; flex-wrap: wrap; }
