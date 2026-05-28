@@ -1617,23 +1617,23 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
               <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="16">{z.icon}</text>
               <text x={p.x} y={p.y - SIZE * 0.12} textAnchor="middle" fontSize="6.5" fill="#88a596"
                 fontFamily="'Courier New', monospace" letterSpacing="0.5">{z.label}</text>
-              {/* − število + (gumbi razmaknjeni, znaki centrirani) */}
+              {/* − število + (gumbi znotraj heksa, znaki centrirani) */}
               {(() => {
-                const cy = p.y + SIZE * 0.34;
-                const bx = SIZE * 0.66;
+                const cy = p.y + SIZE * 0.16;   // bliže sredini, kjer je heks najširši
+                const bx = SIZE * 0.46;          // znotraj apoteme (~0.87 R)
                 return (
                   <>
                     <g className="cz-minus" style={{ cursor: 'pointer' }} onClick={() => onCampAdjust(z.adj, -1)}>
-                      <circle cx={p.x - bx} cy={cy} r="8.5" fill="#101a16" stroke={z.color} strokeWidth="1.3" />
+                      <circle cx={p.x - bx} cy={cy} r="7.5" fill="#101a16" stroke={z.color} strokeWidth="1.2" />
                       <text x={p.x - bx} y={cy} textAnchor="middle" dominantBaseline="central"
-                        fontSize="14" fill={z.color} fontWeight="bold" fontFamily="'Courier New', monospace">−</text>
+                        fontSize="12" fill={z.color} fontWeight="bold" fontFamily="'Courier New', monospace">−</text>
                     </g>
                     <text x={p.x} y={cy} textAnchor="middle" dominantBaseline="central"
-                      fontSize="15" fill={z.color} fontFamily="'Courier New', monospace" fontWeight="bold">{z.count}</text>
+                      fontSize="14" fill={z.color} fontFamily="'Courier New', monospace" fontWeight="bold">{z.count}</text>
                     <g className="cz-plus" style={{ cursor: 'pointer' }} onClick={() => onCampAdjust(z.adj, +1)}>
-                      <circle cx={p.x + bx} cy={cy} r="8.5" fill="#101a16" stroke={z.color} strokeWidth="1.3" />
+                      <circle cx={p.x + bx} cy={cy} r="7.5" fill="#101a16" stroke={z.color} strokeWidth="1.2" />
                       <text x={p.x + bx} y={cy} textAnchor="middle" dominantBaseline="central"
-                        fontSize="14" fill={z.color} fontWeight="bold" fontFamily="'Courier New', monospace">+</text>
+                        fontSize="12" fill={z.color} fontWeight="bold" fontFamily="'Courier New', monospace">+</text>
                     </g>
                   </>
                 );
