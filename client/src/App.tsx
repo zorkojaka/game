@@ -1588,17 +1588,18 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
           const rp = Math.max(0, Math.min(1, repelProbability));
           const MAX_T = 12;                       // največja debelina obzidja (100 %)
           const wallT = Math.max(1, rp * MAX_T);  // dejanska debelina = sorazmerna z verjetnostjo
+          const repelColor = rp >= 0.6 ? '#22cc66' : rp >= 0.35 ? '#ddaa22' : '#cc3333';
           return (
             <g className="camp-wall" pointerEvents="none">
-              {/* Oznaka NAJVEČJE možne debeline (slabo vidno) */}
+              {/* Oznaka NAJVEČJE možne debeline (prosojno, v barvi verjetnosti) */}
               {segs.map((s, i) => (
                 <line key={`wm${i}`} x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
-                  stroke="#22aa88" strokeWidth={MAX_T} strokeLinecap="round" strokeOpacity={0.12} />
+                  stroke={repelColor} strokeWidth={MAX_T} strokeLinecap="round" strokeOpacity={0.18} />
               ))}
-              {/* Dejanska debelina obzidja — raste do max pri 100 % */}
+              {/* Dejanska debelina obzidja — raste do max pri 100 %, v barvi verjetnosti */}
               {segs.map((s, i) => (
                 <line key={`wf${i}`} x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
-                  stroke="#33ccaa" strokeWidth={wallT} strokeLinecap="round" />
+                  stroke={repelColor} strokeWidth={wallT} strokeLinecap="round" />
               ))}
             </g>
           );
