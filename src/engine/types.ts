@@ -90,17 +90,25 @@ export function tileId(t: { q: number; r: number }): string {
   return `${t.q},${t.r}`;
 }
 
+export type WorkshopObjective = 'weapon' | 'wall';
+export type ResearchObjective = 'robots' | 'weakpoints';
+
 export interface Assignment {
   axis: HumanAxis;
   combatants: number;       // NAPAD
-  defenders: number;        // OBRAMBA (enotna, brez dan/noč razdelitve)
-  foragers: number;
-  scouts: number;
+  defenders: number;        // OBRAMBA
+  foragers: number;         // HRANA
+  workers: number;          // DELAVCI — delavnica (orožje/zid)
+  researchers: number;      // RAZISKOVALCI — raziskava (AI roboti/ranljivosti)
+  workshopObjective?: WorkshopObjective;  // kaj delavci delajo
+  researchObjective?: ResearchObjective;  // kaj raziskovalci raziskujejo
   rations: number;
   missionAssignments?: Record<string, number>;
   missionRations?: Record<string, number>;
-  scoutPlan?: ScoutPlan;
   newExpeditions?: NewExpeditionInput[];
+  // Legacy
+  scouts?: number;
+  scoutPlan?: ScoutPlan;
   // Uporabi 1 artefakt za uničenje izbrane šibke točke
   useArtifactOnWpId?: string;
   // Legacy (ne uporabljati — ohranjeno za stara state-a)

@@ -8,7 +8,9 @@ const resourcesSchema = new Schema({
   survival: Number,
   combat: Number,
   intelligence: Number,
-}, { _id: false });
+  material: Number,
+  artifacts: Number,
+}, { _id: false, strict: false });
 
 const aiTreeNodeSchema = new Schema({
   id: String,

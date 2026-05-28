@@ -84,7 +84,7 @@ export function raidRepelProbability(state: GameState, assignment: Assignment): 
 
 /** Verjetnost, da izvidniki vrnejo s polnim donosom. */
 export function scoutSuccessProbability(state: GameState, assignment: Assignment): number {
-  if (assignment.scouts <= 0) return 0;
+  if ((assignment.scouts ?? 0) <= 0) return 0;
   const tier = RATIONS_LEVELS[assignment.rations ?? DEFAULT_RATIONS] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
   let p = SCOUT_BASE_SUCCESS
     + SCOUT_INTEL_BONUS_PER_100 * (state.resources.intelligence / 100)
@@ -95,9 +95,9 @@ export function scoutSuccessProbability(state: GameState, assignment: Assignment
 
 /** Verjetnost, da AI ujame izvidnike. */
 export function scoutCaptureProbability(state: GameState, assignment: Assignment): number {
-  if (assignment.scouts <= 0) return 0;
+  if ((assignment.scouts ?? 0) <= 0) return 0;
   let p = SCOUT_CAPTURE_BASE
-    + SCOUT_CAPTURE_PER_SCOUT * assignment.scouts
+    + SCOUT_CAPTURE_PER_SCOUT * (assignment.scouts ?? 0)
     + SCOUT_AI_KNOWLEDGE_BONUS * state.aiKnowledge;
   if (assignment.axis === 'hiding') p *= (1 - SCOUT_HIDING_REDUCTION);
   return Math.max(0, Math.min(0.80, p));
@@ -286,92 +286,77 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   survival += foraged;
   survival = Math.max(0, survival);
 
-  // 3. IZVIDNIKI — kotaljenje uspeha in možno ujetje
-  let scoutResult: ScoutResult = { captured: false, scoutsLost: 0, effectivenessMult: 1.0 };
-  let effectiveScouts = assignment.scouts;
-  if (assignment.scouts > 0) {
-    const captureProb = scoutCaptureProbability(state, assignment);
-    const [captureRoll, rngA] = rngNext(rng); rng = rngA;
-    if (captureRoll < captureProb) {
-      // Ujeti
-      const [pctRoll, rngB] = rngInt(rng, SCOUT_CAPTURED_LOSS_MIN * 100, SCOUT_CAPTURED_LOSS_MAX * 100);
-      rng = rngB;
-      const lost = Math.floor(assignment.scouts * (pctRoll / 100));
-      effectiveScouts = Math.max(0, assignment.scouts - lost);
-      scoutResult = { captured: true, scoutsLost: lost, effectivenessMult: SCOUT_PARTIAL_EFFECTIVE };
-    } else {
-      const successProb = scoutSuccessProbability(state, assignment);
-      const [successRoll, rngC] = rngNext(rng); rng = rngC;
-      scoutResult = {
-        captured: false, scoutsLost: 0,
-        effectivenessMult: successRoll < successProb ? 1.0 : SCOUT_PARTIAL_EFFECTIVE,
-      };
-    }
-  }
+  // (izvidniki v kampu nimajo več ujetja — to velja le za odprave na poti)
+  const scoutResult: ScoutResult = { captured: false, scoutsLost: 0, effectivenessMult: 1.0 };
 
-  // Donos izvidnikov skaliran z uspehom misije
-  const intelGained = Math.floor(effectiveScouts * SCOUT_INTEL_YIELD * rations.strengthMult * scoutResult.effectivenessMult);
-  let intelligence = state.resources.intelligence + intelGained;
-  // Material, combat in artifacts potrebujejo zgodnji declaration (delavnice + najdbe)
   let combat = state.resources.combat;
   let material = state.resources.material ?? 0;
   let artifacts = state.resources.artifacts ?? 0;
 
-  // 4. Izvidniki — razdelitev moči po izbranem cilju
-  const scoutObjective = assignment.scoutPlan?.objective ?? 'ai_weakpoints';
-  const fogEfficiency = assignment.axis === 'espionage' ? M_OS[state.phase].espionage : 0.15;
-  const espionageBonus = 1 + 0.20 * espionageLvl;
-  const totalScoutBudget = Math.floor(effectiveScouts * SCOUT_FOG_YIELD * fogEfficiency * espionageBonus * rations.strengthMult * scoutResult.effectivenessMult);
+  // 3. RAZISKOVALCI — intel + razkrivanje AI drevesa / boost
+  const researchers = assignment.researchers ?? assignment.scouts ?? 0;
+  const researchObj: 'robots' | 'weakpoints' = assignment.researchObjective ?? 'weakpoints';
+  const intelGained = Math.floor(researchers * SCOUT_INTEL_YIELD * rations.strengthMult);
+  let intelligence = state.resources.intelligence + intelGained;
 
   let aiTree = state.aiTree;
   let revealed: string[] = [];
   let mapTiles = state.mapTiles ?? generateMap();
-  // Delavnice — preberi prejšnje stanje (backward compat)
+  const workshopEvents: string[] = [];
+
+  if (researchers > 0) {
+    if (researchObj === 'weakpoints') {
+      const fogEfficiency = assignment.axis === 'espionage' ? M_OS[state.phase].espionage : 0.15;
+      const espionageBonus = 1 + 0.20 * espionageLvl;
+      const budget = Math.floor(researchers * SCOUT_FOG_YIELD * fogEfficiency * espionageBonus * rations.strengthMult);
+      const r = spendIntelOnFog(aiTree, budget);
+      aiTree = r.nodes;
+      revealed = r.revealed;
+    } else if (researchObj === 'robots') {
+      const intelBonus = Math.floor(researchers * SCOUT_INTEL_YIELD * 3 * rations.strengthMult);
+      intelligence += intelBonus;
+    }
+  }
+
+  // 4. DELAVCI — delavnica orožja ali gradnja zidu
+  const workers = assignment.workers ?? 0;
+  const workshopObj: 'weapon' | 'wall' = assignment.workshopObjective ?? 'weapon';
   let weaponWorkshopProgress = state.weaponWorkshopProgress ?? 0;
   let weaponWorkshopScouts = state.weaponWorkshopScouts ?? 0;
   let wallProgress = state.wallProgress ?? 0;
   let wallsBuilt = state.wallsBuilt ?? 0;
-  const workshopEvents: string[] = [];
 
-  if (scoutObjective === 'ai_weakpoints') {
-    const r = spendIntelOnFog(aiTree, totalScoutBudget);
-    aiTree = r.nodes;
-    revealed = r.revealed;
-  } else if (scoutObjective === 'ai_robots') {
-    // Specializirana raziskava AI — velik intel boost (~3× nad bazo)
-    const intelBonus = Math.floor(effectiveScouts * SCOUT_INTEL_YIELD * 3 * rations.strengthMult * scoutResult.effectivenessMult);
-    intelligence += intelBonus;
-  } else if (scoutObjective === 'weapon_dev' && effectiveScouts > 0) {
-    // Delavnica orožja — vsaki 2 scout-meseca = 1 orožje na scout (z 1 materialom za vsak)
-    if (material <= 0) {
-      workshopEvents.push(`🔨 Delavnica orožja stoji — ni materiala.`);
-    } else {
-      weaponWorkshopScouts = effectiveScouts;
-      weaponWorkshopProgress += 1;
-      if (weaponWorkshopProgress >= 2) {
-        const possible = Math.min(weaponWorkshopScouts, material);
-        combat += possible;
-        material -= possible;
-        workshopEvents.push(`🔨 Delavnica orožja: +${possible} orožja (−${possible} materiala).`);
-        weaponWorkshopProgress = 0;
+  if (workers > 0) {
+    if (workshopObj === 'weapon') {
+      if (material <= 0) {
+        workshopEvents.push(`🔨 Delavnica orožja stoji — ni materiala.`);
       } else {
-        workshopEvents.push(`🔨 Delavnica orožja dela (mesec ${weaponWorkshopProgress}/2)…`);
+        weaponWorkshopScouts = workers;
+        weaponWorkshopProgress += 1;
+        if (weaponWorkshopProgress >= 2) {
+          const possible = Math.min(weaponWorkshopScouts, material);
+          combat += possible;
+          material -= possible;
+          workshopEvents.push(`🔨 Delavnica orožja: +${possible} orožja (−${possible} materiala).`);
+          weaponWorkshopProgress = 0;
+        } else {
+          workshopEvents.push(`🔨 Delavnica orožja dela (mesec ${weaponWorkshopProgress}/2)…`);
+        }
       }
-    }
-  } else if (scoutObjective === 'wall_dev' && effectiveScouts > 0) {
-    // Zid: prag 6 scout-mesecev = 1 zid; vsak mesec porabi material
-    if (material <= 0) {
-      workshopEvents.push(`🧱 Gradnja zidu stoji — ni materiala.`);
-    } else {
-      wallProgress += effectiveScouts;
-      const materialCost = Math.min(material, effectiveScouts);  // znižan strošek (1/scout namesto 2)
-      material -= materialCost;
-      if (wallProgress >= 6) {
-        wallsBuilt += 1;
-        wallProgress = 0;
-        workshopEvents.push(`🧱 Obrambni zid dograjen! Skupaj ${wallsBuilt} zidov, +20 % obrambe (−${materialCost} materiala).`);
+    } else if (workshopObj === 'wall') {
+      if (material <= 0) {
+        workshopEvents.push(`🧱 Gradnja zidu stoji — ni materiala.`);
       } else {
-        workshopEvents.push(`🧱 Gradnja zidu: ${Math.min(6, wallProgress)}/6 (−${materialCost} materiala).`);
+        wallProgress += workers;
+        const materialCost = Math.min(material, workers);
+        material -= materialCost;
+        if (wallProgress >= 6) {
+          wallsBuilt += 1;
+          wallProgress = 0;
+          workshopEvents.push(`🧱 Obrambni zid dograjen! Skupaj ${wallsBuilt} zidov, +20 % obrambe (−${materialCost} materiala).`);
+        } else {
+          workshopEvents.push(`🧱 Gradnja zidu: ${Math.min(6, wallProgress)}/6 (−${materialCost} materiala).`);
+        }
       }
     }
   }
@@ -631,7 +616,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   // 7. Klan aktivnost — krivulja + vedenjski modifikator
   // Hiding lvl bonus: 25 % počasnejši padec na nivo
   // Skrivamo se le če ni ofenzivnih akcij ven (combatants+scouts majhni)
-  const isHiding = assignment.axis === 'hiding' && assignment.combatants < 5 && assignment.scouts < 8;
+  const isHiding = assignment.axis === 'hiding' && assignment.combatants < 5 && (assignment.researchers ?? 0) < 8;
   const rawClanDelta = isHiding
     ? -CLAN_ACTIVITY_HIDDEN_MODIFIER
     : -CLAN_ACTIVITY_EXPOSURE_MODIFIER;
@@ -639,7 +624,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   const clanActivity = Math.max(0, state.clanActivity + clanDelta);
 
   // 8. AI surveillance gain (skupna izpostavljenost: combatants + scouts)
-  const exposure = (assignment.combatants + assignment.scouts) / Math.max(1, state.population);
+  const exposure = (assignment.combatants + (assignment.researchers ?? 0)) / Math.max(1, state.population);
   const aiKnowledgeGain = calcAISurveillanceGain(DEFAULT_GENOME, clanActivity, exposure);
   const finalAiKnowledge = Math.min(1, aiKnowledge + aiKnowledgeGain);
 

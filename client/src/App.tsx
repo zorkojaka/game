@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, ScoutObjective, Expedition, NewExpeditionInput } from './types';
+import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective } from './types';
 import { tileId } from './types';
 import { createGame, getGame, playRound, previewOdds } from './api';
 
@@ -605,7 +605,7 @@ function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsCha
 
 /** Vizualni razdelilnik ljudi — segmenti z vlečnimi mejami, posameznikovi ikoni se obarvajo po vlogi */
 type AllocRole = {
-  key: 'c' | 'd' | 'f' | 's' | '_';
+  key: 'c' | 'd' | 'f' | 's' | 'w' | 'r' | '_';
   label: string;
   icon: string;
   color: string;
@@ -1319,7 +1319,7 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, drawingMode }: {
+function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, drawingMode, camp }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   plannedPaths: Array<Array<{ q: number; r: number }>>;
@@ -1329,6 +1329,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
   expeditions: Expedition[];
   wps: AIWeakPoint[];
   drawingMode: boolean;
+  camp: { defenders: number; researchers: number; workers: number; foragers: number };
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
@@ -1544,6 +1545,52 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
           </g>
         )}
 
+        {/* Veliki kamp z obzidjem + 3 notranji oddelki + branilci na obzidju */}
+        {(() => {
+          const clan = tiles.find(t => t.isClanCamp);
+          if (!clan) return null;
+          const p = shift(hexToPixel(clan.q, clan.r, SIZE));
+          const R = SIZE * 1.9;
+          const sections = [
+            { icon: '🔬', label: 'Raziskava', val: camp.researchers, color: '#3377cc' },
+            { icon: '🔨', label: 'Delavnica', val: camp.workers,     color: '#cc7733' },
+            { icon: '🌾', label: 'Hrana',     val: camp.foragers,    color: '#6aa630' },
+          ];
+          return (
+            <g className="camp-graphic" pointerEvents="none">
+              {/* Notranjost kampa */}
+              <path d={hexPath(p.x, p.y, R)} fill="#0a1a14" stroke="#0a1a14" strokeWidth="1" />
+              {/* Obzidje (debela obroba) */}
+              <path d={hexPath(p.x, p.y, R)} fill="none" stroke="#22aa88" strokeWidth="4" />
+              <path d={hexPath(p.x, p.y, R * 0.92)} fill="none" stroke="#1a6a55" strokeWidth="1.5" strokeDasharray="3 2" />
+              {/* Naslov */}
+              <text x={p.x} y={p.y - R * 0.55} textAnchor="middle" fontSize="9" fill="#66ccaa"
+                fontFamily="'Courier New', monospace" fontWeight="bold" letterSpacing="1">⌂ KAMP</text>
+              {/* 3 notranji oddelki */}
+              {sections.map((s, i) => {
+                const y = p.y - R * 0.22 + i * (R * 0.34);
+                return (
+                  <g key={i}>
+                    <text x={p.x} y={y} textAnchor="middle" fontSize="13" fill={s.color}
+                      fontFamily="'Courier New', monospace" fontWeight="bold">
+                      {s.icon} {s.val}
+                    </text>
+                    <text x={p.x} y={y + 9} textAnchor="middle" fontSize="6.5" fill="#7a9a8a"
+                      fontFamily="'Courier New', monospace">{s.label}</text>
+                  </g>
+                );
+              })}
+              {/* Branilci na obzidju (spodaj na zidu) */}
+              <g>
+                <rect x={p.x - 26} y={p.y + R * 0.66} width="52" height="15" rx="2"
+                  fill="#0a1a14" stroke="#66aabb" strokeWidth="1.5" />
+                <text x={p.x} y={p.y + R * 0.66 + 11} textAnchor="middle" fontSize="9.5" fill="#88ccdd"
+                  fontFamily="'Courier New', monospace" fontWeight="bold">🛡 {camp.defenders}</text>
+              </g>
+            </g>
+          );
+        })()}
+
         {/* Aktivne odprave kot ikone — hover + klik za info */}
         {expPositions.map(({ exp, tile }) => {
           if (!tile) return null;
@@ -1617,23 +1664,44 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
   );
 }
 
-/** Izbira cilja izvidnikov — 3 ikone + razlaga izbire */
-function ScoutObjectiveSelector({ value, onChange }: { value: ScoutObjective; onChange: (o: ScoutObjective) => void }) {
-  const opts: Array<{ id: ScoutObjective; icon: string; label: string; color: string; desc: string }> = [
-    { id: 'weapon_dev',    icon: '🔨', label: 'Orožje',       color: '#cc4433', desc: 'Vsaka 2 mes.: +orožje na izvidnika, porabi enako materiala.' },
-    { id: 'wall_dev',      icon: '🧱', label: 'Zid',          color: '#aabb88', desc: 'Zid (6 scout-mes.), porabi material/mesec. +20 % obrambe.' },
-    { id: 'ai_robots',     icon: '🤖', label: 'AI roboti',    color: '#cc8800', desc: '+intel → boljši % v vseh bojih.' },
-    { id: 'ai_weakpoints', icon: '🎯', label: 'Ranljivosti',  color: '#cc3333', desc: 'Razkrij vozlišča AI načrtovalnega drevesa.' },
+/** Izbira cilja delavnice (delavci) */
+function WorkshopSelector({ value, onChange }: { value: WorkshopObjective; onChange: (o: WorkshopObjective) => void }) {
+  const opts: Array<{ id: WorkshopObjective; icon: string; label: string; color: string; desc: string }> = [
+    { id: 'weapon', icon: '🔨', label: 'Orožje', color: '#cc4433', desc: 'Vsaka 2 mes.: +orožje na delavca, porabi material.' },
+    { id: 'wall',   icon: '🧱', label: 'Zid',    color: '#aabb88', desc: 'Zid (6 delavec-mes.), porabi material. +20 % obrambe.' },
   ];
   const sel = opts.find(o => o.id === value);
   return (
     <div className="scout-objectives compact">
-      <div className="so-row">
+      <div className="so-row" style={{ gridTemplateColumns: 'repeat(2,1fr)' }}>
         {opts.map(o => (
           <button key={o.id} className={`so-btn ${value === o.id ? 'sel' : ''}`}
             style={value === o.id ? { borderColor: o.color, color: o.color } : {}}
-            onClick={() => onChange(o.id)}
-            title={`${o.label} — ${o.desc}`}>
+            onClick={() => onChange(o.id)} title={`${o.label} — ${o.desc}`}>
+            <span className="so-icon">{o.icon}</span>
+            <span className="so-label-mini">{o.label}</span>
+          </button>
+        ))}
+      </div>
+      {sel && <div className="so-desc-line dim small">{sel.desc}</div>}
+    </div>
+  );
+}
+
+/** Izbira cilja raziskave (raziskovalci) */
+function ResearchSelector({ value, onChange }: { value: ResearchObjective; onChange: (o: ResearchObjective) => void }) {
+  const opts: Array<{ id: ResearchObjective; icon: string; label: string; color: string; desc: string }> = [
+    { id: 'robots',     icon: '🤖', label: 'AI roboti',   color: '#cc8800', desc: '+veliko intela → boljši % v vseh bojih.' },
+    { id: 'weakpoints', icon: '🎯', label: 'Ranljivosti', color: '#cc3333', desc: 'Razkrij vozlišča AI načrtovalnega drevesa.' },
+  ];
+  const sel = opts.find(o => o.id === value);
+  return (
+    <div className="scout-objectives compact">
+      <div className="so-row" style={{ gridTemplateColumns: 'repeat(2,1fr)' }}>
+        {opts.map(o => (
+          <button key={o.id} className={`so-btn ${value === o.id ? 'sel' : ''}`}
+            style={value === o.id ? { borderColor: o.color, color: o.color } : {}}
+            onClick={() => onChange(o.id)} title={`${o.label} — ${o.desc}`}>
             <span className="so-icon">{o.icon}</span>
             <span className="so-label-mini">{o.label}</span>
           </button>
@@ -1797,10 +1865,12 @@ export default function App() {
   const [combatants,   setCombatants]   = useState(0);
   const [defenders,    setDefenders]    = useState(15);
   const [foragers,     setForagers]     = useState(20);
-  const [scouts,       setScouts]       = useState(10);
+  const [workers,      setWorkers]      = useState(5);   // DELAVCI — delavnica
+  const [researchers,  setResearchers]  = useState(5);   // RAZISKOVALCI — raziskava
+  const [workshopObj,  setWorkshopObj]  = useState<WorkshopObjective>('weapon');
+  const [researchObj,  setResearchObj]  = useState<ResearchObjective>('weakpoints');
   const [missions,     setMissions]     = useState<Record<string, number>>({});
   const [missionR,     setMissionR]     = useState<Record<string, number>>({});
-  const [scoutObj,     setScoutObj]     = useState<ScoutObjective>('ai_weakpoints');
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
@@ -1914,13 +1984,13 @@ export default function App() {
   useEffect(() => {
     if (!game || game.status !== 'active') return;
     const t = setTimeout(() => {
-      previewOdds(game.runId, { axis, combatants, defenders, foragers, scouts, rations,
-        missionAssignments: missions, missionRations: missionR,
-        scoutPlan: { objective: scoutObj, targetTileIds: Array.from(scoutTargets) } }).then(setOdds).catch(() => setOdds(null));
+      previewOdds(game.runId, { axis, combatants, defenders, foragers, workers, researchers,
+        workshopObjective: workshopObj, researchObjective: researchObj, rations,
+        missionAssignments: missions, missionRations: missionR }).then(setOdds).catch(() => setOdds(null));
     }, 250);
     return () => clearTimeout(t);
-  }, [game?.runId, game?.totalRounds, axis, combatants, defenders, foragers, scouts, rations,
-      JSON.stringify(missions), JSON.stringify(missionR), scoutObj, scoutTargets.size]);
+  }, [game?.runId, game?.totalRounds, axis, combatants, defenders, foragers, workers, researchers, workshopObj, researchObj, rations,
+      JSON.stringify(missions), JSON.stringify(missionR), scoutTargets.size]);
 
   const handleNew = async () => {
     setLoading(true);
@@ -1928,7 +1998,7 @@ export default function App() {
       const g = await createGame();
       setGame(g);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('hiding'); setCombatants(0); setDefenders(15); setForagers(20); setScouts(10); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutObj('ai_weakpoints'); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
+      setAxis('hiding'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('weakpoints'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
     } finally { setLoading(false); }
   };
 
@@ -1942,9 +2012,9 @@ export default function App() {
         newExps.push({ kind: 'scout', path: draftPath, assigned: draftPeople, rations: draftRations });
       }
       const { state } = await playRound(game.runId, {
-        assignment: { axis, combatants, defenders, foragers, scouts, rations,
+        assignment: { axis, combatants, defenders, foragers, workers, researchers,
+          workshopObjective: workshopObj, researchObjective: researchObj, rations,
           missionAssignments: missions, missionRations: missionR,
-          scoutPlan: { objective: scoutObj, targetTileIds: Array.from(scoutTargets) },
           newExpeditions: newExps.length > 0 ? newExps : undefined,
           useArtifactOnWpId: artifactTargetWp || undefined },
         targetWeakPoint: targetWP || undefined,
@@ -1966,7 +2036,7 @@ export default function App() {
   const newMissionPeople = Object.values(missions).reduce((s, v) => s + v, 0);
   const pendingExpPpl = pendingExpeditions.reduce((s, e) => s + e.assigned, 0);
   const plannedTotal = newMissionPeople + pendingExpPpl + combatants;  // rezervirani za odprave/misije/napad
-  const assignedHome = defenders + foragers + scouts;
+  const assignedHome = defenders + foragers + workers + researchers;
   const availablePop = Math.max(0, pop - inMissions);
   const assigned = assignedHome + plannedTotal;
   const over = assigned > availablePop;
@@ -1975,28 +2045,21 @@ export default function App() {
   const armedTotal = combatants + defenders;
   const overArmed  = armedTotal > weaponCap;
 
-  type SliderKey = 'd' | 'f' | 's';
+  type SliderKey = 'd' | 'f' | 'w' | 'r';
   function setSliderClamped(which: SliderKey, newVal: number) {
-    // Rezervirano (napad + odprave/misije) je izven razdelilnika
     const reserved = combatants + newMissionPeople + pendingExpPpl;
     const v = Math.max(0, Math.min(availablePop, Math.floor(newVal)));
-    const cur = { d: defenders, f: foragers, s: scouts };
+    const cur = { d: defenders, f: foragers, w: workers, r: researchers };
     cur[which] = v;
-    const total = cur.d + cur.f + cur.s + reserved;
-    if (total <= availablePop) {
-      setDefenders(cur.d); setForagers(cur.f); setScouts(cur.s);
-      return;
-    }
-    const others = (['d','f','s'] as const).filter(k => k !== which);
+    const total = cur.d + cur.f + cur.w + cur.r + reserved;
+    const setAll = () => { setDefenders(cur.d); setForagers(cur.f); setWorkers(cur.w); setResearchers(cur.r); };
+    if (total <= availablePop) { setAll(); return; }
+    const others = (['d','f','w','r'] as const).filter(k => k !== which);
     const otherSum = others.reduce((s, k) => s + cur[k], 0);
     const capLeft = Math.max(0, availablePop - v - reserved);
-    if (otherSum === 0) {
-      others.forEach(k => { cur[k] = 0; });
-    } else {
-      const scale = capLeft / otherSum;
-      others.forEach(k => { cur[k] = Math.floor(cur[k] * scale); });
-    }
-    setDefenders(cur.d); setForagers(cur.f); setScouts(cur.s);
+    if (otherSum === 0) others.forEach(k => { cur[k] = 0; });
+    else { const scale = capLeft / otherSum; others.forEach(k => { cur[k] = Math.floor(cur[k] * scale); }); }
+    setAll();
   }
 
   function toggleScoutTarget(id: string) {
@@ -2042,7 +2105,7 @@ export default function App() {
       const tile = game.mapTiles?.find(t => t.q === step.q && t.r === step.r);
       if (!tile) continue;
       const distFromCamp = hexDistFE({ q: tile.q, r: tile.r }, { q: clan.q, r: clan.r });
-      const base = SCOUT_CAPTURE_BASE_FE + SCOUT_CAPTURE_PER_SCOUT_FE * scouts + AI_KNOW_BONUS_FE * game.aiKnowledge;
+      const base = SCOUT_CAPTURE_BASE_FE + SCOUT_CAPTURE_PER_SCOUT_FE * draftPeople + AI_KNOW_BONUS_FE * game.aiKnowledge;
       const p = Math.max(0, Math.min(0.85, base * tileEncounterMultFE(tile.researchProgress, distFromCamp)));
       pNo *= (1 - p);
     }
@@ -2081,7 +2144,8 @@ export default function App() {
     setCombatants(Math.floor(combatants * scale));
     setDefenders(Math.floor(defenders * scale));
     setForagers(Math.floor(foragers * scale));
-    setScouts(Math.floor(scouts * scale));
+    setWorkers(Math.floor(workers * scale));
+    setResearchers(Math.floor(researchers * scale));
     const newMap: Record<string, number> = {};
     for (const [k, v] of Object.entries(missions)) {
       const sv = Math.floor(v * scale);
@@ -2097,9 +2161,9 @@ export default function App() {
 
   const rTier = RATIONS[rations];
   const foragerYield = Math.floor(foragers * 4 * rTier.strengthMult);
-  const scoutIntelBase = Math.floor(scouts * 8 * rTier.strengthMult);
-  const scoutIntelBonus = scoutObj === 'ai_robots' ? Math.floor(scouts * 8 * 3 * rTier.strengthMult) : 0;
-  const scoutIntel   = scoutIntelBase + scoutIntelBonus;
+  const researchIntelBase = Math.floor(researchers * 8 * rTier.strengthMult);
+  const researchIntelBonus = researchObj === 'robots' ? Math.floor(researchers * 8 * 3 * rTier.strengthMult) : 0;
+  const researchIntel = researchIntelBase + researchIntelBonus;
   const inCampPop    = Math.max(0, game.population);
   const campFoodCost = Math.round(inCampPop * rTier.foodMult);
   // Aktivne misije/odprave: ne jedo iz kampa (so vzele upfront)
@@ -2158,7 +2222,8 @@ export default function App() {
             onWpSelect={(id) => setTargetWP(targetWP === id ? '' : id)}
             selectedWpId={targetWP}
             expeditions={game.expeditions ?? []}
-            wps={game.aiWeakPoints} drawingMode={true} />
+            wps={game.aiWeakPoints} drawingMode={true}
+            camp={{ defenders, researchers, workers, foragers }} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
@@ -2354,20 +2419,22 @@ export default function App() {
                 yieldText: `${survBalance >= 0 ? '+' : ''}${survBalance} hrana`,
                 probLabel: 'Brez izgub', prob: odds?.forageSafetyProbability,
                 contextTop: <RationsMini value={rations} onChange={setRations} /> },
-              { key: 's', label: 'Delovci', icon: '🔧', color: '#3377cc', count: scouts,
-                yieldText: `+${scoutIntel} intel`,
-                probLabel: scouts > 0 ? 'Uspeh' : undefined, prob: scouts > 0 ? odds?.scoutSuccessProbability : undefined,
-                contextTop: <ScoutObjectiveSelector value={scoutObj} onChange={setScoutObj} /> },
+              { key: 'w', label: 'Delavci', icon: '🔧', color: '#cc7733', count: workers,
+                yieldText: workshopObj === 'weapon' ? 'razvoj orožja' : 'gradnja zidu',
+                contextTop: <WorkshopSelector value={workshopObj} onChange={setWorkshopObj} /> },
+              { key: 'r', label: 'Raziskovalci', icon: '🔬', color: '#3377cc', count: researchers,
+                yieldText: `+${researchIntel} intel`,
+                contextTop: <ResearchSelector value={researchObj} onChange={setResearchObj} /> },
               { key: '_', label: plannedTotal > 0 ? `Prosti (${plannedTotal} načrt.)` : 'Prosti',
                 icon: '·', color: '#888888',
-                count: Math.max(0, availablePop - defenders - foragers - scouts),
+                count: Math.max(0, availablePop - defenders - foragers - workers - researchers),
                 markedCount: plannedTotal,
                 markedIcon: '↑',
                 markedTitle: 'načrtovan za odpravo' },
             ]}
             onTransfer={(nc) => {
-              const [nD, nF, nS] = nc;
-              setDefenders(nD); setForagers(nF); setScouts(nS);
+              const [nD, nF, nW, nR] = nc;
+              setDefenders(nD); setForagers(nF); setWorkers(nW); setResearchers(nR);
             }}
           />
 

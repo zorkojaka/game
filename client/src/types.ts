@@ -74,18 +74,25 @@ export function tileId(t: { q: number; r: number }): string {
   return `${t.q},${t.r}`;
 }
 
+export type WorkshopObjective = 'weapon' | 'wall';
+export type ResearchObjective = 'robots' | 'weakpoints';
+
 export interface Assignment {
   axis: HumanAxis;
   combatants: number;
   defenders: number;
   foragers: number;
-  scouts: number;
+  workers: number;
+  researchers: number;
+  workshopObjective?: WorkshopObjective;
+  researchObjective?: ResearchObjective;
   rations: number;
   missionAssignments?: Record<string, number>;
   missionRations?: Record<string, number>;
-  scoutPlan?: ScoutPlan;
   newExpeditions?: NewExpeditionInput[];
   useArtifactOnWpId?: string;
+  scouts?: number;
+  scoutPlan?: ScoutPlan;
   dayGuard?: number;
   nightGuard?: number;
 }
