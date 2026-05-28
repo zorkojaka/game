@@ -1964,8 +1964,8 @@ export default function App() {
                    + (game?.expeditions ?? []).reduce((s, e) => s + e.assigned, 0);
   const newMissionPeople = Object.values(missions).reduce((s, v) => s + v, 0);
   const pendingExpPpl = pendingExpeditions.reduce((s, e) => s + e.assigned, 0);
-  const plannedTotal = newMissionPeople + pendingExpPpl;  // vsi rezervirani za nove odprave/misije
-  const assignedHome = combatants + defenders + foragers + scouts;
+  const plannedTotal = newMissionPeople + pendingExpPpl + combatants;  // rezervirani za odprave/misije/napad
+  const assignedHome = defenders + foragers + scouts;
   const availablePop = Math.max(0, pop - inMissions);
   const assigned = assignedHome + plannedTotal;
   const over = assigned > availablePop;
@@ -1974,26 +1974,28 @@ export default function App() {
   const armedTotal = combatants + defenders;
   const overArmed  = armedTotal > weaponCap;
 
-  type SliderKey = 'c' | 'd' | 'f' | 's';
+  type SliderKey = 'd' | 'f' | 's';
   function setSliderClamped(which: SliderKey, newVal: number) {
+    // Rezervirano (napad + odprave/misije) je izven razdelilnika
+    const reserved = combatants + newMissionPeople + pendingExpPpl;
     const v = Math.max(0, Math.min(availablePop, Math.floor(newVal)));
-    const cur = { c: combatants, d: defenders, f: foragers, s: scouts };
+    const cur = { d: defenders, f: foragers, s: scouts };
     cur[which] = v;
-    const total = cur.c + cur.d + cur.f + cur.s + newMissionPeople;
+    const total = cur.d + cur.f + cur.s + reserved;
     if (total <= availablePop) {
-      setCombatants(cur.c); setDefenders(cur.d); setForagers(cur.f); setScouts(cur.s);
+      setDefenders(cur.d); setForagers(cur.f); setScouts(cur.s);
       return;
     }
-    const others = (['c','d','f','s'] as const).filter(k => k !== which);
+    const others = (['d','f','s'] as const).filter(k => k !== which);
     const otherSum = others.reduce((s, k) => s + cur[k], 0);
-    const capLeft = Math.max(0, availablePop - v - newMissionPeople);
+    const capLeft = Math.max(0, availablePop - v - reserved);
     if (otherSum === 0) {
       others.forEach(k => { cur[k] = 0; });
     } else {
       const scale = capLeft / otherSum;
       others.forEach(k => { cur[k] = Math.floor(cur[k] * scale); });
     }
-    setCombatants(cur.c); setDefenders(cur.d); setForagers(cur.f); setScouts(cur.s);
+    setDefenders(cur.d); setForagers(cur.f); setScouts(cur.s);
   }
 
   function toggleScoutTarget(id: string) {
@@ -2230,6 +2232,50 @@ export default function App() {
               )}
             </div>
           </div>
+
+          {/* Nov napad — direkten udar na AI robote ta mesec */}
+          <div className="panel">
+            <div className="panel-head">
+              <h3>⚔ NOV NAPAD</h3>
+              {targetWP && <span className="panel-badge" style={{ color: '#ffd84a' }}>cilj izbran</span>}
+            </div>
+            <div className="path-builder">
+              <div className="pb-instr dim small">
+                Pošlji napadalce na AI robote ta mesec. Cilj (šibko točko) izberi s klikom na mapi.
+              </div>
+              <div className="path-stats">
+                <div className="ps-row">
+                  <span className="dim small">Napadalci:</span>
+                  <span className="pa-pm">
+                    <button className="pa-btn" disabled={combatants <= 0} onClick={() => setCombatants(Math.max(0, combatants - 1))}>−</button>
+                    <b className="pa-count">{combatants}</b>
+                    <button className="pa-btn"
+                      disabled={assignedHome + plannedTotal + 1 > availablePop || combatants + 1 > weaponCap}
+                      onClick={() => setCombatants(combatants + 1)}>+</button>
+                  </span>
+                </div>
+                <div className="ps-row">
+                  <span className="dim small">Moč napada:</span>
+                  <b style={{ color: '#cc4433' }}>+{(combatants * 1.2 * rTier.strengthMult).toFixed(0)}</b>
+                </div>
+                <div className="ps-row">
+                  <span className="dim small">Zmaga v napadu:</span>
+                  <b style={{ color: combatants > 0 ? probColor(odds?.successProbability ?? 0) : '#555' }}>
+                    {combatants > 0 && odds ? Math.round(odds.successProbability * 100) + '%' : '–'}
+                  </b>
+                </div>
+                <div className="ps-row">
+                  <span className="dim small">Cilj:</span>
+                  <b style={{ color: targetWP ? '#ffd84a' : '#888' }}>
+                    {targetWP ? (game.aiWeakPoints.find(w => w.id === targetWP)?.label ?? 'šibka točka') : 'splošni napad na robote'}
+                  </b>
+                </div>
+              </div>
+              {combatants > weaponCap && (
+                <div className="weapon-warning">⚠ Premalo orožja ({weaponCap}) za {combatants} napadalcev.</div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2260,19 +2306,6 @@ export default function App() {
             inMissions={inMissions}
             newMission={newMissionPeople}
             roles={[
-              { key: 'c', label: 'Napad', icon: '⚔', color: '#cc4433', count: combatants,
-                yieldText: `+${(combatants * 1.2 * rTier.strengthMult).toFixed(0)} moč · ${combatants} orožja`,
-                contextTop: (
-                  <div className="pa-ctx pa-ctx-combat">
-                    <span className="dim small">🎯 Zmaga v napadu</span>
-                    <span className="pa-ctx-val" style={{ color: combatants > 0 ? probColor(odds?.successProbability ?? 0) : '#555' }}>
-                      {combatants > 0 && odds ? Math.round(odds.successProbability * 100) + '%' : '–'}
-                    </span>
-                    {odds && odds.intelBonus > 0 && (
-                      <span className="pa-ctx-extra small" style={{ color: '#3388cc' }}>+intel bonus {Math.round(odds.intelBonus * 100)}%</span>
-                    )}
-                  </div>
-                ) },
               { key: 'd', label: 'Obramba', icon: '🛡', color: '#66aabb', count: defenders,
                 yieldText: `${defenders} stražarjev · ${defenders} orožja`,
                 contextTop: (
@@ -2295,20 +2328,20 @@ export default function App() {
                 yieldText: `${survBalance >= 0 ? '+' : ''}${survBalance} hrana`,
                 probLabel: 'Brez izgub', prob: odds?.forageSafetyProbability,
                 contextTop: <RationsMini value={rations} onChange={setRations} /> },
-              { key: 's', label: 'Izvidniki', icon: '🔭', color: '#3377cc', count: scouts,
+              { key: 's', label: 'Delovci', icon: '🔧', color: '#3377cc', count: scouts,
                 yieldText: `+${scoutIntel} intel`,
                 probLabel: scouts > 0 ? 'Uspeh' : undefined, prob: scouts > 0 ? odds?.scoutSuccessProbability : undefined,
                 contextTop: <ScoutObjectiveSelector value={scoutObj} onChange={setScoutObj} /> },
               { key: '_', label: plannedTotal > 0 ? `Prosti (${plannedTotal} načrt.)` : 'Prosti',
                 icon: '·', color: '#888888',
-                count: Math.max(0, availablePop - combatants - defenders - foragers - scouts),
+                count: Math.max(0, availablePop - defenders - foragers - scouts),
                 markedCount: plannedTotal,
                 markedIcon: '↑',
                 markedTitle: 'načrtovan za odpravo' },
             ]}
             onTransfer={(nc) => {
-              const [nC, nD, nF, nS] = nc;
-              setCombatants(nC); setDefenders(nD); setForagers(nF); setScouts(nS);
+              const [nD, nF, nS] = nc;
+              setDefenders(nD); setForagers(nF); setScouts(nS);
             }}
           />
 
