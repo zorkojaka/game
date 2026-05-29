@@ -444,6 +444,50 @@ b      { color: var(--text); }
 }
 .fb-textarea:focus { outline: none; border-color: #3a6ea5; }
 
+/* Glavni meni (☰) gumb + spustni meni */
+.ph-menu-btn {
+  background: #161b22; border: 1px solid #2a3442; border-radius: 8px;
+  color: #cdd6e0; font-size: 1.1rem; line-height: 1;
+  padding: .35rem .6rem; cursor: pointer; margin-left: auto;
+}
+.ph-menu-btn:hover { background: #1d2733; border-color: #3a536e; }
+.app-menu-overlay { position: fixed; inset: 0; z-index: 1100; background: rgba(0,0,0,.35); }
+.app-menu {
+  position: absolute; top: .5rem; right: .5rem;
+  display: flex; flex-direction: column; gap: .25rem;
+  background: #11171f; border: 1px solid #2a3a4a; border-radius: 10px;
+  padding: .4rem; min-width: 220px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.6);
+}
+.app-menu button {
+  text-align: left; background: none; border: none; color: #d7e0ea;
+  font-family: var(--font); font-size: .9rem; padding: .55rem .6rem;
+  border-radius: 7px; cursor: pointer;
+}
+.app-menu button:hover { background: #1d2733; }
+.app-menu button:disabled { color: #555; cursor: default; }
+
+/* Pravila modal */
+.rules-box {
+  position: relative; width: 100%; max-width: 560px; max-height: 85dvh;
+  display: flex; flex-direction: column;
+  background: #11171f; border: 1px solid #2a3a4a; border-radius: 12px;
+  padding: 1.1rem 1.2rem; box-shadow: 0 10px 40px rgba(0,0,0,.6);
+}
+.rules-acc { overflow-y: auto; min-height: 0; }
+.rules-sec { border: 1px solid #232c36; border-radius: 8px; margin-bottom: .4rem; overflow: hidden; }
+.rules-sec.open { border-color: #3a536e; }
+.rules-sec-head {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  background: #161b22; border: none; color: #cdd6e0; cursor: pointer;
+  font-family: var(--font); font-size: .9rem; font-weight: bold; padding: .6rem .7rem;
+}
+.rules-sec-head:hover { background: #1d2530; }
+.rules-sec-body { padding: .6rem .8rem; font-size: .85rem; line-height: 1.5; color: #b8c4d0; }
+.rules-sec-body ul { margin: 0; padding-left: 1.1rem; }
+.rules-sec-body li { margin-bottom: .3rem; }
+.rules-sec-body b { color: #e6edf3; }
+
 .hud-arena {
   display: grid;
   grid-template-columns: 1fr 1fr;

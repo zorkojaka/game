@@ -120,7 +120,7 @@ function DualKnowledge({ ourK, aiK }: { ourK: number; aiK: number }) {
 }
 
 /** Faza header: vse 3 faze v vrsti levo→desno + Nova igra desno */
-function PhaseHeader({ game, onNewGame, onFeedback, loading }: { game: GameState; onNewGame: () => void; onFeedback: () => void; loading: boolean }) {
+function PhaseHeader({ game, onMenu, loading }: { game: GameState; onMenu: () => void; loading: boolean }) {
   const phases: Array<keyof typeof PHASE> = ['find', 'understand', 'eliminate'];
   const phaseOrder: Record<string, number> = { find: 0, understand: 1, eliminate: 2 };
   const currentIdx = phaseOrder[game.phase];
@@ -161,11 +161,8 @@ function PhaseHeader({ game, onNewGame, onFeedback, loading }: { game: GameState
         );
       })}
       <div className="ph-total-cell dim small">M {game.totalRounds}/36</div>
-      <button className="ph-feedback" onClick={onFeedback} title="Pošlji mnenje / predlog">
-        💬 Mnenje
-      </button>
-      <button className="ph-newgame" onClick={onNewGame} disabled={loading} title="Nova igra">
-        {loading ? '⟳' : '↺ Nova igra'}
+      <button className="ph-menu-btn" onClick={onMenu} title="Meni" aria-label="Meni">
+        {loading ? '⟳' : '☰'}
       </button>
     </header>
   );
@@ -1312,6 +1309,96 @@ function FeedbackModal({ game, onClose }: { game: GameState | null; onClose: () 
   );
 }
 
+/** Pravila igre — razdeljena na pregledne podenote */
+function RulesModal({ onClose }: { onClose: () => void }) {
+  const sections: Array<{ id: string; icon: string; title: string; body: React.ReactNode }> = [
+    { id: 'cilj', icon: '🎯', title: 'Cilj igre', body: (
+      <p>Vodiš zadnji človeški klan po tem, ko je AI prevzel Zemljo. Igra traja <b>36 mesecev (3 faze po 12)</b>.
+        Zmagaš, če uničiš vse <b>šibke točke AI</b> ali iztrebiš vse robote. Izgubiš, če ti izumre populacija
+        ali te AI premaga.</p>
+    ) },
+    { id: 'faze', icon: '🌑', title: 'Faze AI', body: (
+      <ul>
+        <li><b>1 — AI išče:</b> droni in senzorji te iščejo. Skrivanje je najmočnejše.</li>
+        <li><b>2 — AI razume:</b> analizira vzorce. Špijonaža razkriva njegov načrt.</li>
+        <li><b>3 — AI iztreblja:</b> udari na preživetje. Obramba je ključna.</li>
+      </ul>
+    ) },
+    { id: 'viri', icon: '📦', title: 'Viri', body: (
+      <ul>
+        <li>🍞 <b>Hrana</b> — porablja jo populacija; nabiralci jo pridelajo.</li>
+        <li>⚔ <b>Orožje</b> — omejuje, koliko ljudi se lahko bori; izdela se iz materiala.</li>
+        <li>⚙ <b>Material</b> — surovina za orožje in zid; najdeš ga z odpravami in iz uničenih robotov.</li>
+        <li>👁 <b>Intel</b> — raziskovalci ga zbirajo; izboljša boje in razkriva AI.</li>
+        <li>💎 <b>Artefakt</b> — redek; takoj uniči eno odkrito šibko točko.</li>
+      </ul>
+    ) },
+    { id: 'ljudje', icon: '👥', title: 'Razporeditev ljudi', body: (
+      <ul>
+        <li>🛡 <b>Obramba</b> — branilci odbijajo napade AI na kamp.</li>
+        <li>🌾 <b>Prehrana</b> — nabiralci zbirajo hrano; jakost obrokov (1–5) vpliva na porabo in moč.</li>
+        <li>🔨 <b>Delavnice</b> — delavci izdelujejo orožje ali gradijo zid.</li>
+        <li>🔬 <b>Raziskave</b> — raziskovalci zbirajo intel (roboti = boljši boj, ranljivosti = razkrivanje AI).</li>
+        <li>Pod ikonami so + / − za premik prostih ljudi v vsako območje.</li>
+      </ul>
+    ) },
+    { id: 'karta', icon: '🗺', title: 'Karta & odprave', body: (
+      <ul>
+        <li>Karta je v megli; razkrivaš jo z odpravami (raziskanost polja raste z obiski).</li>
+        <li>V zavihku <b>Izvidniki</b> narišeš pot (klikaš sosednje hekse) in pošlješ izvidnike.</li>
+        <li>Odprave vzamejo hrano s seboj; na poti so možna srečanja in najdbe (material, orožje, artefakt).</li>
+        <li>Pot odprave je <b>rumena</b>.</li>
+      </ul>
+    ) },
+    { id: 'napad', icon: '⚔', title: 'Napad', body: (
+      <ul>
+        <li>V zavihku <b>Napad</b> narišeš pot do <b>AI jedra (☣)</b> ali odkrite <b>šibke točke (◆)</b> in pošlješ napadalce.</li>
+        <li>Spopad se sproži <b>ob prihodu</b>; preživeli se vrnejo v kamp.</li>
+        <li>Pot napada je <b>rdeča</b>.</li>
+      </ul>
+    ) },
+    { id: 'obramba', icon: '🧱', title: 'Obramba & obzidje', body: (
+      <ul>
+        <li>Verjetnost napada AT je <b>na mesec</b> in se v več mesecih sešteje; znižata jo skrivanje in nizka populacija.</li>
+        <li>Branilci in <b>obzidje</b> ne znižajo verjetnosti napada, ampak povečajo <b>odbitje</b>.</li>
+        <li>Vsak <b>zid</b> doda <b>+20 %</b> moči obrambe; gradi se v Delavnicah (6 delavec-mesecev na zid).</li>
+      </ul>
+    ) },
+    { id: 'zavezniki', icon: '⛺', title: 'Drugi klani (zavezniki)', body: (
+      <ul>
+        <li>Na karti so skriti drugi človeški klani. Razišči njihov heks, da jih <b>odkriješ</b> (⛺).</li>
+        <li>Pošlji odpravo do njih za <b>zavezništvo</b>; nato mesečno pomagajo (hrana / material / orožje / okrepitve) in dvignejo aktivnost klanov (manj napadov AI).</li>
+      </ul>
+    ) },
+    { id: 'konec', icon: '🏁', title: 'Zmaga & poraz', body: (
+      <ul>
+        <li><b>Zmaga:</b> vse šibke točke uničene ali vsi roboti iztrebljeni.</li>
+        <li><b>Poraz:</b> populacija pade na 0 (lakota / izgube) ali te AI premaga.</li>
+      </ul>
+    ) },
+  ];
+  const [open, setOpen] = useState<string>('cilj');
+  return (
+    <div className="fb-overlay" onClick={onClose}>
+      <div className="rules-box" onClick={e => e.stopPropagation()}>
+        <button className="fb-close" onClick={onClose}>✕</button>
+        <h3 style={{ marginBottom: 10 }}>📖 Pravila igre</h3>
+        <div className="rules-acc">
+          {sections.map(s => (
+            <div key={s.id} className={`rules-sec ${open === s.id ? 'open' : ''}`}>
+              <button className="rules-sec-head" onClick={() => setOpen(open === s.id ? '' : s.id)}>
+                <span>{s.icon} {s.title}</span>
+                <span className="dim">{open === s.id ? '▾' : '▸'}</span>
+              </button>
+              {open === s.id && <div className="rules-sec-body">{s.body}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Log zadnjega meseca */
 function RoundLog({ log }: { log: RoundLog }) {
   const c = log.combat;
@@ -2191,6 +2278,8 @@ export default function App() {
   const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
   const [draftKind,    setDraftKind]    = useState<'scout' | 'attack'>('scout');
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showRules,    setShowRules]    = useState(false);
+  const [appMenuOpen,  setAppMenuOpen]  = useState(false);
   const [pendingExpeditions, setPendingExpeditions] = useState<NewExpeditionInput[]>([]);
   const [artifactTargetWp, setArtifactTargetWp] = useState<string>('');
   const [targetWP,   setTargetWP]   = useState('');
@@ -2541,9 +2630,19 @@ export default function App() {
         />
       )}
       {showFeedback && <FeedbackModal game={game} onClose={() => setShowFeedback(false)} />}
+      {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+      {appMenuOpen && (
+        <div className="app-menu-overlay" onClick={() => setAppMenuOpen(false)}>
+          <div className="app-menu" onClick={e => e.stopPropagation()}>
+            <button onClick={() => { setAppMenuOpen(false); handleNew(); }} disabled={loading}>↺ Nova igra</button>
+            <button onClick={() => { setAppMenuOpen(false); setShowFeedback(true); }}>💡 Predlogi za izboljšave</button>
+            <button onClick={() => { setAppMenuOpen(false); setShowRules(true); }}>📖 Pravila</button>
+          </div>
+        </div>
+      )}
       {/* ─── ZGORNJA VRSTICA: faza + viri ─── */}
       <header className="top-bar">
-        <PhaseHeader game={game} onNewGame={handleNew} onFeedback={() => setShowFeedback(true)} loading={loading} />
+        <PhaseHeader game={game} onMenu={() => setAppMenuOpen(true)} loading={loading} />
         <div className="top-res">
           <BigStat icon="👥" label="Populacija" value={game.population}      color="#d8d8d8" />
           <BigStat icon="🍞" label="Hrana"      value={game.resources.survival} color="#cc8800"
