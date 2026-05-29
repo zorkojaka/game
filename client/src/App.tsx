@@ -2637,8 +2637,30 @@ export default function App() {
               <div className="ps-row"><span className="dim small">⚙ Material:</span><b>{game.resources.material ?? 0}</b></div>
               <div className="ps-row"><span className="dim small">⚔ Orožje:</span><b>{game.resources.combat}</b></div>
               <div className="ps-row"><span className="dim small">🧱 Zidovi:</span><b>{game.wallsBuilt ?? 0}</b></div>
+              {workshopObj === 'weapon' ? (
+                <>
+                  <div className="ps-row"><span className="dim small">Cikel orožja:</span><b>{(game.weaponWorkshopProgress ?? 0)} / 2 meseca</b></div>
+                  <div className="ps-row"><span className="dim small">Naslednja serija:</span>
+                    <b style={{ color: '#cc7733' }}>{workers > 0 ? `+${Math.min(workers, game.resources.material ?? 0)} orožja` : '–'}</b></div>
+                </>
+              ) : (() => {
+                const wp = game.wallProgress ?? 0;
+                const need = Math.max(0, 6 - wp);
+                const months = workers > 0 ? Math.ceil(need / workers) : Infinity;
+                return (
+                  <>
+                    <div className="ps-row"><span className="dim small">Napredek zidu:</span><b>{wp} / 6 delavec-mesecev</b></div>
+                    <div className="ps-row"><span className="dim small">Do zidu (pri {workers} delavcih):</span>
+                      <b style={{ color: '#aabb88' }}>{workers > 0 ? `${months} mesec(ev)` : '∞'}</b></div>
+                  </>
+                );
+              })()}
             </div>
-            <p className="field-note dim small">Delavci iz materiala izdelujejo orožje ali gradijo zid (obramba).</p>
+            <p className="field-note dim small">
+              Delavci iz materiala izdelujejo orožje ali gradijo zid. <b>Zid</b> potrebuje <b>6 delavec-mesecev</b>:
+              z {workers || 'N'} delavci to traja <b>{workers > 0 ? Math.ceil(6 / workers) : '∞'} mesec(ev)</b> na zid (več delavcev = hitreje).
+              Vsak mesec gradnje porabi do {workers || 'N'} materiala.
+            </p>
           </div>
           )}
 

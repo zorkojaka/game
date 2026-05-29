@@ -357,7 +357,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
           wallProgress = 0;
           workshopEvents.push(`🧱 Obrambni zid dograjen! Skupaj ${wallsBuilt} zidov, +20 % obrambe (−${materialCost} materiala).`);
         } else {
-          workshopEvents.push(`🧱 Gradnja zidu: ${Math.min(6, wallProgress)}/6 (−${materialCost} materiala).`);
+          workshopEvents.push(`🧱 Gradnja zidu: ${Math.min(6, wallProgress)}/6 delavec-mesecev (−${materialCost} materiala).`);
         }
       }
     }
