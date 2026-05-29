@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan } from './types';
 import { tileId } from './types';
-import { createGame, getGame, playRound, previewOdds } from './api';
+import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
 
 // ─── Konstante ───────────────────────────────────────────────────────────────
 
@@ -120,7 +120,7 @@ function DualKnowledge({ ourK, aiK }: { ourK: number; aiK: number }) {
 }
 
 /** Faza header: vse 3 faze v vrsti levo→desno + Nova igra desno */
-function PhaseHeader({ game, onNewGame, loading }: { game: GameState; onNewGame: () => void; loading: boolean }) {
+function PhaseHeader({ game, onNewGame, onFeedback, loading }: { game: GameState; onNewGame: () => void; onFeedback: () => void; loading: boolean }) {
   const phases: Array<keyof typeof PHASE> = ['find', 'understand', 'eliminate'];
   const phaseOrder: Record<string, number> = { find: 0, understand: 1, eliminate: 2 };
   const currentIdx = phaseOrder[game.phase];
@@ -161,6 +161,9 @@ function PhaseHeader({ game, onNewGame, loading }: { game: GameState; onNewGame:
         );
       })}
       <div className="ph-total-cell dim small">M {game.totalRounds}/36</div>
+      <button className="ph-feedback" onClick={onFeedback} title="Pošlji mnenje / predlog">
+        💬 Mnenje
+      </button>
       <button className="ph-newgame" onClick={onNewGame} disabled={loading} title="Nova igra">
         {loading ? '⟳' : '↺ Nova igra'}
       </button>
@@ -1260,6 +1263,55 @@ function AlliesPanel({ clans }: { clans: OtherClan[] }) {
   );
 }
 
+/** Modal za povratne informacije igralca */
+function FeedbackModal({ game, onClose }: { game: GameState | null; onClose: () => void }) {
+  const [msg, setMsg] = useState('');
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState('');
+  async function submit() {
+    if (!msg.trim() || sending) return;
+    setSending(true); setErr('');
+    try {
+      await sendFeedback({
+        message: msg.trim(),
+        runId: game?.runId,
+        round: game?.totalRounds,
+        status: game?.status,
+      });
+      setDone(true);
+      setTimeout(onClose, 1200);
+    } catch {
+      setErr('Pošiljanje ni uspelo. Poskusi znova.');
+    } finally { setSending(false); }
+  }
+  return (
+    <div className="fb-overlay" onClick={onClose}>
+      <div className="fb-box" onClick={e => e.stopPropagation()}>
+        <button className="fb-close" onClick={onClose}>✕</button>
+        <h3 style={{ marginBottom: 8 }}>💬 Tvoje mnenje</h3>
+        {done ? (
+          <p style={{ color: '#33cc88', margin: '1rem 0' }}>✓ Hvala! Mnenje je shranjeno.</p>
+        ) : (
+          <>
+            <p className="dim small" style={{ marginBottom: 8 }}>
+              Napiši predlog, napako ali kar koli o igri. Shrani se in si ga ogledava.
+            </p>
+            <textarea className="fb-textarea" value={msg} maxLength={5000}
+              placeholder="Tvoje mnenje…" autoFocus
+              onChange={e => setMsg(e.target.value)} />
+            {err && <div className="weapon-warning" style={{ marginTop: 6 }}>{err}</div>}
+            <button className="exec-btn" style={{ marginTop: 10 }}
+              disabled={!msg.trim() || sending} onClick={submit}>
+              {sending ? '⟳ Pošiljam…' : '▶ Pošlji mnenje'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Log zadnjega meseca */
 function RoundLog({ log }: { log: RoundLog }) {
   const c = log.combat;
@@ -2096,6 +2148,7 @@ export default function App() {
   const [draftPeople,  setDraftPeople]  = useState(5);
   const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
   const [draftKind,    setDraftKind]    = useState<'scout' | 'attack'>('scout');
+  const [showFeedback, setShowFeedback] = useState(false);
   const [pendingExpeditions, setPendingExpeditions] = useState<NewExpeditionInput[]>([]);
   const [artifactTargetWp, setArtifactTargetWp] = useState<string>('');
   const [targetWP,   setTargetWP]   = useState('');
@@ -2445,9 +2498,10 @@ export default function App() {
           onClose={() => setPhaseTrans(null)}
         />
       )}
+      {showFeedback && <FeedbackModal game={game} onClose={() => setShowFeedback(false)} />}
       {/* ─── ZGORNJA VRSTICA: faza + viri ─── */}
       <header className="top-bar">
-        <PhaseHeader game={game} onNewGame={handleNew} loading={loading} />
+        <PhaseHeader game={game} onNewGame={handleNew} onFeedback={() => setShowFeedback(true)} loading={loading} />
         <div className="top-res">
           <BigStat icon="👥" label="Populacija" value={game.population}      color="#d8d8d8" />
           <BigStat icon="🍞" label="Hrana"      value={game.resources.survival} color="#cc8800"

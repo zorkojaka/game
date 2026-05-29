@@ -30,6 +30,18 @@ export async function playRound(
   return res.json();
 }
 
+export async function sendFeedback(
+  payload: { message: string; runId?: string; round?: number; status?: string }
+): Promise<{ ok: boolean }> {
+  const res = await fetch(`${BASE}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error('Napaka pri pošiljanju');
+  return res.json();
+}
+
 export async function previewOdds(
   runId: string,
   assignment: Assignment

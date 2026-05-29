@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { connectDB } from '../db/connection.js';
 import { GameSession } from '../db/models/GameSession.js';
 import { CompletedRun } from '../db/models/CompletedRun.js';
+import { Feedback } from '../db/models/Feedback.js';
 import { newGame, processRound, previewOdds } from '../engine/game.js';
 import type { PlayerAction } from '../engine/types.js';
 
@@ -78,6 +79,27 @@ app.post('/api/game/:runId/preview', async (req, res) => {
 
   const odds = previewOdds(doc as ReturnType<typeof newGame>, assignment);
   res.json(odds);
+});
+
+// Povratne informacije igralca
+app.post('/api/feedback', async (req, res) => {
+  const message = (req.body.message as string | undefined)?.trim();
+  if (!message) return res.status(400).json({ error: 'Manjka sporočilo' });
+  if (message.length > 5000) return res.status(400).json({ error: 'Sporočilo predolgo' });
+  await Feedback.create({
+    message,
+    runId: req.body.runId,
+    round: req.body.round,
+    status: req.body.status,
+    userAgent: req.get('user-agent'),
+  });
+  res.json({ ok: true });
+});
+
+// Pregled povratnih informacij (za nas)
+app.get('/api/feedback', async (_req, res) => {
+  const list = await Feedback.find().sort({ createdAt: -1 }).limit(200).lean();
+  res.json(list);
 });
 
 // Seznam sej (zadnjih 20)
