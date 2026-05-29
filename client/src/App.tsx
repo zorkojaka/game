@@ -2164,7 +2164,7 @@ export default function App() {
   const [missionR,     setMissionR]     = useState<Record<string, number>>({});
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
-  const [tab,          setTab]          = useState<'defense' | 'food' | 'workshop' | 'research' | 'map' | 'attack' | 'active' | 'tree' | 'missions'>('food');
+  const [tab,          setTab]          = useState<'defense' | 'food' | 'workshop' | 'research' | 'map' | 'attack' | 'active' | 'tree' | 'missions' | 'log'>('food');
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
   const [draftPeople,  setDraftPeople]  = useState(5);
   const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
@@ -2510,7 +2510,7 @@ export default function App() {
   const foodNextMonth = Math.max(0, _afterCamp - expPacksFood);
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell mob-tab-${tab}`}>
       {phaseTrans && (
         <PhaseTransitionBanner
           fromPhase={phaseTrans.from}
@@ -2556,8 +2556,9 @@ export default function App() {
             { id: 'active',   icon: '⏳', label: 'V teku' },
             { id: 'missions', icon: '🎯', label: 'Misije' },
             { id: 'tree',     icon: '🔬', label: 'Drevo' },
+            { id: 'log',      icon: '📜', label: 'Log', mobileOnly: true },
           ] as const).map(m => (
-            <button key={m.id} className={`sm-btn ${tab === m.id ? 'active' : ''}`}
+            <button key={m.id} className={`sm-btn ${tab === m.id ? 'active' : ''} ${'mobileOnly' in m && m.mobileOnly ? 'sm-mobile-only' : ''}`}
               onClick={() => { setTab(m.id); if (m.id === 'attack') setDraftKind('attack'); else if (m.id === 'map') setDraftKind('scout'); }} title={m.label}>
               <span className="sm-icon">{m.icon}</span>
               <span className="sm-label">{m.label}</span>
@@ -2970,6 +2971,13 @@ export default function App() {
           </div>
           )}
          </FitScale>
+         {/* ─── LOG (mobilno) — dnevnik dogodkov, lasten scroll, brez skaliranja ─── */}
+         {tab === 'log' && (
+           <div className="panel rc-log lp-log">
+             <div className="panel-head"><h3>DNEVNIK DOGODKOV</h3></div>
+             <div className="rc-log-scroll"><EventLog entries={eventLog} /></div>
+           </div>
+         )}
         </div>
       </aside>
 
