@@ -1417,7 +1417,7 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, onCampAdjust, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch }: {
+function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, onCampAdjust, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   plannedPaths: Array<Array<{ q: number; r: number }>>;
@@ -1434,6 +1434,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
   rations: number; onRations: (n: number) => void;
   workshopObj: WorkshopObjective; onWorkshop: (o: WorkshopObjective) => void;
   researchObj: ResearchObjective; onResearch: (o: ResearchObjective) => void;
+  workshop: { wallsBuilt: number; weaponProgress: number; wallProgress: number; workers: number };
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
@@ -1739,6 +1740,14 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
               <path d={hexPath(p.x, p.y, SIZE)} fill="#0a1a14" stroke="#1a4a3a" strokeWidth="0.8" />
               {/* ikona + oznaka */}
               <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="16">{z.icon}</text>
+              {/* OBRAMBA: število zidov na ščitu */}
+              {z.adj === 'd' && workshop.wallsBuilt > 0 && (
+                <g pointerEvents="none">
+                  <circle cx={p.x + SIZE * 0.22} cy={p.y - SIZE * 0.5} r="6.5" fill="#0a1c14" stroke="#aabb88" strokeWidth="1.2" />
+                  <text x={p.x + SIZE * 0.22} y={p.y - SIZE * 0.5} textAnchor="middle" dominantBaseline="central"
+                    fontSize="9" fill="#cce0a0" fontWeight="bold" fontFamily="'Courier New', monospace">{workshop.wallsBuilt}</text>
+                </g>
+              )}
               <text x={p.x} y={p.y - SIZE * 0.12} textAnchor="middle" fontSize="6.5" fill="#88a596"
                 fontFamily="'Courier New', monospace" letterSpacing="0.5">{z.label}</text>
               {/* − število + (gumbi znotraj heksa, znaki centrirani) */}
@@ -1782,7 +1791,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
             const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
             const px = -dy, py = dx;  // pravokotno za razporeditev gumbov
             // Definiraj gumbe glede na zono
-            type Btn = { label: string; active: boolean; onClick: () => void; title: string };
+            type Btn = { label: string; active: boolean; onClick: () => void; title: string; sub?: string };
             let btns: Btn[] = [];
             if (z.adj === 'f') {
               btns = [1,2,3,4,5].map(lvl => {
@@ -1791,12 +1800,19 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
                 return {
                   label: RATIONS_EMOJI[lvl]!, active: rations === lvl, onClick: () => onRations(lvl),
                   title: `Obroki: ${t.label} — hrana ×${t.foodMult}, moč ×${t.strengthMult}, ljudje ${popHint}`,
+                  sub: rations === lvl ? `×${t.foodMult}` : undefined,  // količnik hrane le za izbrano
                 };
               });
             } else if (z.adj === 'w') {
               btns = [
-                { label: '🔨', active: workshopObj === 'weapon', onClick: () => onWorkshop('weapon'), title: 'Orožje: vsaka 2 meseca +orožje na delavca, porabi enako materiala' },
-                { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),   title: 'Zid: 6 delavec-mesecev za 1 zid, porabi material. +20 % obrambe' },
+                { label: '🔨', active: workshopObj === 'weapon', onClick: () => onWorkshop('weapon'),
+                  title: 'Orožje: vsaka 2 meseca +orožje na delavca, porabi enako materiala',
+                  sub: workshopObj === 'weapon' ? `${workshop.weaponProgress}/2m` : undefined },
+                { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),
+                  title: 'Zid: 6 delavec-mesecev za 1 zid, porabi material. +20 % obrambe',
+                  sub: workshopObj === 'wall'
+                    ? (workshop.workers > 0 ? `${Math.ceil(Math.max(0, 6 - workshop.wallProgress) / workshop.workers)}m` : `${workshop.wallProgress}/6`)
+                    : undefined },
               ];
             } else if (z.adj === 'r') {
               btns = [
@@ -1821,6 +1837,11 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
                         stroke={z.color} strokeWidth={b.active ? 2 : 1} />
                       <text x={bxp} y={byp} textAnchor="middle" dominantBaseline="central"
                         fontSize="9" style={{ pointerEvents: 'none' }}>{b.label}</text>
+                      {b.sub && (
+                        <text x={bxp} y={byp + 12} textAnchor="middle" dominantBaseline="central"
+                          fontSize="6.5" fill={z.color} fontWeight="bold"
+                          fontFamily="'Courier New', monospace" style={{ pointerEvents: 'none' }}>{b.sub}</text>
+                      )}
                     </g>
                   );
                 })}
@@ -2974,7 +2995,8 @@ export default function App() {
             repelProbability={odds?.raidRepelProbability ?? 0}
             rations={rations} onRations={setRations}
             workshopObj={workshopObj} onWorkshop={setWorkshopObj}
-            researchObj={researchObj} onResearch={setResearchObj} />
+            researchObj={researchObj} onResearch={setResearchObj}
+            workshop={{ wallsBuilt: game.wallsBuilt ?? 0, weaponProgress: game.weaponWorkshopProgress ?? 0, wallProgress: game.wallProgress ?? 0, workers }} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
