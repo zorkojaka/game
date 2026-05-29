@@ -1417,10 +1417,11 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, onCampAdjust, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop }: {
+function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, onCampAdjust, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
-  plannedPaths: Array<Array<{ q: number; r: number }>>;
+  draftKind: 'scout' | 'attack';
+  plannedPaths: Array<{ path: Array<{ q: number; r: number }>; kind: 'scout' | 'mission' }>;
   onPathClick: (tile: { q: number; r: number }) => void;
   onWpSelect: (wpId: string) => void;
   selectedWpId: string;
@@ -1441,6 +1442,10 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
   const [info, setInfo] = useState<string | null>(null);
   const popExpId = selectedExpId ?? hoveredExpId;
   const SIZE = 36;
+  // Barve poti: odprava (izvid) = rumena, napad = rdeča
+  const COL_EXP = '#ffd84a';
+  const COL_ATK = '#cc3333';
+  const draftColor = draftKind === 'attack' ? COL_ATK : COL_EXP;
   // Kamp = 3 hexagoni (zoni). Vsak je svoje območje.
   const CAMP_ZONES = [
     { q: 0, r: 3, icon: '🔬', label: 'RAZISKAVE', count: camp.researchers, color: '#3377cc', adj: 'r' as const },
@@ -1541,7 +1546,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
 
           const isInDraft = inDraft(t);
           const isLast = lastStep && lastStep.q === t.q && lastStep.r === t.r;
-          if (isInDraft) stroke = '#22ccff';
+          if (isInDraft) stroke = draftColor;
 
           const canClickDraw = drawingMode && !t.isClanCamp && !campZoneIds.has(id) && (
             (lastStep && areNeighbors(lastStep, t)) ||
@@ -1627,7 +1632,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
 
         {/* Aktivne odprave: prepotovana pot (polna) + preostala pot (črtkana) */}
         {expeditions.filter(e => e.status === 'traveling').map(e => {
-          const color = e.kind === 'mission' ? '#cc8800' : '#22ccff';
+          const color = e.kind === 'mission' ? COL_ATK : COL_EXP;
           return (
             <g key={`path_${e.id}`} className="path-lines" pointerEvents="none">
               {e.path.slice(0, -1).map((s, i) => {
@@ -1657,31 +1662,34 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
           );
         })}
 
-        {/* Načrtovane (potrjene, a še ne sproženo) odprave — zlata črtkana */}
-        {plannedPaths.map((pp, pi) => (
+        {/* Načrtovane (potrjene, a še ne sproženo) — odprava rumena, napad rdeč */}
+        {plannedPaths.map((pp, pi) => {
+          const pc = pp.kind === 'mission' ? COL_ATK : COL_EXP;
+          return (
           <g key={`planned_${pi}`} className="path-lines" pointerEvents="none">
-            {pp.slice(0, -1).map((s, i) => {
+            {pp.path.slice(0, -1).map((s, i) => {
               const a = shift(hexToPixel(s.q, s.r, SIZE));
-              const b = shift(hexToPixel(pp[i + 1].q, pp[i + 1].r, SIZE));
+              const b = shift(hexToPixel(pp.path[i + 1].q, pp.path[i + 1].r, SIZE));
               return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                stroke="#ffd84a" strokeWidth="1.8" strokeDasharray="2 3" strokeOpacity="0.7" />;
+                stroke={pc} strokeWidth="1.8" strokeDasharray="2 3" strokeOpacity="0.7" />;
             })}
-            {pp.length > 0 && (() => {
-              const t = pp[pp.length - 1];
+            {pp.path.length > 0 && (() => {
+              const t = pp.path[pp.path.length - 1];
               const p = shift(hexToPixel(t.q, t.r, SIZE));
-              return <circle cx={p.x} cy={p.y} r="3.5" fill="#ffd84a" fillOpacity="0.7" />;
+              return <circle cx={p.x} cy={p.y} r="3.5" fill={pc} fillOpacity="0.7" />;
             })()}
           </g>
-        ))}
+          );
+        })}
 
-        {/* Draft path (igralec gradi novo odpravo) — NAD tile fillom */}
+        {/* Draft path (igralec gradi novo pot) — rumena za odpravo, rdeča za napad */}
         {draftPath.length > 1 && (
           <g className="path-lines" pointerEvents="none">
             {draftPath.slice(0, -1).map((s, i) => {
               const a = shift(hexToPixel(s.q, s.r, SIZE));
               const b = shift(hexToPixel(draftPath[i + 1].q, draftPath[i + 1].r, SIZE));
               return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                stroke="#22ccff" strokeWidth="2.6" strokeDasharray="4 3" />;
+                stroke={draftColor} strokeWidth="2.6" strokeDasharray="4 3" />;
             })}
           </g>
         )}
@@ -1854,7 +1862,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
         {expPositions.map(({ exp, tile }) => {
           if (!tile) return null;
           const p = shift(hexToPixel(tile.q, tile.r, SIZE));
-          const color = exp.kind === 'mission' ? '#cc8800' : '#22ccff';
+          const color = exp.kind === 'mission' ? COL_ATK : COL_EXP;
           const isActive = popExpId === exp.id;
           return (
             <g key={exp.id} className="exp-marker"
@@ -1881,7 +1889,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
         const target = exp.path[exp.path.length - 1];
         const stepsLeft = exp.path.length - 1 - exp.currentIndex;
         const monthsLeft = stepsLeft;  // 1 korak = 1 mesec
-        const color = exp.kind === 'mission' ? '#cc8800' : '#22ccff';
+        const color = exp.kind === 'mission' ? COL_ATK : COL_EXP;
         // Pozicija popupa: nad heksom kjer je odprava
         const p = shift(hexToPixel(tile.q, tile.r, SIZE));
         const popLeft = (p.x / W) * 100;
@@ -2783,7 +2791,7 @@ export default function App() {
                     return (
                       <div key={e.id} className="exp-card">
                         <div className="exp-head">
-                          <span className="exp-kind" style={{ color: e.kind === 'mission' ? '#cc8800' : '#22ccff' }}>
+                          <span className="exp-kind" style={{ color: e.kind === 'mission' ? '#cc3333' : '#ffd84a' }}>
                             {e.kind === 'mission' ? '🎯' : '🔭'} {e.assigned} ljudi
                           </span>
                           <span className="dim small">cilj: ({target?.q},{target?.r})</span>
@@ -2791,7 +2799,7 @@ export default function App() {
                         <div className="exp-progress">
                           <div className="ep-track">
                             <div className="ep-fill" style={{ width: `${(done / Math.max(1, steps)) * 100}%`,
-                              background: e.kind === 'mission' ? '#cc8800' : '#22ccff' }} />
+                              background: e.kind === 'mission' ? '#cc3333' : '#ffd84a' }} />
                           </div>
                           <span className="dim small">{done} / {steps}</span>
                         </div>
@@ -2900,7 +2908,7 @@ export default function App() {
                   const remaining = Math.max(0, total - done);
                   const target = e.path[e.path.length - 1];
                   const isAttack = e.kind === 'mission';
-                  const color = isAttack ? '#cc5544' : '#22ccff';
+                  const color = isAttack ? '#cc3333' : '#ffd84a';
                   const wp = e.weakPointId ? game.aiWeakPoints.find(w => w.id === e.weakPointId) : undefined;
                   const kindLabel = isAttack ? (wp ? `⚔ Napad na ◆ ${wp.label}` : '⚔ Napad') : '🔭 Izvidnica';
                   return (
@@ -2992,7 +3000,8 @@ export default function App() {
             </span>
           </div>
           <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
-            plannedPaths={pendingExpeditions.map(e => e.path)}
+            draftKind={tab === 'attack' ? 'attack' : draftKind}
+            plannedPaths={pendingExpeditions.map(e => ({ path: e.path, kind: e.kind }))}
             onPathClick={handlePathClick}
             onWpSelect={(id) => setTargetWP(targetWP === id ? '' : id)}
             selectedWpId={targetWP}
@@ -3010,7 +3019,8 @@ export default function App() {
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
             <span className="ml-item"><span style={{ color: '#cc8800' }}>◆</span> šibka točka</span>
             <span className="ml-item"><span style={{ color: '#33cc88' }}>⛺</span> drug klan</span>
-            <span className="ml-item"><span style={{ color: '#3377cc' }}>●</span> aktivna odprava</span>
+            <span className="ml-item"><span style={{ color: '#ffd84a' }}>―</span> odprava</span>
+            <span className="ml-item"><span style={{ color: '#cc3333' }}>―</span> napad</span>
             <span className="ml-sep">·</span>
             <span className="ml-item" style={{ color: '#7a3a3a' }}>rdeč = neraziskan</span>
             <span className="ml-item" style={{ color: '#5a8a9c' }}>moder = raziskan</span>
