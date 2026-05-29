@@ -37,6 +37,18 @@ export interface HexTile {
   isClanCamp: boolean;
   isAICore: boolean;
   hidesWeakPointId?: string;
+  otherClanId?: string;
+}
+
+export type ClanSpecialty = 'food' | 'weapons' | 'material' | 'people';
+export interface OtherClan {
+  id: string;
+  label: string;
+  q: number;
+  r: number;
+  discovered: boolean;
+  allied: boolean;
+  specialty: ClanSpecialty;
 }
 
 export type ExpeditionKind = 'scout' | 'mission';
@@ -156,6 +168,7 @@ export interface GameState {
   completedMissions: Mission[];
   consecutiveStarvationMonths: number;
   mapTiles: HexTile[];
+  otherClans: OtherClan[];
   expeditions: Expedition[];
   completedExpeditions: Expedition[];
   weaponWorkshopProgress: number;

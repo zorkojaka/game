@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective } from './types';
+import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan } from './types';
 import { tileId } from './types';
 import { createGame, getGame, playRound, previewOdds } from './api';
 
@@ -1214,6 +1214,52 @@ function HumanMissionsPlaceholder() {
   );
 }
 
+/** Zavezniki — drugi človeški klani na mapi */
+function AlliesPanel({ clans }: { clans: OtherClan[] }) {
+  const specInfo: Record<string, { icon: string; label: string; gift: string }> = {
+    food:     { icon: '🌾', label: 'hrana',    gift: '+8 hrane / mesec' },
+    material: { icon: '⚙',  label: 'material',  gift: '+4 materiala / mesec' },
+    weapons:  { icon: '⚔',  label: 'orožje',    gift: '+2 orožja / mesec' },
+    people:   { icon: '👥', label: 'okrepitve', gift: '+1 oseba / mesec' },
+  };
+  const discovered = clans.filter(c => c.discovered);
+  const allied = clans.filter(c => c.allied);
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <h3>ZAVEZNIKI</h3>
+        <span className="panel-badge teal">{allied.length} zavez. · {discovered.length}/{clans.length} najdenih</span>
+      </div>
+      <div className="dim small" style={{ marginBottom: 8 }}>
+        Drugi človeški klani so skriti v megli. Razišči njihov heks, da jih najdeš, nato pošlji
+        odpravo (Izvidniki) do njih za zavezništvo — odslej mesečno pomagajo.
+      </div>
+      {clans.map(c => {
+        const s = specInfo[c.specialty];
+        const status = c.allied ? 'available' : c.discovered ? 'available' : 'locked';
+        const color = c.allied ? '#33cc88' : c.discovered ? '#c0a050' : '#555';
+        return (
+          <div key={c.id} className={`hm-card ${status}`} style={{ borderLeftColor: color }}>
+            <div className="hm-head">
+              <span className="hm-title" style={{ color }}>
+                {c.discovered ? `⛺ ${c.label}` : '⛺ ??? neznan klan'}
+              </span>
+              <span className="hm-months dim small">{c.discovered ? `(${c.q},${c.r})` : '?'}</span>
+            </div>
+            <div className="hm-desc dim small">
+              {c.allied
+                ? `🤝 Zaveznik — ${s.icon} ${s.gift}; dviguje aktivnost klanov (manj AI napadov).`
+                : c.discovered
+                  ? `Specialnost: ${s.icon} ${s.label}. Pošlji odpravo na (${c.q},${c.r}) za zavezništvo.`
+                  : 'Neznana lokacija — razišči mapo, da ga najdeš.'}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Log zadnjega meseca */
 function RoundLog({ log }: { log: RoundLog }) {
   const c = log.combat;
@@ -1319,7 +1365,7 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, drawingMode, camp, onCampAdjust, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch }: {
+function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, onCampAdjust, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   plannedPaths: Array<Array<{ q: number; r: number }>>;
@@ -1328,6 +1374,7 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
   selectedWpId: string;
   expeditions: Expedition[];
   wps: AIWeakPoint[];
+  otherClans: OtherClan[];
   drawingMode: boolean;
   camp: { defenders: number; researchers: number; workers: number; foragers: number };
   onCampAdjust: (which: 'd' | 'f' | 'w' | 'r', delta: number) => void;
@@ -1411,10 +1458,17 @@ function HexMap({ tiles, draftPath, plannedPaths, onPathClick, onWpSelect, selec
           let { fill, stroke, labelColor } = hexColorByProgress(t.researchProgress);
           let label = '';
 
+          const clan = t.otherClanId ? otherClans.find(c => c.id === t.otherClanId) : undefined;
+          const clanVisible = clan && t.researchProgress >= 0.50;
+
           if (t.isClanCamp) {
             fill = '#0a2018'; stroke = '#22aa88'; label = '⌂'; labelColor = '#66ccaa';
           } else if (t.isAICore) {
             fill = '#220606'; stroke = '#cc2222'; label = '☣'; labelColor = '#cc3333';
+          } else if (clanVisible) {
+            label = '⛺';
+            if (clan!.allied) { labelColor = '#33cc88'; stroke = '#33cc88'; fill = '#0a1c14'; }
+            else { labelColor = '#c0a050'; stroke = '#a08540'; fill = '#181408'; }
           } else if (t.researchProgress < 0.25) {
             label = '?';
           } else if (t.researchProgress < 0.50) {
@@ -2808,7 +2862,7 @@ export default function App() {
           {/* ─── ZAVIHEK: Misije človeštva + Šibke točke AI ─── */}
           {tab === 'missions' && (
           <div className="band band-missions">
-            <HumanMissionsPlaceholder />
+            <AlliesPanel clans={game.otherClans ?? []} />
             <Missions wps={game.aiWeakPoints} aiTree={game.aiTree}
               active={game.activeMissions ?? []} plan={missions} planR={missionR}
               onPlanChange={setMissionAssignment} onRationsChange={setMissionRations}
@@ -2838,7 +2892,7 @@ export default function App() {
             onWpSelect={(id) => setTargetWP(targetWP === id ? '' : id)}
             selectedWpId={targetWP}
             expeditions={game.expeditions ?? []}
-            wps={game.aiWeakPoints} drawingMode={true}
+            wps={game.aiWeakPoints} otherClans={game.otherClans ?? []} drawingMode={true}
             camp={{ defenders, researchers, workers, foragers }}
             onCampAdjust={(which, delta) => bumpRole(which, delta)}
             repelProbability={odds?.raidRepelProbability ?? 0}
@@ -2849,6 +2903,7 @@ export default function App() {
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
             <span className="ml-item"><span style={{ color: '#cc8800' }}>◆</span> šibka točka</span>
+            <span className="ml-item"><span style={{ color: '#33cc88' }}>⛺</span> drug klan</span>
             <span className="ml-item"><span style={{ color: '#3377cc' }}>●</span> aktivna odprava</span>
             <span className="ml-sep">·</span>
             <span className="ml-item" style={{ color: '#7a3a3a' }}>rdeč = neraziskan</span>

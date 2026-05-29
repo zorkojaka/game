@@ -53,6 +53,19 @@ export interface HexTile {
   isClanCamp: boolean;
   isAICore: boolean;
   hidesWeakPointId?: string;
+  otherClanId?: string;   // drug človeški klan na tem polju (zaveznik)
+}
+
+// Drugi človeški klani na mapi — najdeš jih z raziskovanjem, z njimi sodeluješ
+export type ClanSpecialty = 'food' | 'weapons' | 'material' | 'people';
+export interface OtherClan {
+  id: string;
+  label: string;
+  q: number;
+  r: number;
+  discovered: boolean;   // odkrit (raziskan njihov heks)
+  allied: boolean;       // navezan stik (odprava dospela do njih)
+  specialty: ClanSpecialty;
 }
 
 export type ExpeditionKind = 'scout' | 'mission';
@@ -207,6 +220,9 @@ export interface GameState {
 
   // Heksa mapa
   mapTiles: HexTile[];
+
+  // Drugi človeški klani (zavezniki)
+  otherClans: OtherClan[];
 
   // Odprave (izvidniki in misije s potjo)
   expeditions: Expedition[];

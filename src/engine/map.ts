@@ -5,11 +5,23 @@
 //   < 1.00 → partial   (gray, raziskan)
 //   = 1.00 → revealed  (blue, domač)
 
-import type { HexTile, Visibility } from './types.js';
+import type { HexTile, Visibility, OtherClan } from './types.js';
 import { tileId } from './types.js';
 
 export const MAP_COLS = 6;
 export const MAP_ROWS = 5;
+
+// Drugi človeški klani — fiksne lokacije, skriti v megli dokler jih ne najdeš
+export const OTHER_CLAN_DEFS: OtherClan[] = [
+  { id: 'clan_north', label: 'Severni klan',  q: 1, r: 0, discovered: false, allied: false, specialty: 'people' },
+  { id: 'clan_east',  label: 'Vzhodni klan',  q: 4, r: 3, discovered: false, allied: false, specialty: 'material' },
+  { id: 'clan_mid',   label: 'Dolinski klan', q: 2, r: 1, discovered: false, allied: false, specialty: 'food' },
+];
+
+/** Sveže kopije definicij klanov (za nov state). */
+export function generateOtherClans(): OtherClan[] {
+  return OTHER_CLAN_DEFS.map(c => ({ ...c }));
+}
 
 const CLAN_POS = { q: 0, r: MAP_ROWS - 1 };
 const CORE_POS = { q: MAP_COLS - 1, r: 0 };
@@ -45,6 +57,9 @@ export function generateMap(): HexTile[] {
     wp_core:  { q: 4, r: 1 },
   };
 
+  const clanTileMap: Record<string, string> = {};
+  for (const c of OTHER_CLAN_DEFS) clanTileMap[`${c.q},${c.r}`] = c.id;
+
   const tiles: HexTile[] = [];
   const clanNeighbors = new Set(neighbors(CLAN_POS).map(n => tileId(n)));
 
@@ -74,6 +89,7 @@ export function generateMap(): HexTile[] {
         isClanCamp: isClan,
         isAICore:   isCore,
         hidesWeakPointId,
+        otherClanId: clanTileMap[`${q},${r}`],
       });
     }
   }

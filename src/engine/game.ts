@@ -6,7 +6,7 @@ import type { RNGState } from './rng.js';
 import { createRNG, rngBool, rngInt, rngNext, seedFromString } from './rng.js';
 import { resolveCombat } from './combat.js';
 import { spendIntelOnFog, revealNodeRetroactive } from './fog.js';
-import { generateMap, spendScoutsOnMap, visibilityFromProgress } from './map.js';
+import { generateMap, generateOtherClans, spendScoutsOnMap, visibilityFromProgress } from './map.js';
 import { tickExpedition } from './expedition.js';
 import { tileId } from './types.js';
 import type { Expedition } from './types.js';
@@ -223,6 +223,7 @@ export function newGame(seed?: number): GameState {
     completedMissions: [],
     consecutiveStarvationMonths: 0,
     mapTiles: generateMap(),
+    otherClans: generateOtherClans(),
     expeditions: [],
     completedExpeditions: [],
     weaponWorkshopProgress: 0,
@@ -302,6 +303,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   let aiTree = state.aiTree;
   let revealed: string[] = [];
   let mapTiles = state.mapTiles ?? generateMap();
+  let otherClans = (state.otherClans ?? generateOtherClans()).map(c => ({ ...c }));
   const workshopEvents: string[] = [];
 
   if (researchers > 0) {
@@ -478,6 +480,15 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     if (r.exp.status === 'completed' || r.exp.status === 'lost') {
       if (r.exp.status === 'completed') {
         const target = r.exp.path[r.exp.path.length - 1];
+        // Navezava stika z drugim klanom, če je odprava dospela na njihov heks
+        const arrTile = mapTiles.find(t => t.q === target.q && t.r === target.r);
+        if (arrTile?.otherClanId) {
+          const ci = otherClans.findIndex(c => c.id === arrTile.otherClanId);
+          if (ci >= 0 && !otherClans[ci].allied) {
+            otherClans[ci] = { ...otherClans[ci], discovered: true, allied: true };
+            expeditionEvents.push(`🤝 ZAVEZNIŠTVO: ${otherClans[ci].label} se nam je pridružil — odslej sodelujemo!`);
+          }
+        }
         if (r.exp.kind === 'mission') {
           // SPOPAD OB PRIHODU — napadalci udarijo na cilju, preživeli se vrnejo
           const aTier = RATIONS_LEVELS[r.exp.rations] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
@@ -651,6 +662,31 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       successProbability: sp, rations: mRationsLvl, status: 'in_progress' });
   }
 
+  // 6e. DRUGI KLANI — odkritje (raziskan heks) + mesečno sodelovanje (če zavezniki)
+  for (let i = 0; i < otherClans.length; i++) {
+    const c = otherClans[i];
+    if (!c.discovered) {
+      const tile = mapTiles.find(t => t.q === c.q && t.r === c.r);
+      if (tile && tile.researchProgress >= 0.50) {
+        otherClans[i] = { ...c, discovered: true };
+        expeditionEvents.push(`📍 ODKRIT KLAN: ${c.label} na (${c.q},${c.r}). Pošlji odpravo do njih za zavezništvo.`);
+      }
+    }
+  }
+  let clanAllyBoost = 0;
+  for (const c of otherClans) {
+    if (!c.allied) continue;
+    clanAllyBoost += 0.04;  // zavezniki dvignejo aktivnost klanov (manj AI napadov)
+    if (c.specialty === 'food')     { survival += 8; }
+    else if (c.specialty === 'material') { material += 4; }
+    else if (c.specialty === 'weapons')  { combat += 2; }
+    else if (c.specialty === 'people')   { population += 1; }
+  }
+  if (clanAllyBoost > 0) {
+    const gifts = otherClans.filter(c => c.allied).map(c => c.label).join(', ');
+    expeditionEvents.push(`🤝 Zavezniki (${gifts}) so poslali pomoč ta mesec.`);
+  }
+
   // 7. Klan aktivnost — krivulja + vedenjski modifikator
   // Hiding lvl bonus: 25 % počasnejši padec na nivo
   // Skrivamo se le če ni ofenzivnih akcij ven (combatants+scouts majhni)
@@ -659,7 +695,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     ? -CLAN_ACTIVITY_HIDDEN_MODIFIER
     : -CLAN_ACTIVITY_EXPOSURE_MODIFIER;
   const clanDelta = rawClanDelta * Math.max(0, 1 - 0.25 * hidingLvl);
-  const clanActivity = Math.max(0, state.clanActivity + clanDelta);
+  const clanActivity = Math.max(0, Math.min(1, state.clanActivity + clanDelta + clanAllyBoost));
 
   // 8. AI surveillance gain (skupna izpostavljenost: combatants + scouts)
   const exposure = (assignment.combatants + (assignment.researchers ?? 0)) / Math.max(1, state.population);
@@ -763,6 +799,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     completedMissions: [...oldCompleted, ...newlyCompleted],
     consecutiveStarvationMonths: newStarvStreak,
     mapTiles,
+    otherClans,
     expeditions: tickedExps,
     completedExpeditions: [...oldCompletedExps, ...finishedExps],
     weaponWorkshopProgress, weaponWorkshopScouts, wallProgress, wallsBuilt,
