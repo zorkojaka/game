@@ -1784,18 +1784,16 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           );
         })}
 
-        {/* Populacija nad kampom: skupaj + delitev kamp/odprave */}
+        {/* Populacija — v praznem kotu spodaj levo (skupaj + delitev kamp/odprave) */}
         {(() => {
-          const cs = CAMP_ZONES.map(z => shift(hexToPixel(z.q, z.r, SIZE)));
-          const cxp = cs.reduce((s, p) => s + p.x, 0) / cs.length;
-          const topY = Math.min(...cs.map(p => p.y));
-          const ly = topY - SIZE * 1.05;
+          const lx = W * 0.04;
+          const ly = H * 0.74;
           return (
-            <g pointerEvents="none" textAnchor="middle" fontFamily="'Courier New', monospace">
-              <text x={cxp} y={ly} fontSize="12" fill="#e6e6e6" fontWeight="bold">👥 {pop.total}</text>
-              <text x={cxp} y={ly + 12} fontSize="7.5" fill="#88a596">
-                🏠 {pop.inCamp} v kampu · 🎯 {pop.away} na odpravi
-              </text>
+            <g pointerEvents="none" textAnchor="start" fontFamily="'Courier New', monospace">
+              <text x={lx} y={ly} fontSize="9" fill="#7a8a82" letterSpacing="0.5">POPULACIJA</text>
+              <text x={lx} y={ly + 22} fontSize="20" fill="#e6e6e6" fontWeight="bold">👥 {pop.total}</text>
+              <text x={lx} y={ly + 40} fontSize="9" fill="#9ec0ad">🏠 {pop.inCamp} v kampu</text>
+              <text x={lx} y={ly + 53} fontSize="9" fill="#d6a96a">🎯 {pop.away} na odpravi</text>
             </g>
           );
         })()}
