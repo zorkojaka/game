@@ -1417,7 +1417,7 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, onCampAdjust, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop }: {
+function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, onCampAdjust, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, pop }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   draftKind: 'scout' | 'attack';
@@ -1436,6 +1436,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
   workshopObj: WorkshopObjective; onWorkshop: (o: WorkshopObjective) => void;
   researchObj: ResearchObjective; onResearch: (o: ResearchObjective) => void;
   workshop: { wallsBuilt: number; weaponProgress: number; wallProgress: number; workers: number };
+  pop: { total: number; inCamp: number; away: number };
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
@@ -1748,13 +1749,11 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               <path d={hexPath(p.x, p.y, SIZE)} fill="#0a1a14" stroke="#1a4a3a" strokeWidth="0.8" />
               {/* ikona + oznaka */}
               <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="16">{z.icon}</text>
-              {/* OBRAMBA: število zidov na ščitu */}
+              {/* OBRAMBA: število zidov vpisano v ščit (del ikone) */}
               {z.adj === 'd' && workshop.wallsBuilt > 0 && (
-                <g pointerEvents="none">
-                  <circle cx={p.x + SIZE * 0.22} cy={p.y - SIZE * 0.5} r="6.5" fill="#0a1c14" stroke="#aabb88" strokeWidth="1.2" />
-                  <text x={p.x + SIZE * 0.22} y={p.y - SIZE * 0.5} textAnchor="middle" dominantBaseline="central"
-                    fontSize="9" fill="#cce0a0" fontWeight="bold" fontFamily="'Courier New', monospace">{workshop.wallsBuilt}</text>
-                </g>
+                <text x={p.x} y={p.y - SIZE * 0.40} textAnchor="middle" dominantBaseline="central"
+                  fontSize="8" fill="#0a2a18" fontWeight="bold" fontFamily="'Courier New', monospace"
+                  pointerEvents="none">{workshop.wallsBuilt}</text>
               )}
               <text x={p.x} y={p.y - SIZE * 0.12} textAnchor="middle" fontSize="6.5" fill="#88a596"
                 fontFamily="'Courier New', monospace" letterSpacing="0.5">{z.label}</text>
@@ -1784,6 +1783,22 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             </g>
           );
         })}
+
+        {/* Populacija nad kampom: skupaj + delitev kamp/odprave */}
+        {(() => {
+          const cs = CAMP_ZONES.map(z => shift(hexToPixel(z.q, z.r, SIZE)));
+          const cxp = cs.reduce((s, p) => s + p.x, 0) / cs.length;
+          const topY = Math.min(...cs.map(p => p.y));
+          const ly = topY - SIZE * 1.05;
+          return (
+            <g pointerEvents="none" textAnchor="middle" fontFamily="'Courier New', monospace">
+              <text x={cxp} y={ly} fontSize="12" fill="#e6e6e6" fontWeight="bold">👥 {pop.total}</text>
+              <text x={cxp} y={ly + 12} fontSize="7.5" fill="#88a596">
+                🏠 {pop.inCamp} v kampu · 🎯 {pop.away} na odpravi
+              </text>
+            </g>
+          );
+        })()}
 
         {/* Zunanji kontrolni gumbi vsake zone (na zunanji strani) */}
         {(() => {
@@ -3013,7 +3028,8 @@ export default function App() {
             rations={rations} onRations={setRations}
             workshopObj={workshopObj} onWorkshop={setWorkshopObj}
             researchObj={researchObj} onResearch={setResearchObj}
-            workshop={{ wallsBuilt: game.wallsBuilt ?? 0, weaponProgress: game.weaponWorkshopProgress ?? 0, wallProgress: game.wallProgress ?? 0, workers }} />
+            workshop={{ wallsBuilt: game.wallsBuilt ?? 0, weaponProgress: game.weaponWorkshopProgress ?? 0, wallProgress: game.wallProgress ?? 0, workers }}
+            pop={{ total: game.population, inCamp: Math.max(0, game.population - inMissions), away: inMissions }} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
