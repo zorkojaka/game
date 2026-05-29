@@ -477,18 +477,56 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
 
     if (r.exp.status === 'completed' || r.exp.status === 'lost') {
       if (r.exp.status === 'completed') {
-        if (r.exp.kind === 'mission' && r.exp.weakPointId) {
-          const idx = aiWeakPoints.findIndex(wp => wp.id === r.exp.weakPointId);
-          if (idx >= 0) {
-            const wpLabel = aiWeakPoints[idx].label;
-            aiWeakPoints[idx] = { ...aiWeakPoints[idx], exploited: true, discovered: true };
-            expeditionEvents.push(`💥 ŠIBKA TOČKA UNIČENA: ${wpLabel} — ${r.exp.assigned} se vrača v kamp.`);
+        const target = r.exp.path[r.exp.path.length - 1];
+        if (r.exp.kind === 'mission') {
+          // SPOPAD OB PRIHODU — napadalci udarijo na cilju, preživeli se vrnejo
+          const aTier = RATIONS_LEVELS[r.exp.rations] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
+          let survivors = r.exp.assigned;
+          if (r.exp.weakPointId) {
+            // Napad na šibko točko AI
+            const wpIdx = aiWeakPoints.findIndex(wp => wp.id === r.exp.weakPointId);
+            const p = missionSuccessProbability(
+              { ...state, resources: { ...state.resources, intelligence } },
+              r.exp.weakPointId, survivors, r.exp.rations);
+            const [roll, rngA] = rngNext(rng); rng = rngA;
+            const wpLabel = wpIdx >= 0 ? aiWeakPoints[wpIdx].label : 'šibka točka';
+            if (roll < p && wpIdx >= 0) {
+              const lost = Math.round(survivors * (1 - p) * 0.3);
+              survivors = Math.max(0, survivors - lost);
+              aiWeakPoints[wpIdx] = { ...aiWeakPoints[wpIdx], exploited: true, discovered: true };
+              expeditionEvents.push(`💥 ŠIBKA TOČKA UNIČENA: ${wpLabel} — ${lost} padlih, ${survivors} se vrača.`);
+            } else {
+              const lost = Math.round(survivors * 0.5);
+              survivors = Math.max(0, survivors - lost);
+              expeditionEvents.push(`✗ Napad na ${wpLabel} ni uspel — ${lost} padlih, ${survivors} se vrača.`);
+            }
+          } else {
+            // Splošni napad na AI robote
+            const humanStr = survivors * 1.2 * aTier.strengthMult;
+            const aiStr = Math.max(1, aiRobots * 0.05);
+            const p = humanStr / (humanStr + aiStr);
+            const [roll, rngA] = rngNext(rng); rng = rngA;
+            if (roll < p) {
+              const destroyed = Math.min(aiRobots, Math.round(survivors * (1 + p)));
+              aiRobots = Math.max(0, aiRobots - destroyed);
+              material += destroyed;
+              const lost = Math.round(survivors * (1 - p) * 0.3);
+              survivors = Math.max(0, survivors - lost);
+              expeditionEvents.push(`⚔ Napad uspešen na (${target.q},${target.r}): ${destroyed} robotov uničenih, ${lost} padlih, ${survivors} se vrača.`);
+            } else {
+              const destroyed = Math.min(aiRobots, Math.round(survivors * 0.5));
+              aiRobots = Math.max(0, aiRobots - destroyed);
+              material += destroyed;
+              const lost = Math.round(survivors * 0.6);
+              survivors = Math.max(0, survivors - lost);
+              expeditionEvents.push(`⚔ Napad odbit na (${target.q},${target.r}): ${destroyed} robotov, a ${lost} padlih, ${survivors} se vrača.`);
+            }
           }
+          population += Math.max(0, survivors);
         } else {
-          const target = r.exp.path[r.exp.path.length - 1];
           expeditionEvents.push(`✓ Izvidniška odprava dospela na (${target.q},${target.r}) — ${r.exp.assigned} se vrača v kamp.`);
+          population += r.exp.assigned;
         }
-        population += r.exp.assigned;
       } else {
         expeditionEvents.push(`☠ Odprava izgubljena — vsi člani so padli.`);
       }

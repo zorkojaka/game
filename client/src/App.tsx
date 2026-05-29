@@ -2041,6 +2041,7 @@ export default function App() {
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
   const [draftPeople,  setDraftPeople]  = useState(5);
   const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
+  const [draftKind,    setDraftKind]    = useState<'scout' | 'attack'>('scout');
   const [pendingExpeditions, setPendingExpeditions] = useState<NewExpeditionInput[]>([]);
   const [artifactTargetWp, setArtifactTargetWp] = useState<string>('');
   const [targetWP,   setTargetWP]   = useState('');
@@ -2172,12 +2173,12 @@ export default function App() {
     setLoading(true);
     try {
       const newExps: NewExpeditionInput[] = [...pendingExpeditions];
-      // Če uporabnik ni potrdil tekoče poti a ima veljaven draft, ga pošlji tudi
+      // Če uporabnik ni potrdil tekoče poti a ima veljaven draft, ga pošlji tudi (z vrsto trenutnega zavihka)
       if (draftPath.length >= 2 && draftPeople > 0) {
-        newExps.push({ kind: 'scout', path: draftPath, assigned: draftPeople, rations: draftRations });
+        newExps.push(buildDraftInput(tab === 'attack' ? 'attack' : draftKind));
       }
       const { state } = await playRound(game.runId, {
-        assignment: { axis, combatants, defenders, foragers, workers, researchers,
+        assignment: { axis, combatants: 0, defenders, foragers, workers, researchers,
           workshopObjective: workshopObj, researchObjective: researchObj, rations,
           missionAssignments: missions, missionRations: missionR,
           newExpeditions: newExps.length > 0 ? newExps : undefined,
@@ -2290,16 +2291,28 @@ export default function App() {
     setMissionR({ ...missionR, [wpId]: lvl });
   }
 
-  function confirmDraftExpedition() {
+  // Sestavi vhod za odpravo iz tekoče poti, glede na vrsto (izvid/napad).
+  function buildDraftInput(kind: 'scout' | 'attack'): NewExpeditionInput {
+    const last = draftPath[draftPath.length - 1];
+    const tile = game?.mapTiles?.find(t => t.q === last.q && t.r === last.r);
+    // napad na razkrito šibko točko, če pot konča na njej
+    const wpId = (kind === 'attack' && tile?.hidesWeakPointId
+      && game?.aiWeakPoints.find(w => w.id === tile.hidesWeakPointId)?.discovered)
+      ? tile.hidesWeakPointId : undefined;
+    return {
+      kind: kind === 'attack' ? 'mission' : 'scout',
+      weakPointId: wpId,
+      path: draftPath, assigned: draftPeople, rations: draftRations,
+    };
+  }
+  function confirmDraft(kind: 'scout' | 'attack') {
     if (draftPath.length < 2 || draftPeople < 1) return;
-    setPendingExpeditions([...pendingExpeditions, {
-      kind: 'scout', path: draftPath, assigned: draftPeople, rations: draftRations,
-    }]);
-    // Resetiraj draft (pot začni iz klanovega heksa)
+    setPendingExpeditions([...pendingExpeditions, buildDraftInput(kind)]);
     const clan = game?.mapTiles?.find(t => t.isClanCamp);
     if (clan) setDraftPath([{ q: clan.q, r: clan.r }]);
     setDraftPeople(5);
   }
+  function confirmDraftExpedition() { confirmDraft('scout'); }
   function removePendingExpedition(idx: number) {
     setPendingExpeditions(pendingExpeditions.filter((_, i) => i !== idx));
   }
@@ -2415,7 +2428,7 @@ export default function App() {
             { id: 'tree',     icon: '🔬', label: 'Drevo' },
           ] as const).map(m => (
             <button key={m.id} className={`sm-btn ${tab === m.id ? 'active' : ''}`}
-              onClick={() => setTab(m.id)} title={m.label}>
+              onClick={() => { setTab(m.id); if (m.id === 'attack') setDraftKind('attack'); else if (m.id === 'map') setDraftKind('scout'); }} title={m.label}>
               <span className="sm-icon">{m.icon}</span>
               <span className="sm-label">{m.label}</span>
             </button>
@@ -2577,10 +2590,10 @@ export default function App() {
                   </button>
                 </>
               )}
-              {pendingExpeditions.length > 0 && (
+              {pendingExpeditions.some(e => e.kind === 'scout') && (
                 <div className="pending-exps">
                   <div className="dim small" style={{ marginBottom: 4 }}>Potrjene odprave (sproži ob izvedbi meseca):</div>
-                  {pendingExpeditions.map((e, i) => {
+                  {pendingExpeditions.map((e, i) => e.kind === 'scout' && (() => {
                     const months = e.path.length - 1;
                     const t = RATIONS[e.rations] ?? RATIONS[3];
                     const food = Math.round(e.assigned * months * t.foodMult);
@@ -2590,7 +2603,7 @@ export default function App() {
                         <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
                       </div>
                     );
-                  })}
+                  })())}
                 </div>
               )}
             </div>
@@ -2629,42 +2642,79 @@ export default function App() {
           </div>
           )}
 
-          {/* ─── NAPAD ─── */}
+          {/* ─── NAPAD — pošlji napadalce po poti, spopad ob prihodu ─── */}
           {tab === 'attack' && (
           <div className="panel">
             <div className="panel-head">
               <h3>⚔ NOV NAPAD</h3>
-              {targetWP && <span className="panel-badge" style={{ color: '#ffd84a' }}>cilj izbran</span>}
+              {pendingExpeditions.filter(e => e.kind === 'mission').length > 0 && (
+                <span className="panel-badge">{pendingExpeditions.filter(e => e.kind === 'mission').length} napadov</span>
+              )}
             </div>
             <div className="path-builder">
               <div className="pb-instr dim small">
-                Pošlji napadalce na AI robote ta mesec. Cilj (šibko točko) izberi s klikom na mapi.
+                Nariši pot na mapi do AI jedra (☣) ali razkrite šibke točke (◆) in pošlji napadalce.
+                Ob prihodu se sproži spopad; preživeli se vrnejo v kamp.
               </div>
-              <div className="path-stats">
-                <div className="ps-row">
-                  <span className="dim small">Napadalci:</span>
-                  <span className="pa-pm">
-                    <button className="pa-btn" disabled={combatants <= 0} onClick={() => setCombatants(Math.max(0, combatants - 1))}>−</button>
-                    <b className="pa-count">{combatants}</b>
-                    <button className="pa-btn" disabled={assignedHome + plannedTotal + 1 > availablePop || combatants + 1 > weaponCap}
-                      onClick={() => setCombatants(combatants + 1)}>+</button>
-                  </span>
+              {draftPath.length < 2 ? (
+                <div className="map-hint">Pot je prazna. Klikni sosednji heks ⌂ klana za začetek poti do cilja.</div>
+              ) : (() => {
+                const last = draftPath[draftPath.length - 1];
+                const tile = game.mapTiles?.find(t => t.q === last.q && t.r === last.r);
+                const wp = tile?.hidesWeakPointId ? game.aiWeakPoints.find(w => w.id === tile.hidesWeakPointId) : undefined;
+                const wpDisc = !!wp?.discovered;
+                const targetLabel = wpDisc ? `◆ ${wp!.label}` : tile?.isAICore ? '☣ AI jedro' : `(${last.q},${last.r}) — splošni napad`;
+                const hStr = draftPeople * 1.2 * draftRTier.strengthMult;
+                const aStr = Math.max(1, (game.aiRobots ?? 0) * 0.05);
+                const winP = hStr / (hStr + aStr);
+                return (
+                  <>
+                    <div className="path-stats">
+                      <div className="ps-row"><span className="dim small">Cilj:</span><b style={{ color: wpDisc ? '#ffd84a' : '#cc6655' }}>{targetLabel}</b></div>
+                      <div className="ps-row"><span className="dim small">Korakov:</span><b>{draftPath.length - 1}</b></div>
+                      <div className="ps-row"><span className="dim small">Trajanje:</span><b style={{ color: '#cc8800' }}>{draftPathMonths} mesec(ev)</b></div>
+                      <div className="ps-row"><span className="dim small">Tveganje srečanja na poti:</span><b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b></div>
+                      <div className="ps-row">
+                        <span className="dim small">Napadalci:</span>
+                        <span className="pa-pm">
+                          <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
+                          <b className="pa-count">{draftPeople}</b>
+                          <button className="pa-btn" disabled={assignedHome + plannedTotal + draftPeople >= availablePop}
+                            onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
+                        </span>
+                      </div>
+                      <div className="ps-row"><span className="dim small">Ocena zmage v spopadu:</span>
+                        <b style={{ color: probColor(winP) }}>{wpDisc ? '~' : ''}{Math.round(winP * 100)}%</b></div>
+                    </div>
+                    <div className="exp-rations">
+                      <span className="dim small">Obroki:</span>
+                      <RationsMini value={draftRations} onChange={setDraftRations} />
+                    </div>
+                    <div className="exp-takealong">
+                      <div className="dim small" style={{ marginBottom: 2 }}>Vzamejo s seboj:</div>
+                      <div className="eta-row">
+                        <span>🍞 <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane</span>
+                        <span className="dim small">moč ×{draftRTier.strengthMult}</span>
+                      </div>
+                    </div>
+                    <button className="autofit-btn" disabled={!canConfirmDraft} onClick={() => confirmDraft('attack')}>
+                      ✓ Pošlji napad
+                    </button>
+                  </>
+                );
+              })()}
+              {pendingExpeditions.filter(e => e.kind === 'mission').length > 0 && (
+                <div className="pending-exps">
+                  <div className="dim small" style={{ marginBottom: 4 }}>Potrjeni napadi (sproži ob izvedbi meseca):</div>
+                  {pendingExpeditions.map((e, i) => e.kind === 'mission' && (
+                    <div key={i} className="pending-exp-row">
+                      <span>⚔ {e.assigned} · {e.path.length - 1}m{e.weakPointId ? ' · ◆ šibka točka' : ''}</span>
+                      <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
+                    </div>
+                  ))}
                 </div>
-                <div className="ps-row"><span className="dim small">Moč napada:</span><b style={{ color: '#cc4433' }}>+{(combatants * 1.2 * rTier.strengthMult).toFixed(0)}</b></div>
-                <div className="ps-row"><span className="dim small">Zmaga v napadu:</span>
-                  <b style={{ color: combatants > 0 ? probColor(odds?.successProbability ?? 0) : '#555' }}>
-                    {combatants > 0 && odds ? Math.round(odds.successProbability * 100) + '%' : '–'}
-                  </b></div>
-                <div className="ps-row"><span className="dim small">Cilj:</span>
-                  <b style={{ color: targetWP ? '#ffd84a' : '#888' }}>
-                    {targetWP ? (game.aiWeakPoints.find(w => w.id === targetWP)?.label ?? 'šibka točka') : 'splošni napad na robote'}
-                  </b></div>
-              </div>
-              {combatants > weaponCap && (
-                <div className="weapon-warning">⚠ Premalo orožja ({weaponCap}) za {combatants} napadalcev.</div>
               )}
             </div>
-            <OddsDisplay odds={odds} combatants={combatants} />
           </div>
           )}
 
