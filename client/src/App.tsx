@@ -2467,7 +2467,11 @@ export default function App() {
                   {odds ? Math.round((1 - Math.pow(1 - odds.raidProbability, 6)) * 100) + '%' : '–'}</b></div>
               <div className="ps-row"><span className="dim small">✓ Obramba odbije napad:</span>
                 <b style={{ color: probColor(odds?.raidRepelProbability ?? 0) }}>{defenders > 0 && odds ? Math.round(odds.raidRepelProbability * 100) + '%' : '–'}</b></div>
-              <div className="ps-row"><span className="dim small">🧱 Zgrajeni zidovi:</span><b>{game.wallsBuilt ?? 0}</b></div>
+              <div className="ps-row"><span className="dim small">🧱 Obzidje (zidovi):</span>
+                <b style={{ color: (game.wallsBuilt ?? 0) > 0 ? '#aabb88' : '#888' }}>{game.wallsBuilt ?? 0}</b></div>
+              <div className="ps-row"><span className="dim small">🧱 Bonus obrambe (obzidje):</span>
+                <b style={{ color: (game.wallsBuilt ?? 0) > 0 ? '#66cc88' : '#888' }}>
+                  +{((game.wallsBuilt ?? 0) * 20)}%{(game.wallsBuilt ?? 0) > 0 ? ` (×${(1 + 0.20 * (game.wallsBuilt ?? 0)).toFixed(1)})` : ''}</b></div>
               <div className="ps-row"><span className="dim small">⚔ Orožje (kapaciteta boja):</span><b>{weaponCap}</b></div>
             </div>
             {overArmed && (
@@ -2476,6 +2480,7 @@ export default function App() {
             <p className="field-note dim small">
               „Napad AI" je verjetnost <b>na mesec</b> — neodvisna vsak mesec, zato se v več mesecih sešteje.
               Branilci/zidovi ne znižajo verjetnosti napada, ampak povečajo možnost <b>odbitja</b>.
+              Vsako <b>obzidje</b> doda <b>+20 %</b> k moči obrambe (gradi se v Delavnicah), zato z več zidovi obramba postaja vse lažja.
               Verjetnost napada znižata <b>skrivanje</b> (os) in nižja populacija; viša jo to, kar AI ve o tebi.
             </p>
           </div>
