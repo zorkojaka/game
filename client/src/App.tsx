@@ -2670,7 +2670,19 @@ export default function App() {
       <header className="top-bar">
         <div className="top-spacer" />
         <div className="top-res">
-          <BigStat icon="👥" label="Populacija" value={game.population}      color="#d8d8d8" />
+          <div className="top-pop" title={`👥 ${game.population} skupaj — 🏠 v kampu · 🎯 na odpravi · · prosti (brez naloge)`}>
+            <div className="top-pop-head">
+              <span className="top-pop-icon">👥</span>
+              <b className="top-pop-val">{game.population}</b>
+              <span className="top-pop-label">POPULACIJA</span>
+            </div>
+            <div className="top-pop-sub">
+              <span style={{ color: '#9ec0ad' }}>🏠 {Math.max(0, game.population - inMissions)}</span>
+              <span style={{ color: '#d6a96a' }}>🎯 {inMissions}</span>
+              <span style={{ color: freePeople > 0 ? '#66cc88' : '#7a8a82' }}>· {freePeople} prostih</span>
+            </div>
+          </div>
+          <span className="top-sep" />
           <BigStat icon="🍞" label="Hrana"      value={game.resources.survival} color="#cc8800"
             note={`(→ ${foodNextMonth})`}
             noteColor={foodNextMonth <= 0 ? '#cc2222' : foodNextMonth >= game.resources.survival ? '#22cc88' : '#cc8800'} />

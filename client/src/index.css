@@ -184,6 +184,17 @@ b      { color: var(--text); }
 .top-spacer { flex: 1 1 0; }
 .top-sep { width: 1px; align-self: stretch; background: #2a3442; margin: 0 .25rem; }
 
+.top-pop {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: .15rem .6rem .2rem;
+  background: #0d141b; border: 1px solid #2a3a4a; border-radius: 8px;
+}
+.top-pop-head { display: flex; align-items: baseline; gap: .35rem; }
+.top-pop-icon { font-size: 1.15rem; line-height: 1; }
+.top-pop-val { font-size: 1.25rem; font-weight: bold; color: #e6e6e6; }
+.top-pop-label { font-size: .55rem; letter-spacing: .1em; color: #6a7a82; }
+.top-pop-sub { display: flex; gap: .55rem; font-size: .7rem; }
+
 /* Srednji del: meni+levo / karta / desno */
 .main-cols {
   display: grid;
