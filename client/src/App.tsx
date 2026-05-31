@@ -2853,16 +2853,15 @@ export default function App() {
       <aside className="left-col">
         <nav className="side-menu">
           {([
-            { id: 'defense',  icon: '🛡', label: 'Obramba' },
+            { id: 'defense',  icon: '🛡️', label: 'Obramba' },
             { id: 'food',     icon: '🌾', label: 'Prehrana' },
             { id: 'workshop', icon: '🔨', label: 'Delavnice' },
             { id: 'research', icon: '🔬', label: 'Raziskave' },
             { id: 'map',      icon: '🗺', label: 'Izvidniki' },
-            { id: 'attack',   icon: '⚔', label: 'Napad' },
+            { id: 'attack',   icon: '⚔️', label: 'Napad' },
             { id: 'active',   icon: '⏳', label: 'V teku' },
             { id: 'missions', icon: '🎯', label: 'Misije' },
             { id: 'tree',     icon: '🔬', label: 'Drevo' },
-            { id: 'log',      icon: '📜', label: 'Log', mobileOnly: true },
           ] as const).map(m => (
             <button key={m.id} className={`sm-btn ${tab === m.id ? 'active' : ''} ${'mobileOnly' in m && m.mobileOnly ? 'sm-mobile-only' : ''}`}
               onClick={() => { setTab(m.id); if (m.id === 'attack') setDraftKind('attack'); else if (m.id === 'map') setDraftKind('scout'); }} title={m.label}>
