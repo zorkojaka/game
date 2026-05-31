@@ -1924,7 +1924,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
             const px = -dy, py = dx;  // pravokotno za razporeditev gumbov
             // Definiraj gumbe glede na zono
-            type Btn = { label: string; active: boolean; onClick: () => void; title: string; sub?: string };
+            type Btn = { label: string; active: boolean; onClick: () => void; title: string; sub?: string; progress?: number };
             let btns: Btn[] = [];
             if (z.adj === 'f') {
               btns = [1,2,3,4,5].map(lvl => {
@@ -1938,14 +1938,16 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               });
             } else if (z.adj === 'w') {
               btns = [
-                { label: '🔨', active: workshopObj === 'weapon', onClick: () => onWorkshop('weapon'),
-                  title: 'Orožje: vsaka 2 meseca +orožje na delavca, porabi enako materiala',
-                  sub: workshopObj === 'weapon' ? `${workshop.weaponProgress}/2m` : undefined },
+                { label: '⚔', active: workshopObj === 'weapon', onClick: () => onWorkshop('weapon'),
+                  title: 'Orožje: fiksen 2-mesečni cikel; količina = min(delavci, material). Več delavcev = več orožja, ne hitreje.',
+                  sub: workshopObj === 'weapon' ? `${workshop.weaponProgress}/2m` : '2m',
+                  progress: workshopObj === 'weapon' ? workshop.weaponProgress / 2 : 0 },
                 { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),
-                  title: 'Obzidje: 6 delavec-mesecev za 1 obzidje, porabi material. +20 % obrambe',
+                  title: 'Obzidje: 6 delavec-mesecev za 1 obzidje, porabi material. Več delavcev = hitreje.',
                   sub: workshopObj === 'wall'
                     ? (workshop.workers > 0 ? `${Math.ceil(Math.max(0, 6 - workshop.wallProgress) / workshop.workers)}m` : `${workshop.wallProgress}/6`)
-                    : undefined },
+                    : (workshop.workers > 0 ? `${Math.ceil(6 / workshop.workers)}m` : '∞'),
+                  progress: workshopObj === 'wall' ? workshop.wallProgress / 6 : 0 },
               ];
             } else if (z.adj === 'r') {
               btns = [
@@ -1968,6 +1970,20 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                       <circle cx={bxp} cy={byp} r="7.5"
                         fill={b.active ? z.color : '#0a0a0a'}
                         stroke={z.color} strokeWidth={b.active ? 2 : 1} />
+                      {/* Napredek izdelave kot lok okoli gumba */}
+                      {b.progress !== undefined && b.progress > 0 && (() => {
+                        const R = 10.5;
+                        const C = 2 * Math.PI * R;
+                        const frac = Math.max(0, Math.min(1, b.progress));
+                        return (
+                          <circle cx={bxp} cy={byp} r={R}
+                            fill="none" stroke={z.color} strokeWidth="1.6"
+                            strokeDasharray={`${C * frac} ${C * (1 - frac)}`}
+                            strokeDashoffset={C / 4}
+                            transform={`rotate(-90 ${bxp} ${byp})`}
+                            opacity="0.9" />
+                        );
+                      })()}
                       <text x={bxp} y={byp} textAnchor="middle" dominantBaseline="central"
                         fontSize="9" style={{ pointerEvents: 'none' }}>{b.label}</text>
                       {b.sub && (
