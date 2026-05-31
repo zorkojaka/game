@@ -226,7 +226,7 @@ function ClanStatus({ game, inMissions, food }: {
           <BigStat icon="💎" label="Artefakti" value={r.artifacts}     color="#ffd84a" />
         )}
         {(game.wallsBuilt ?? 0) > 0 && (
-          <BigStat icon="🧱" label="Zidovi"    value={game.wallsBuilt} color="#aabb88" />
+          <BigStat icon="🧱" label="Obzidje"   value={game.wallsBuilt} color="#aabb88" />
         )}
       </div>
       {/* Razčlenitev izračuna hrane za naslednji mesec */}
@@ -1353,7 +1353,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
       <ul>
         <li>🍞 <b>Hrana</b> — porablja jo populacija; nabiralci jo pridelajo.</li>
         <li>⚔ <b>Orožje</b> — omejuje, koliko ljudi se lahko bori; izdela se iz materiala.</li>
-        <li>⚙ <b>Material</b> — surovina za orožje in zid; najdeš ga z odpravami in iz uničenih robotov.</li>
+        <li>⚙ <b>Material</b> — surovina za orožje in obzidje; najdeš ga z odpravami in iz uničenih robotov.</li>
         <li>👁 <b>Intel</b> — raziskovalci ga zbirajo; izboljša boje in razkriva AI.</li>
         <li>💎 <b>Artefakt</b> — redek; takoj uniči eno odkrito šibko točko.</li>
       </ul>
@@ -1362,7 +1362,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
       <ul>
         <li>🛡 <b>Obramba</b> — branilci odbijajo napade AI na kamp.</li>
         <li>🌾 <b>Prehrana</b> — nabiralci zbirajo hrano; jakost obrokov (1–5) vpliva na porabo in moč.</li>
-        <li>🔨 <b>Delavnice</b> — delavci izdelujejo orožje ali gradijo zid.</li>
+        <li>🔨 <b>Delavnice</b> — delavci izdelujejo orožje ali gradijo obzidje.</li>
         <li>🔬 <b>Raziskave</b> — raziskovalci zbirajo intel (roboti = boljši boj, ranljivosti = razkrivanje AI).</li>
         <li>Pod ikonami so + / − za premik prostih ljudi v vsako območje.</li>
       </ul>
@@ -1386,7 +1386,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
       <ul>
         <li>Verjetnost napada AT je <b>na mesec</b> in se v več mesecih sešteje; znižata jo skrivanje in nizka populacija.</li>
         <li>Branilci in <b>obzidje</b> ne znižajo verjetnosti napada, ampak povečajo <b>odbitje</b>.</li>
-        <li>Vsak <b>zid</b> doda <b>+20 %</b> moči obrambe; gradi se v Delavnicah (6 delavec-mesecev na zid).</li>
+        <li>Vsako <b>obzidje</b> doda <b>+20 %</b> moči obrambe; gradi se v Delavnicah (6 delavec-mesecev na obzidje).</li>
       </ul>
     ) },
     { id: 'zavezniki', icon: '⛺', title: 'Drugi klani (zavezniki)', body: (
@@ -1851,7 +1851,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           const p = shift(hexToPixel(z.q, z.r, SIZE));
           const zoneInfo =
             z.adj === 'f' ? 'Prehrana — nabiralci zbirajo hrano za kamp.' :
-            z.adj === 'w' ? 'Delavnice — delavci izdelujejo orožje ali gradijo zid (porabijo material).' :
+            z.adj === 'w' ? 'Delavnice — delavci izdelujejo orožje ali gradijo obzidje (porabijo material).' :
             z.adj === 'r' ? 'Raziskave — raziskovalci zbirajo intel in razkrivajo AI načrtovalno drevo.' :
             'Obramba — branilci ščitijo kamp pred napadi AI.';
           return (
@@ -1861,7 +1861,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               <path d={hexPath(p.x, p.y, SIZE)} fill="#0a1a14" stroke="#1a4a3a" strokeWidth="0.8" />
               {/* ikona + oznaka */}
               <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="16">{z.icon}</text>
-              {/* OBRAMBA: število zidov vpisano v ščit (del ikone) */}
+              {/* OBRAMBA: število obzidij vpisano v ščit (del ikone) */}
               {z.adj === 'd' && workshop.wallsBuilt > 0 && (
                 <text x={p.x} y={p.y - SIZE * 0.40} textAnchor="middle" dominantBaseline="central"
                   fontSize="8" fill="#0a2a18" fontWeight="bold" fontFamily="'Courier New', monospace"
@@ -1943,7 +1943,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                   title: 'Orožje: vsaka 2 meseca +orožje na delavca, porabi enako materiala',
                   sub: workshopObj === 'weapon' ? `${workshop.weaponProgress}/2m` : undefined },
                 { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),
-                  title: 'Zid: 6 delavec-mesecev za 1 zid, porabi material. +20 % obrambe',
+                  title: 'Obzidje: 6 delavec-mesecev za 1 obzidje, porabi material. +20 % obrambe',
                   sub: workshopObj === 'wall'
                     ? (workshop.workers > 0 ? `${Math.ceil(Math.max(0, 6 - workshop.wallProgress) / workshop.workers)}m` : `${workshop.wallProgress}/6`)
                     : undefined },
@@ -2061,7 +2061,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
 function WorkshopSelector({ value, onChange }: { value: WorkshopObjective; onChange: (o: WorkshopObjective) => void }) {
   const opts: Array<{ id: WorkshopObjective; icon: string; label: string; color: string; desc: string }> = [
     { id: 'weapon', icon: '🔨', label: 'Orožje', color: '#cc4433', desc: 'Vsaka 2 mes.: +orožje na delavca, porabi material.' },
-    { id: 'wall',   icon: '🧱', label: 'Zid',    color: '#aabb88', desc: 'Zid (6 delavec-mes.), porabi material. +20 % obrambe.' },
+    { id: 'wall',   icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: 'Obzidje (6 delavec-mes.), porabi material. +20 % obrambe.' },
   ];
   const sel = opts.find(o => o.id === value);
   return (
@@ -2706,7 +2706,7 @@ export default function App() {
                   <BigStat icon="💎" label="Artefakti" value={game.resources.artifacts} color="#ffd84a" />
                 )}
                 {(game.wallsBuilt ?? 0) > 0 && (
-                  <BigStat icon="🧱" label="Zidovi"    value={game.wallsBuilt}         color="#aabb88" />
+                  <BigStat icon="🧱" label="Obzidje"   value={game.wallsBuilt}         color="#aabb88" />
                 )}
                 <span className="top-sep" />
                 <BigStat icon="🤖" label="AI roboti" value={game.aiRobots}                      color="#cc3333"
@@ -2797,7 +2797,7 @@ export default function App() {
                   {odds ? Math.round((1 - Math.pow(1 - odds.raidProbability, 6)) * 100) + '%' : '–'}</b></div>
               <div className="ps-row"><span className="dim small">✓ Obramba odbije napad:</span>
                 <b style={{ color: probColor(odds?.raidRepelProbability ?? 0) }}>{defenders > 0 && odds ? Math.round(odds.raidRepelProbability * 100) + '%' : '–'}</b></div>
-              <div className="ps-row"><span className="dim small">🧱 Obzidje (zidovi):</span>
+              <div className="ps-row"><span className="dim small">🧱 Obzidje:</span>
                 <b style={{ color: (game.wallsBuilt ?? 0) > 0 ? '#aabb88' : '#888' }}>{game.wallsBuilt ?? 0}</b></div>
               <div className="ps-row"><span className="dim small">🧱 Bonus obrambe (obzidje):</span>
                 <b style={{ color: (game.wallsBuilt ?? 0) > 0 ? '#66cc88' : '#888' }}>
@@ -2809,8 +2809,8 @@ export default function App() {
             )}
             <p className="field-note dim small">
               „Napad AI" je verjetnost <b>na mesec</b> — neodvisna vsak mesec, zato se v več mesecih sešteje.
-              Branilci/zidovi ne znižajo verjetnosti napada, ampak povečajo možnost <b>odbitja</b>.
-              Vsako <b>obzidje</b> doda <b>+20 %</b> k moči obrambe (gradi se v Delavnicah), zato z več zidovi obramba postaja vse lažja.
+              Branilci/obzidja ne znižajo verjetnosti napada, ampak povečajo možnost <b>odbitja</b>.
+              Vsako <b>obzidje</b> doda <b>+20 %</b> k moči obrambe (gradi se v Delavnicah), zato z več obzidji obramba postaja vse lažja.
               Verjetnost napada znižata <b>skrivanje</b> (os) in nižja populacija; viša jo to, kar AI ve o tebi.
             </p>
           </div>
@@ -2858,7 +2858,7 @@ export default function App() {
               <div className="ps-row"><span className="dim small">Cilj:</span><WorkshopSelector value={workshopObj} onChange={setWorkshopObj} /></div>
               <div className="ps-row"><span className="dim small">⚙ Material:</span><b>{game.resources.material ?? 0}</b></div>
               <div className="ps-row"><span className="dim small">⚔ Orožje:</span><b>{game.resources.combat}</b></div>
-              <div className="ps-row"><span className="dim small">🧱 Zidovi:</span><b>{game.wallsBuilt ?? 0}</b></div>
+              <div className="ps-row"><span className="dim small">🧱 Obzidje:</span><b>{game.wallsBuilt ?? 0}</b></div>
               {workshopObj === 'weapon' ? (
                 <>
                   <div className="ps-row"><span className="dim small">Cikel orožja:</span><b>{(game.weaponWorkshopProgress ?? 0)} / 2 meseca</b></div>
@@ -2871,16 +2871,16 @@ export default function App() {
                 const months = workers > 0 ? Math.ceil(need / workers) : Infinity;
                 return (
                   <>
-                    <div className="ps-row"><span className="dim small">Napredek zidu:</span><b>{wp} / 6 delavec-mesecev</b></div>
-                    <div className="ps-row"><span className="dim small">Do zidu (pri {workers} delavcih):</span>
+                    <div className="ps-row"><span className="dim small">Napredek obzidja:</span><b>{wp} / 6 delavec-mesecev</b></div>
+                    <div className="ps-row"><span className="dim small">Do obzidja (pri {workers} delavcih):</span>
                       <b style={{ color: '#aabb88' }}>{workers > 0 ? `${months} mesec(ev)` : '∞'}</b></div>
                   </>
                 );
               })()}
             </div>
             <p className="field-note dim small">
-              Delavci iz materiala izdelujejo orožje ali gradijo zid. <b>Zid</b> potrebuje <b>6 delavec-mesecev</b>:
-              z {workers || 'N'} delavci to traja <b>{workers > 0 ? Math.ceil(6 / workers) : '∞'} mesec(ev)</b> na zid (več delavcev = hitreje).
+              Delavci iz materiala izdelujejo orožje ali gradijo obzidje. <b>Obzidje</b> potrebuje <b>6 delavec-mesecev</b>:
+              z {workers || 'N'} delavci to traja <b>{workers > 0 ? Math.ceil(6 / workers) : '∞'} mesec(ev)</b> na obzidje (več delavcev = hitreje).
               Vsak mesec gradnje porabi do {workers || 'N'} materiala.
             </p>
           </div>

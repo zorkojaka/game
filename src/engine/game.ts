@@ -347,7 +347,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       }
     } else if (workshopObj === 'wall') {
       if (material <= 0) {
-        workshopEvents.push(`🧱 Gradnja zidu stoji — ni materiala.`);
+        workshopEvents.push(`🧱 Gradnja obzidja stoji — ni materiala.`);
       } else {
         wallProgress += workers;
         const materialCost = Math.min(material, workers);
@@ -355,9 +355,9 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         if (wallProgress >= 6) {
           wallsBuilt += 1;
           wallProgress = 0;
-          workshopEvents.push(`🧱 Obrambni zid dograjen! Skupaj ${wallsBuilt} zidov, +20 % obrambe (−${materialCost} materiala).`);
+          workshopEvents.push(`🧱 Obrambno obzidje dograjeno! Skupaj ${wallsBuilt} obzidij, +20 % obrambe (−${materialCost} materiala).`);
         } else {
-          workshopEvents.push(`🧱 Gradnja zidu: ${Math.min(6, wallProgress)}/6 delavec-mesecev (−${materialCost} materiala).`);
+          workshopEvents.push(`🧱 Gradnja obzidja: ${Math.min(6, wallProgress)}/6 delavec-mesecev (−${materialCost} materiala).`);
         }
       }
     }
