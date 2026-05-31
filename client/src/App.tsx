@@ -1962,12 +1962,14 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             }
             if (!btns.length) return null;
             // Za raziskave premaknemo gumbe nižje na levi stranici (down-left),
-            // delavnico pustimo v naravni smeri (bottom-right). Ostale enako.
+            // za delavnico naravnost navzdol (na dno karte).
             let bdx = dx, bdy = dy;
             if (z.adj === 'r') {
               bdx = -Math.abs(dx);            // levo
               bdy = Math.abs(dy);             // navzdol (nižje)
               const bl = Math.hypot(bdx, bdy) || 1; bdx /= bl; bdy /= bl;
+            } else if (z.adj === 'w') {
+              bdx = 0; bdy = 1;               // naravnost navzdol
             }
             const hasSeg = btns.some(b => b.segments);
             const pushOut = hasSeg ? 1.06 : 1.02;
