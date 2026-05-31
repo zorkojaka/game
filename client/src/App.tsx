@@ -1961,9 +1961,11 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               ];
             }
             if (!btns.length) return null;
-            const baseX = p.x + dx * SIZE * 1.02;
-            const baseY = p.y + dy * SIZE * 1.02;
-            const sp = 15;
+            // Več prostora če imajo gumbi segmente (večji radij), sicer normalno
+            const hasSeg = btns.some(b => b.segments);
+            const baseX = p.x + dx * SIZE * (hasSeg ? 1.18 : 1.02);
+            const baseY = p.y + dy * SIZE * (hasSeg ? 1.18 : 1.02);
+            const sp = hasSeg ? 26 : 15;
             return (
               <g key={`ctrl_${z.q}_${z.r}`}>
                 {btns.map((b, i) => {
@@ -1973,15 +1975,15 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                     <g key={i} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); b.onClick(); }}>
                       <title>{b.title}</title>
                       {/* Ikona z integriranim okvirom: brez ločenega obroba, če ima segmente */}
-                      <circle cx={bxp} cy={byp} r={b.segments ? 8.5 : 7.5}
+                      <circle cx={bxp} cy={byp} r={b.segments ? 8 : 7.5}
                         fill={b.active ? '#0d1612' : '#0a0a0a'}
                         stroke={b.segments ? 'none' : z.color}
                         strokeWidth={b.active ? 2 : 1} />
-                      {/* Segmenti okoli ikone — done = polno, next-month napoved = svetlo, ostalo = temno */}
+                      {/* Segmenti kot obroba ikone — done = polno, next-month napoved = svetlo, ostalo = temno */}
                       {b.segments && (() => {
                         const { done, next, total } = b.segments;
-                        const R = 11.5;
-                        const gap = total > 4 ? 0.12 : 0.18;
+                        const R = 9.5;
+                        const gap = total > 4 ? 0.16 : 0.22;
                         const seg = (2 * Math.PI) / total;
                         const arcs: JSX.Element[] = [];
                         for (let s = 0; s < total; s++) {
