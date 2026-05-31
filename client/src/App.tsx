@@ -120,7 +120,7 @@ function DualKnowledge({ ourK, aiK }: { ourK: number; aiK: number }) {
 }
 
 /** Faza header: vse 3 faze v vrsti levo→desno + Nova igra desno */
-function PhaseHeader({ game, onMenu, loading }: { game: GameState; onMenu: () => void; loading: boolean }) {
+function PhaseHeader({ game }: { game: GameState }) {
   const phases: Array<keyof typeof PHASE> = ['find', 'understand', 'eliminate'];
   const phaseOrder: Record<string, number> = { find: 0, understand: 1, eliminate: 2 };
   const currentIdx = phaseOrder[game.phase];
@@ -161,9 +161,6 @@ function PhaseHeader({ game, onMenu, loading }: { game: GameState; onMenu: () =>
         );
       })}
       <div className="ph-total-cell dim small">M {game.totalRounds}/36</div>
-      <button className="ph-menu-btn" onClick={onMenu} title="Meni" aria-label="Meni">
-        {loading ? '⟳' : '☰'}
-      </button>
     </header>
   );
 }
@@ -2642,7 +2639,7 @@ export default function App() {
       )}
       {/* ─── ZGORNJA VRSTICA: faza + viri ─── */}
       <header className="top-bar">
-        <PhaseHeader game={game} onMenu={() => setAppMenuOpen(true)} loading={loading} />
+        <PhaseHeader game={game} />
         <div className="top-res">
           <BigStat icon="👥" label="Populacija" value={game.population}      color="#d8d8d8" />
           <BigStat icon="🍞" label="Hrana"      value={game.resources.survival} color="#cc8800"
@@ -2657,6 +2654,11 @@ export default function App() {
           {(game.wallsBuilt ?? 0) > 0 && (
             <BigStat icon="🧱" label="Zidovi"    value={game.wallsBuilt}         color="#aabb88" />
           )}
+        </div>
+        <div className="top-menu-wrap">
+          <button className="ph-menu-btn" onClick={() => setAppMenuOpen(true)} title="Meni" aria-label="Meni">
+            {loading ? '⟳' : '☰'}
+          </button>
         </div>
       </header>
 

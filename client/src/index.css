@@ -161,15 +161,16 @@ b      { color: var(--text); }
   padding: .5rem .6rem;
 }
 
-/* Zgornja vrstica: faza + viri */
+/* Zgornja vrstica: faza (levo) — viri (sredina) — meni (desno) */
 .top-bar {
   display: flex;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
 }
-.top-bar > :first-child { flex: 1 1 auto; min-width: 0; }
+.top-bar > .phase-header { flex: 1 1 0; min-width: 0; }
 .top-res {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 1.25rem;
@@ -179,6 +180,7 @@ b      { color: var(--text); }
   border: 1px solid #232c36;
   border-radius: 10px;
 }
+.top-menu-wrap { flex: 1 1 0; display: flex; justify-content: flex-end; }
 
 /* Srednji del: meni+levo / karta / desno */
 .main-cols {
@@ -448,7 +450,7 @@ b      { color: var(--text); }
 .ph-menu-btn {
   background: #161b22; border: 1px solid #2a3442; border-radius: 8px;
   color: #cdd6e0; font-size: 1.1rem; line-height: 1;
-  padding: .35rem .6rem; cursor: pointer; margin-left: auto;
+  padding: .35rem .6rem; cursor: pointer;
 }
 .ph-menu-btn:hover { background: #1d2733; border-color: #3a536e; }
 .app-menu-overlay { position: fixed; inset: 0; z-index: 1100; background: rgba(0,0,0,.35); }
