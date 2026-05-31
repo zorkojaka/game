@@ -150,6 +150,10 @@ export const WEAPON_DESTROY_MAX_PCT = 0.80;
 export const WEAPON_WORKER_MONTHS   = 6;
 export const WALL_WORKER_MONTHS     = 12;
 export const ARTIFACT_WORKER_MONTHS = 360;
+// Material za 1 izdelek
+export const WEAPON_MATERIAL_COST   = 1;
+export const WALL_MATERIAL_COST     = 4;
+export const ARTIFACT_MATERIAL_COST = 20;
 
 // ─── AI napad na kamp (raid) ─────────────────────────────────────────────────
 // P(raid) = base + popScaling * popFactor + aiKnowBonus * aiKnow

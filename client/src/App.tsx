@@ -1398,7 +1398,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
       <ul>
         <li>Verjetnost napada AT je <b>na mesec</b> in se v več mesecih sešteje; znižata jo skrivanje in nizka populacija.</li>
         <li>Branilci in <b>obzidje</b> ne znižajo verjetnosti napada, ampak povečajo <b>odbitje</b>.</li>
-        <li>Vsako <b>obzidje</b> doda <b>+20 %</b> moči obrambe; gradi se v Delavnicah (6 delavec-mesecev na obzidje).</li>
+        <li>Vsako <b>obzidje</b> doda <b>+20 %</b> moči obrambe; gradi se v Delavnicah (12 delavec-mesecev + 4 materiala na obzidje).</li>
       </ul>
     ) },
     { id: 'zavezniki', icon: '⛺', title: 'Drugi klani (zavezniki)', body: (
@@ -1939,7 +1939,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             } else if (z.adj === 'w') {
               btns = [
                 { label: '⚔️', active: workshopObj === 'weapon', onClick: () => onWorkshop('weapon'),
-                  title: 'Orožje: 6 delavec-mesecev za 1 orožje. Vsak mesec napolni toliko segmentov, kolikor je delavcev. Napredek se ohrani ob preklopu.',
+                  title: 'Orožje: 6 delavec-mesecev + 1 material za 1 orožje. Vsak mesec napolni toliko segmentov, kolikor je delavcev.',
                   segments: {
                     done: workshop.weaponProgress,
                     next: workshopObj === 'weapon' && workshop.workers > 0
@@ -1947,7 +1947,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                       : workshop.weaponProgress,
                     total: 6 } },
                 { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),
-                  title: 'Obzidje: 12 delavec-mesecev za 1 obzidje. Napredek se ohrani ob preklopu.',
+                  title: 'Obzidje: 12 delavec-mesecev + 4 materiala za 1 obzidje. Napredek se ohrani ob preklopu.',
                   segments: {
                     done: workshop.wallProgress,
                     next: workshopObj === 'wall' && workshop.workers > 0
@@ -1955,7 +1955,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                       : workshop.wallProgress,
                     total: 12 } },
                 { label: '💎', active: workshopObj === 'artifact', onClick: () => onWorkshop('artifact'),
-                  title: 'Artefakt: 360 delavec-mesecev (30 let z 1 delavcem) za 1 artefakt. Napredek se ohrani ob preklopu.',
+                  title: 'Artefakt: 360 delavec-mesecev (30 let z 1 delavcem) + 20 materiala za 1 artefakt. Napredek se ohrani ob preklopu.',
                   segments: {
                     done: workshop.artifactProgress,
                     next: workshopObj === 'artifact' && workshop.workers > 0
@@ -2150,8 +2150,8 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
 function WorkshopSelector({ value, onChange }: { value: WorkshopObjective; onChange: (o: WorkshopObjective) => void }) {
   const opts: Array<{ id: WorkshopObjective; icon: string; label: string; color: string; desc: string }> = [
     { id: 'weapon',   icon: '⚔️', label: 'Orožje',   color: '#cc4433', desc: '6 delavec-mesecev za 1 orožje (−1 material). Napredek se ohrani ob preklopu.' },
-    { id: 'wall',     icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: '12 delavec-mesecev za 1 obzidje (−1 material). +20 % obrambe. Ohrani napredek.' },
-    { id: 'artifact', icon: '💎', label: 'Artefakt', color: '#ffd84a', desc: '360 delavec-mesecev (30 let z 1 delavcem) za 1 artefakt (−1 material). Ohrani napredek.' },
+    { id: 'wall',     icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: '12 delavec-mesecev za 1 obzidje (−4 materiala). +20 % obrambe. Ohrani napredek.' },
+    { id: 'artifact', icon: '💎', label: 'Artefakt', color: '#ffd84a', desc: '360 delavec-mesecev (30 let z 1 delavcem) za 1 artefakt (−20 materiala). Ohrani napredek.' },
   ];
   const sel = opts.find(o => o.id === value);
   return (
@@ -2768,14 +2768,16 @@ export default function App() {
           <span className="top-sep" />
           {(() => {
             const foodDelta = foodNextMonth - game.resources.survival;
-            const weaponProgressNext = (game.weaponWorkshopProgress ?? 0) + 1;
-            const weaponWillProduce = workshopObj === 'weapon' && workers > 0 && weaponProgressNext >= 2;
-            const weaponDelta = weaponWillProduce ? Math.min(workers, game.resources.material ?? 0) : 0;
-            const materialDelta = workshopObj === 'weapon' && weaponWillProduce
-              ? -Math.min(workers, game.resources.material ?? 0)
-              : workshopObj === 'wall' && workers > 0
-                ? -Math.min(workers, game.resources.material ?? 0)
-                : 0;
+            const matAvail = game.resources.material ?? 0;
+            // Napoved naslednjega meseca po cilju delavnice (delavec-mesecev model)
+            const wpProg = (game.weaponWorkshopProgress ?? 0) + (workshopObj === 'weapon' ? workers : 0);
+            const wpMade = workshopObj === 'weapon' ? Math.min(Math.floor(wpProg / 6), Math.floor(matAvail / 1)) : 0;
+            const wlProg = (game.wallProgress ?? 0) + (workshopObj === 'wall' ? workers : 0);
+            const wlMade = workshopObj === 'wall' ? Math.min(Math.floor(wlProg / 12), Math.floor(matAvail / 4)) : 0;
+            const arProg = (game.artifactWorkshopProgress ?? 0) + (workshopObj === 'artifact' ? workers : 0);
+            const arMade = workshopObj === 'artifact' ? Math.min(Math.floor(arProg / 360), Math.floor(matAvail / 20)) : 0;
+            const weaponDelta = wpMade;
+            const materialDelta = -(wpMade * 1 + wlMade * 4 + arMade * 20);
             const intelDelta = researchIntel;
             const robotsDelta = 0;          // težko predvideti — odvisno od napadov
             const clansAlly = (game.otherClans ?? []).filter(c => c.allied).length * 4;
@@ -2786,7 +2788,7 @@ export default function App() {
                 <BigStat icon="🍞" label="Hrana"      value={game.resources.survival} color="#cc8800"
                   note={fmt(foodDelta) || '±0'} noteColor={col(foodDelta)} />
                 <BigStat icon="⚔"  label="Orožje"     value={game.resources.combat}   color="#cc4433"
-                  note={fmt(weaponDelta) || (workshopObj === 'weapon' ? `${weaponProgressNext}/2m` : '')}
+                  note={fmt(weaponDelta) || (workshopObj === 'weapon' && workers > 0 ? `${game.weaponWorkshopProgress ?? 0}/6 dm` : '')}
                   noteColor={col(weaponDelta)} />
                 <BigStat icon="⚙"  label="Material"   value={game.resources.material ?? 0} color="#88aabb"
                   note={fmt(materialDelta)} noteColor={col(materialDelta)} />
@@ -2968,7 +2970,7 @@ export default function App() {
               })()}
             </div>
             <p className="field-note dim small">
-              Vsak izdelek potrebuje določeno število <b>delavec-mesecev</b>: <b>orožje 6</b>, <b>obzidje 12</b>, <b>artefakt 360</b> (30 let z 1 delavcem). Vsak izdelek porabi 1 material.
+              Stroški: <b>orožje</b> 6 delavec-mes. + <b>1 material</b>; <b>obzidje</b> 12 delavec-mes. + <b>4 materiala</b>; <b>artefakt</b> 360 delavec-mes. (30 let z 1 delavcem) + <b>20 materiala</b>.
               Napredek <b>se ohrani</b> ob preklopu med stvarmi — lahko preklopiš na drugo in se kasneje vrneš tu, kjer si končal.
             </p>
           </div>
