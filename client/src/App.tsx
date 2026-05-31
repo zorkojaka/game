@@ -315,6 +315,34 @@ const HUMAN_AXIS_META: Record<HumanAxis, { icon: string; label: string; color: s
 
 const EMPTY_HISTORY: Record<HumanAxis, number> = { hiding: 0, espionage: 0, defense: 0 };
 
+/** Izbira osi (fokusa) meseca — viden gumb skrivanje / špijonaža / obramba. */
+function AxisFocusBar({ value, onChange }: { value: HumanAxis; onChange: (a: HumanAxis) => void }) {
+  const axes: Array<{ id: HumanAxis; effect: string }> = [
+    { id: 'hiding',    effect: '−50 % verjetnosti napada AI · upočasni padec aktivnosti klanov' },
+    { id: 'espionage', effect: 'bonus pri razkrivanju AI načrta · več intela iz vohunjenja' },
+    { id: 'defense',   effect: 'bonus pri odbijanju napadov · zaščita pred izgubami' },
+  ];
+  return (
+    <div className="axis-focus">
+      <div className="dim small" style={{ marginBottom: 4 }}>Fokus tega meseca:</div>
+      <div className="axis-focus-row">
+        {axes.map(a => {
+          const meta = HUMAN_AXIS_META[a.id];
+          const active = value === a.id;
+          return (
+            <button key={a.id} className={`axis-focus-btn ${active ? 'active' : ''}`}
+              onClick={() => onChange(a.id)} title={a.effect}
+              style={active ? { borderColor: meta.color, color: meta.color, background: '#0d1612' } : { color: '#8a99a3' }}>
+              <span className="afb-icon">{meta.icon}</span>
+              <span className="afb-label">{meta.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function HumanTree({ axisHistory, currentAxis, onFocusChange }: {
   axisHistory?: Record<HumanAxis, number>;
   currentAxis: HumanAxis;
@@ -2706,6 +2734,10 @@ export default function App() {
 
         <div className="left-panel">
          <FitScale deps={[tab, game, defenders, foragers, workers, researchers, combatants, draftPath.length, pendingExpeditions.length]}>
+          {/* Fokus meseca (skrivanje / špijonaža / obramba) — vidno na vseh people-zavihkih */}
+          {(tab === 'defense' || tab === 'food' || tab === 'workshop' || tab === 'research') && (
+            <AxisFocusBar value={axis} onChange={setAxis} />
+          )}
           {/* Vrstica prostih ljudi (vsi people-zavihki) */}
           {(tab === 'defense' || tab === 'food' || tab === 'workshop' || tab === 'research') && (
             <div className="free-people">

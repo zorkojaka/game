@@ -245,6 +245,21 @@ b      { color: var(--text); }
 .field-stats { display: flex; flex-direction: column; gap: .35rem; margin-top: .5rem; }
 .field-stats .ps-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .field-note { margin-top: .6rem; line-height: 1.4; }
+
+/* Fokus meseca (skrivanje / špijonaža / obramba) */
+.axis-focus { margin-bottom: .5rem; }
+.axis-focus-row { display: flex; gap: .35rem; }
+.axis-focus-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: .15rem; padding: .35rem .3rem;
+  background: #0c1116; border: 1px solid #2a3038; border-radius: 8px;
+  font-family: var(--font); cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.axis-focus-btn:hover { background: #131a22; }
+.axis-focus-btn.active { background: #0d1612 !important; }
+.afb-icon { font-size: 1.05rem; line-height: 1; }
+.afb-label { font-size: .58rem; font-weight: bold; letter-spacing: .05em; }
 /* drevesa/misije v ozkem levem panelu — en stolpec */
 .left-panel .band-trees,
 .left-panel .band-missions { grid-template-columns: 1fr; }
