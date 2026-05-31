@@ -1961,10 +1961,12 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               ];
             }
             if (!btns.length) return null;
-            // Enotna postavitev za vse zone (rahlo več prostora za gumbe s segmenti)
+            // Raziskave in delavnice potisnemo dlje navzven (na zunanji rob mape),
+            // prehrana in obramba ostaneta tesno ob zoni.
+            const pushOut = (z.adj === 'r' || z.adj === 'w') ? 1.65 : 1.02;
             const hasSeg = btns.some(b => b.segments);
-            const baseX = p.x + dx * SIZE * (hasSeg ? 1.06 : 1.02);
-            const baseY = p.y + dy * SIZE * (hasSeg ? 1.06 : 1.02);
+            const baseX = p.x + dx * SIZE * pushOut;
+            const baseY = p.y + dy * SIZE * pushOut;
             const sp = hasSeg ? 22 : 15;
             return (
               <g key={`ctrl_${z.q}_${z.r}`}>
