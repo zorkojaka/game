@@ -181,6 +181,7 @@ b      { color: var(--text); }
   border-radius: 10px;
 }
 .top-menu-wrap { flex: 1 1 0; display: flex; justify-content: flex-end; }
+.top-sep { width: 1px; align-self: stretch; background: #2a3442; margin: 0 .25rem; }
 
 /* Srednji del: meni+levo / karta / desno */
 .main-cols {

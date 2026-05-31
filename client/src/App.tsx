@@ -2654,6 +2654,21 @@ export default function App() {
           {(game.wallsBuilt ?? 0) > 0 && (
             <BigStat icon="🧱" label="Zidovi"    value={game.wallsBuilt}         color="#aabb88" />
           )}
+          <span className="top-sep" />
+          <BigStat icon="🤖" label="AI roboti" value={game.aiRobots}                      color="#cc3333" />
+          <BigStat icon="🌍" label="Klani"     value={Math.round(game.clanActivity * 100)} color="#88aa66" unit="%" />
+          {(() => {
+            const ourK = calcOurKnowledge(game.aiTree);
+            const aiK  = game.aiKnowledge;
+            const ourColor = ourK >= 0.6 ? '#22cc88' : ourK >= 0.3 ? '#3377cc' : '#5a7a99';
+            const aiColor  = aiK  >= 0.7 ? '#cc2222' : aiK  >= 0.4 ? '#cc7700' : '#aa5a5a';
+            return (
+              <>
+                <BigStat icon="🔭" label="Mi vemo" value={Math.round(ourK * 100)} color={ourColor} unit="%" />
+                <BigStat icon="👁" label="AI ve"   value={Math.round(aiK * 100)}  color={aiColor}  unit="%" />
+              </>
+            );
+          })()}
         </div>
         <div className="top-menu-wrap">
           <button className="ph-menu-btn" onClick={() => setAppMenuOpen(true)} title="Meni" aria-label="Meni">
@@ -3105,7 +3120,6 @@ export default function App() {
 
       {/* SREDINA: operativna karta */}
       <section className="center-col">
-        <ResourceRow game={game} eventLog={eventLog} />
         <div className="panel map-panel">
           <div className="panel-head">
             <h3>OPERATIVNA MAPA</h3>
