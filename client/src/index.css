@@ -1663,7 +1663,7 @@ input[type=range]::-moz-range-thumb {
   border: 1px solid; border-left-width: 3px;
   min-width: 110px; flex: 1;
 }
-.bs-icon { font-size: 1.7rem; line-height: 1; }
+.bs-icon { font-size: 1.4rem; line-height: 1; width: 1.7rem; height: 1.7rem; display: inline-flex; align-items: center; justify-content: center; }
 .bs-body { flex: 1; min-width: 0; }
 .bs-label { font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; line-height: 1; margin-bottom: 3px; }
 .bs-val { font-size: 1.3rem; font-weight: bold; line-height: 1; }

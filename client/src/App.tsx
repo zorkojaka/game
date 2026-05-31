@@ -2674,21 +2674,46 @@ export default function App() {
             note={`🏠${Math.max(0, game.population - inMissions)} · 🎯${inMissions} · ·${freePeople}`}
             noteColor={freePeople > 0 ? '#66cc88' : '#9ec0ad'} />
           <span className="top-sep" />
-          <BigStat icon="🍞" label="Hrana"      value={game.resources.survival} color="#cc8800"
-            note={`(→ ${foodNextMonth})`}
-            noteColor={foodNextMonth <= 0 ? '#cc2222' : foodNextMonth >= game.resources.survival ? '#22cc88' : '#cc8800'} />
-          <BigStat icon="⚔"  label="Orožje"     value={game.resources.combat}   color="#cc4433" />
-          <BigStat icon="⚙"  label="Material"   value={game.resources.material ?? 0} color="#88aabb" />
-          <BigStat icon="👁"  label="Intel"      value={game.resources.intelligence} color="#3388cc" />
-          {(game.resources.artifacts ?? 0) > 0 && (
-            <BigStat icon="💎" label="Artefakti" value={game.resources.artifacts} color="#ffd84a" />
-          )}
-          {(game.wallsBuilt ?? 0) > 0 && (
-            <BigStat icon="🧱" label="Zidovi"    value={game.wallsBuilt}         color="#aabb88" />
-          )}
-          <span className="top-sep" />
-          <BigStat icon="🤖" label="AI roboti" value={game.aiRobots}                      color="#cc3333" />
-          <BigStat icon="🌍" label="Klani"     value={Math.round(game.clanActivity * 100)} color="#88aa66" unit="%" />
+          {(() => {
+            const foodDelta = foodNextMonth - game.resources.survival;
+            const weaponProgressNext = (game.weaponWorkshopProgress ?? 0) + 1;
+            const weaponWillProduce = workshopObj === 'weapon' && workers > 0 && weaponProgressNext >= 2;
+            const weaponDelta = weaponWillProduce ? Math.min(workers, game.resources.material ?? 0) : 0;
+            const materialDelta = workshopObj === 'weapon' && weaponWillProduce
+              ? -Math.min(workers, game.resources.material ?? 0)
+              : workshopObj === 'wall' && workers > 0
+                ? -Math.min(workers, game.resources.material ?? 0)
+                : 0;
+            const intelDelta = researchIntel;
+            const robotsDelta = 0;          // težko predvideti — odvisno od napadov
+            const clansAlly = (game.otherClans ?? []).filter(c => c.allied).length * 4;
+            const fmt = (n: number) => n > 0 ? `+${n}` : n < 0 ? `${n}` : '';
+            const col = (n: number) => n > 0 ? '#22cc88' : n < 0 ? '#cc4444' : '#888';
+            return (
+              <>
+                <BigStat icon="🍞" label="Hrana"      value={game.resources.survival} color="#cc8800"
+                  note={fmt(foodDelta) || '±0'} noteColor={col(foodDelta)} />
+                <BigStat icon="⚔"  label="Orožje"     value={game.resources.combat}   color="#cc4433"
+                  note={fmt(weaponDelta) || (workshopObj === 'weapon' ? `${weaponProgressNext}/2m` : '')}
+                  noteColor={col(weaponDelta)} />
+                <BigStat icon="⚙"  label="Material"   value={game.resources.material ?? 0} color="#88aabb"
+                  note={fmt(materialDelta)} noteColor={col(materialDelta)} />
+                <BigStat icon="👁"  label="Intel"      value={game.resources.intelligence} color="#3388cc"
+                  note={fmt(intelDelta)} noteColor={col(intelDelta)} />
+                {(game.resources.artifacts ?? 0) > 0 && (
+                  <BigStat icon="💎" label="Artefakti" value={game.resources.artifacts} color="#ffd84a" />
+                )}
+                {(game.wallsBuilt ?? 0) > 0 && (
+                  <BigStat icon="🧱" label="Zidovi"    value={game.wallsBuilt}         color="#aabb88" />
+                )}
+                <span className="top-sep" />
+                <BigStat icon="🤖" label="AI roboti" value={game.aiRobots}                      color="#cc3333"
+                  note={fmt(robotsDelta)} noteColor={col(robotsDelta)} />
+                <BigStat icon="🌍" label="Klani"     value={Math.round(game.clanActivity * 100)} color="#88aa66" unit="%"
+                  note={clansAlly > 0 ? `+${clansAlly}%` : ''} noteColor={'#22cc88'} />
+              </>
+            );
+          })()}
           {(() => {
             const ourK = calcOurKnowledge(game.aiTree);
             const aiK  = game.aiKnowledge;
