@@ -1961,18 +1961,25 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               ];
             }
             if (!btns.length) return null;
-            // Raziskave in delavnice potisnemo dlje navzven (na zunanji rob mape),
-            // prehrana in obramba ostaneta tesno ob zoni.
-            const pushOut = (z.adj === 'r' || z.adj === 'w') ? 1.65 : 1.02;
+            // Za raziskave premaknemo gumbe nižje na levi stranici (down-left),
+            // delavnico pustimo v naravni smeri (bottom-right). Ostale enako.
+            let bdx = dx, bdy = dy;
+            if (z.adj === 'r') {
+              bdx = -Math.abs(dx);            // levo
+              bdy = Math.abs(dy);             // navzdol (nižje)
+              const bl = Math.hypot(bdx, bdy) || 1; bdx /= bl; bdy /= bl;
+            }
             const hasSeg = btns.some(b => b.segments);
-            const baseX = p.x + dx * SIZE * pushOut;
-            const baseY = p.y + dy * SIZE * pushOut;
+            const pushOut = hasSeg ? 1.06 : 1.02;
+            const baseX = p.x + bdx * SIZE * pushOut;
+            const baseY = p.y + bdy * SIZE * pushOut;
+            const lpx = -bdy, lpy = bdx;
             const sp = hasSeg ? 22 : 15;
             return (
               <g key={`ctrl_${z.q}_${z.r}`}>
                 {btns.map((b, i) => {
                   const off = (i - (btns.length - 1) / 2) * sp;
-                  const bxp = baseX + px * off, byp = baseY + py * off;
+                  const bxp = baseX + lpx * off, byp = baseY + lpy * off;
                   return (
                     <g key={i} style={{ cursor: 'pointer', opacity: b.active ? 1 : 0.45 }}
                        onClick={(e) => { e.stopPropagation(); b.onClick(); }}>
