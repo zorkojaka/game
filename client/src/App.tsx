@@ -2670,9 +2670,11 @@ export default function App() {
       <header className="top-bar">
         <div className="top-spacer" />
         <div className="top-res">
-          <BigStat icon="👥" label="Populacija" value={game.population} color="#d8d8d8"
-            note={`🏠${Math.max(0, game.population - inMissions)} · 🎯${inMissions} · ·${freePeople}`}
-            noteColor={freePeople > 0 ? '#66cc88' : '#9ec0ad'} />
+          <BigStat icon="👥" label="Populacija"  value={game.population}                              color="#d8d8d8" />
+          <BigStat icon="🏠" label="V kampu"     value={Math.max(0, game.population - inMissions)}    color="#9ec0ad" />
+          <BigStat icon="🎯" label="Na odpravi"  value={inMissions}                                   color="#d6a96a" />
+          <BigStat icon="·"  label="Prosti"      value={freePeople}
+            color={freePeople > 0 ? '#66cc88' : '#7a8a82'} />
           <span className="top-sep" />
           {(() => {
             const foodDelta = foodNextMonth - game.resources.survival;
