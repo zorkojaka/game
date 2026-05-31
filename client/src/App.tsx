@@ -1520,7 +1520,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
   workshopObj: WorkshopObjective; onWorkshop: (o: WorkshopObjective) => void;
   researchObj: ResearchObjective; onResearch: (o: ResearchObjective) => void;
   workshop: { wallsBuilt: number; weaponProgress: number; wallProgress: number; workers: number };
-  pop: { total: number; inCamp: number; away: number };
+  pop: { total: number; inCamp: number; away: number; free: number };
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
@@ -1878,6 +1878,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               <text x={lx} y={ly + 22} fontSize="20" fill="#e6e6e6" fontWeight="bold">👥 {pop.total}</text>
               <text x={lx} y={ly + 40} fontSize="9" fill="#9ec0ad">🏠 {pop.inCamp} v kampu</text>
               <text x={lx} y={ly + 53} fontSize="9" fill="#d6a96a">🎯 {pop.away} na odpravi</text>
+              <text x={lx} y={ly + 66} fontSize="9" fill={pop.free > 0 ? '#66cc88' : '#7a8a82'}>· {pop.free} prostih (brez naloge)</text>
             </g>
           );
         })()}
@@ -3142,7 +3143,7 @@ export default function App() {
             workshopObj={workshopObj} onWorkshop={setWorkshopObj}
             researchObj={researchObj} onResearch={setResearchObj}
             workshop={{ wallsBuilt: game.wallsBuilt ?? 0, weaponProgress: game.weaponWorkshopProgress ?? 0, wallProgress: game.wallProgress ?? 0, workers }}
-            pop={{ total: game.population, inCamp: Math.max(0, game.population - inMissions), away: inMissions }} />
+            pop={{ total: game.population, inCamp: Math.max(0, game.population - inMissions), away: inMissions, free: freePeople }} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
