@@ -1555,8 +1555,22 @@ input[type=range]::-moz-range-thumb {
   transition: background .12s;
 }
 .tl-row:hover { background: #161616; }
-.tl-row.open { background: #14110a; border-left-color: #cc8800; }
-.tl-row:first-child { border-left-color: #cc8800; }
+.tl-row.open { background: #14110a; }
+/* Phase header v časovnem traku (med vrsticami pri prehodu med fazami) */
+.tl-phase-hdr {
+  display: flex; align-items: center; gap: .4rem;
+  margin: .35rem 0 .25rem;
+  padding: .25rem .4rem;
+  border-left: 3px solid;
+  border-radius: 4px;
+  background: #0a0d12;
+  font-family: var(--font);
+}
+.tl-phase-num {
+  font-size: .55rem; font-weight: bold; letter-spacing: .08em;
+  color: #0a0a0a; padding: 1px 5px; border-radius: 3px;
+}
+.tl-phase-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
 
 .tl-row-main {
   display: flex; align-items: center; gap: 6px;

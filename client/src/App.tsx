@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan } from './types';
 import { tileId } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
@@ -1159,12 +1159,23 @@ function EventLog({ entries }: { entries: EventEntry[] }) {
             Mesec še ni minil. Razporedi ekipe in izvedi mesec.
           </div>
         )}
-        {entries.map((e) => {
+        {entries.map((e, i) => {
           const isOpen = openTs === e.ts;
           const isSpecial = /💥 ŠIBKA TOČKA UNIČENA/.test(e.narrative);
           const top = [...e.ledger].sort((a,b) => Math.abs(b.value) - Math.abs(a.value)).slice(0, 4);
+          const prev = entries[i - 1];   // novejša (zgornja) vrstica
+          const showPhaseHdr = !prev || prev.phase !== e.phase;
+          const ph = PHASE[e.phase];
           return (
-            <div key={e.ts} className={`tl-row ${isOpen ? 'open' : ''} ${isSpecial ? 'special' : ''}`}
+            <Fragment key={e.ts}>
+            {showPhaseHdr && (
+              <div className="tl-phase-hdr" style={{ borderColor: ph.color, color: ph.color }}>
+                <span className="tl-phase-num" style={{ background: ph.color }}>FAZA {ph.num}</span>
+                <span className="tl-phase-label">{ph.full}</span>
+              </div>
+            )}
+            <div className={`tl-row ${isOpen ? 'open' : ''} ${isSpecial ? 'special' : ''}`}
+                 style={{ borderLeftColor: ph.color }}
                  onClick={() => setOpenTs(isOpen ? null : e.ts)}>
               <div className="tl-row-main">
                 <span className="tl-round" style={{ color: PHASE[e.phase].color, borderColor: PHASE[e.phase].color }}>
@@ -1199,6 +1210,7 @@ function EventLog({ entries }: { entries: EventEntry[] }) {
                 </div>
               )}
             </div>
+            </Fragment>
           );
         })}
       </div>
@@ -1896,20 +1908,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           );
         })}
 
-        {/* Populacija — v praznem kotu spodaj levo (skupaj + delitev kamp/odprave) */}
-        {(() => {
-          const lx = W * 0.04;
-          const ly = H * 0.74;
-          return (
-            <g pointerEvents="none" textAnchor="start" fontFamily="'Courier New', monospace">
-              <text x={lx} y={ly} fontSize="9" fill="#7a8a82" letterSpacing="0.5">POPULACIJA</text>
-              <text x={lx} y={ly + 22} fontSize="20" fill="#e6e6e6" fontWeight="bold">👥 {pop.total}</text>
-              <text x={lx} y={ly + 40} fontSize="9" fill="#9ec0ad">🏠 {pop.inCamp} v kampu</text>
-              <text x={lx} y={ly + 53} fontSize="9" fill="#d6a96a">🎯 {pop.away} na odpravi</text>
-              <text x={lx} y={ly + 66} fontSize="9" fill={pop.free > 0 ? '#66cc88' : '#7a8a82'}>· {pop.free} prostih (brez naloge)</text>
-            </g>
-          );
-        })()}
+        {/* Populacija je prikazana v zgornji vrstici (top-bar). */}
 
         {/* Zunanji kontrolni gumbi vsake zone (na zunanji strani) */}
         {(() => {
@@ -2673,7 +2672,7 @@ export default function App() {
           <BigStat icon="👥" label="Populacija"  value={game.population}                              color="#d8d8d8" />
           <BigStat icon="🏠" label="V kampu"     value={Math.max(0, game.population - inMissions)}    color="#9ec0ad" />
           <BigStat icon="🎯" label="Na odpravi"  value={inMissions}                                   color="#d6a96a" />
-          <BigStat icon="·"  label="Prosti"      value={freePeople}
+          <BigStat icon="💤" label="Prosti"      value={freePeople}
             color={freePeople > 0 ? '#66cc88' : '#7a8a82'} />
           <span className="top-sep" />
           {(() => {
