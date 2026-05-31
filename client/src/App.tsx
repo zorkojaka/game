@@ -1961,24 +1961,30 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               ];
             }
             if (!btns.length) return null;
-            // Več prostora če imajo gumbi segmente (večji radij), sicer normalno
+            // Enotna postavitev za vse zone (rahlo več prostora za gumbe s segmenti)
             const hasSeg = btns.some(b => b.segments);
-            const baseX = p.x + dx * SIZE * (hasSeg ? 1.18 : 1.02);
-            const baseY = p.y + dy * SIZE * (hasSeg ? 1.18 : 1.02);
-            const sp = hasSeg ? 26 : 15;
+            const baseX = p.x + dx * SIZE * (hasSeg ? 1.06 : 1.02);
+            const baseY = p.y + dy * SIZE * (hasSeg ? 1.06 : 1.02);
+            const sp = hasSeg ? 22 : 15;
             return (
               <g key={`ctrl_${z.q}_${z.r}`}>
                 {btns.map((b, i) => {
                   const off = (i - (btns.length - 1) / 2) * sp;
                   const bxp = baseX + px * off, byp = baseY + py * off;
                   return (
-                    <g key={i} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); b.onClick(); }}>
+                    <g key={i} style={{ cursor: 'pointer', opacity: b.active ? 1 : 0.45 }}
+                       onClick={(e) => { e.stopPropagation(); b.onClick(); }}>
                       <title>{b.title}</title>
+                      {/* Aktivni gumb dobi rahel sij za boljšo opaznost */}
+                      {b.active && (
+                        <circle cx={bxp} cy={byp} r={b.segments ? 13 : 11}
+                          fill={z.color} opacity="0.15" />
+                      )}
                       {/* Ikona z integriranim okvirom: brez ločenega obroba, če ima segmente */}
                       <circle cx={bxp} cy={byp} r={b.segments ? 8 : 7.5}
                         fill={b.active ? '#0d1612' : '#0a0a0a'}
                         stroke={b.segments ? 'none' : z.color}
-                        strokeWidth={b.active ? 2 : 1} />
+                        strokeWidth={b.active ? 2.5 : 1} />
                       {/* Segmenti kot obroba ikone — done = polno, next-month napoved = svetlo, ostalo = temno */}
                       {b.segments && (() => {
                         const { done, next, total } = b.segments;
