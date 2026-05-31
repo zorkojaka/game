@@ -1924,7 +1924,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
             const px = -dy, py = dx;  // pravokotno za razporeditev gumbov
             // Definiraj gumbe glede na zono
-            type Btn = { label: string; active: boolean; onClick: () => void; title: string; sub?: string; segments?: { done: number; total: number } };
+            type Btn = { label: string; active: boolean; onClick: () => void; title: string; sub?: string; segments?: { done: number; next: number; total: number } };
             let btns: Btn[] = [];
             if (z.adj === 'f') {
               btns = [1,2,3,4,5].map(lvl => {
@@ -1940,10 +1940,19 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               btns = [
                 { label: '⚔️', active: workshopObj === 'weapon', onClick: () => onWorkshop('weapon'),
                   title: 'Orožje: fiksen 2-mesečni cikel; količina = min(delavci, material). Več delavcev = več orožja, ne hitreje.',
-                  segments: { done: workshopObj === 'weapon' ? workshop.weaponProgress : 0, total: 2 } },
+                  segments: {
+                    done: workshopObj === 'weapon' ? workshop.weaponProgress : 0,
+                    next: workshopObj === 'weapon' && workshop.workers > 0
+                      ? Math.min(2, workshop.weaponProgress + 1) : (workshopObj === 'weapon' ? workshop.weaponProgress : 0),
+                    total: 2 } },
                 { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),
-                  title: 'Obzidje: 6 delavec-mesecev za 1 obzidje. Več delavcev = hitreje (vsak mesec napolni toliko segmentov, kolikor je delavcev).',
-                  segments: { done: workshopObj === 'wall' ? workshop.wallProgress : 0, total: 6 } },
+                  title: 'Obzidje: 6 delavec-mesecev. Vsak mesec napolni toliko segmentov, kolikor je delavcev. Svetli del = napoved za naslednji mesec.',
+                  segments: {
+                    done: workshopObj === 'wall' ? workshop.wallProgress : 0,
+                    next: workshopObj === 'wall' && workshop.workers > 0
+                      ? Math.min(6, workshop.wallProgress + workshop.workers)
+                      : (workshopObj === 'wall' ? workshop.wallProgress : 0),
+                    total: 6 } },
               ];
             } else if (z.adj === 'r') {
               btns = [
@@ -1963,14 +1972,16 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                   return (
                     <g key={i} style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); b.onClick(); }}>
                       <title>{b.title}</title>
-                      <circle cx={bxp} cy={byp} r="7.5"
-                        fill={b.active ? z.color : '#0a0a0a'}
-                        stroke={z.color} strokeWidth={b.active ? 2 : 1} />
-                      {/* Napredek izdelave kot segmenti okoli gumba (X od skupaj N) */}
+                      {/* Ikona z integriranim okvirom: brez ločenega obroba, če ima segmente */}
+                      <circle cx={bxp} cy={byp} r={b.segments ? 8.5 : 7.5}
+                        fill={b.active ? '#0d1612' : '#0a0a0a'}
+                        stroke={b.segments ? 'none' : z.color}
+                        strokeWidth={b.active ? 2 : 1} />
+                      {/* Segmenti okoli ikone — done = polno, next-month napoved = svetlo, ostalo = temno */}
                       {b.segments && (() => {
-                        const { done, total } = b.segments;
-                        const R = 10.5;
-                        const gap = total > 4 ? 0.10 : 0.15;   // radians med segmenti
+                        const { done, next, total } = b.segments;
+                        const R = 11.5;
+                        const gap = total > 4 ? 0.12 : 0.18;
                         const seg = (2 * Math.PI) / total;
                         const arcs: JSX.Element[] = [];
                         for (let s = 0; s < total; s++) {
@@ -1981,17 +1992,23 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                           const ex = bxp + R * Math.cos(endA);
                           const ey = byp + R * Math.sin(endA);
                           const large = (endA - startA) > Math.PI ? 1 : 0;
-                          const filled = s < done;
+                          const state: 'done' | 'next' | 'empty' =
+                            s < done ? 'done' : s < next ? 'next' : 'empty';
+                          const color =
+                            state === 'done' ? z.color
+                            : state === 'next' ? z.color
+                            : '#2a2a2a';
+                          const opacity = state === 'next' ? 0.4 : 1;
                           arcs.push(
                             <path key={s} d={`M${sx} ${sy} A${R} ${R} 0 ${large} 1 ${ex} ${ey}`}
-                              fill="none" stroke={filled ? z.color : '#2a2a2a'} strokeWidth="2.2"
-                              strokeLinecap="round" />
+                              fill="none" stroke={color} strokeWidth="3"
+                              strokeLinecap="round" opacity={opacity} />
                           );
                         }
                         return <g pointerEvents="none">{arcs}</g>;
                       })()}
                       <text x={bxp} y={byp} textAnchor="middle" dominantBaseline="central"
-                        fontSize="9" style={{ pointerEvents: 'none' }}>{b.label}</text>
+                        fontSize="10" style={{ pointerEvents: 'none' }}>{b.label}</text>
                       {b.sub && (
                         <text x={bxp} y={byp + 12} textAnchor="middle" dominantBaseline="central"
                           fontSize="6.5" fill={z.color} fontWeight="bold"
