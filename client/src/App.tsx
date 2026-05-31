@@ -1559,7 +1559,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
   rations: number; onRations: (n: number) => void;
   workshopObj: WorkshopObjective; onWorkshop: (o: WorkshopObjective) => void;
   researchObj: ResearchObjective; onResearch: (o: ResearchObjective) => void;
-  workshop: { wallsBuilt: number; weaponProgress: number; wallProgress: number; workers: number };
+  workshop: { wallsBuilt: number; weaponProgress: number; wallProgress: number; artifactProgress: number; workers: number };
   pop: { total: number; inCamp: number; away: number; free: number };
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
@@ -1939,20 +1939,29 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             } else if (z.adj === 'w') {
               btns = [
                 { label: '⚔️', active: workshopObj === 'weapon', onClick: () => onWorkshop('weapon'),
-                  title: 'Orožje: fiksen 2-mesečni cikel; količina = min(delavci, material). Več delavcev = več orožja, ne hitreje.',
+                  title: 'Orožje: 6 delavec-mesecev za 1 orožje. Vsak mesec napolni toliko segmentov, kolikor je delavcev. Napredek se ohrani ob preklopu.',
                   segments: {
-                    done: workshopObj === 'weapon' ? workshop.weaponProgress : 0,
+                    done: workshop.weaponProgress,
                     next: workshopObj === 'weapon' && workshop.workers > 0
-                      ? Math.min(2, workshop.weaponProgress + 1) : (workshopObj === 'weapon' ? workshop.weaponProgress : 0),
-                    total: 2 } },
-                { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),
-                  title: 'Obzidje: 6 delavec-mesecev. Vsak mesec napolni toliko segmentov, kolikor je delavcev. Svetli del = napoved za naslednji mesec.',
-                  segments: {
-                    done: workshopObj === 'wall' ? workshop.wallProgress : 0,
-                    next: workshopObj === 'wall' && workshop.workers > 0
-                      ? Math.min(6, workshop.wallProgress + workshop.workers)
-                      : (workshopObj === 'wall' ? workshop.wallProgress : 0),
+                      ? Math.min(6, workshop.weaponProgress + workshop.workers)
+                      : workshop.weaponProgress,
                     total: 6 } },
+                { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),
+                  title: 'Obzidje: 12 delavec-mesecev za 1 obzidje. Napredek se ohrani ob preklopu.',
+                  segments: {
+                    done: workshop.wallProgress,
+                    next: workshopObj === 'wall' && workshop.workers > 0
+                      ? Math.min(12, workshop.wallProgress + workshop.workers)
+                      : workshop.wallProgress,
+                    total: 12 } },
+                { label: '💎', active: workshopObj === 'artifact', onClick: () => onWorkshop('artifact'),
+                  title: 'Artefakt: 360 delavec-mesecev (30 let z 1 delavcem) za 1 artefakt. Napredek se ohrani ob preklopu.',
+                  segments: {
+                    done: workshop.artifactProgress,
+                    next: workshopObj === 'artifact' && workshop.workers > 0
+                      ? Math.min(360, workshop.artifactProgress + workshop.workers)
+                      : workshop.artifactProgress,
+                    total: 360 } },
               ];
             } else if (z.adj === 'r') {
               btns = [
@@ -1996,10 +2005,36 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                         fill={b.active ? '#0d1612' : '#0a0a0a'}
                         stroke={b.segments ? 'none' : z.color}
                         strokeWidth={b.active ? 2.5 : 1} />
-                      {/* Segmenti kot obroba ikone — done = polno, next-month napoved = svetlo, ostalo = temno */}
+                      {/* Segmenti / lok kot obroba ikone — done = polno, next-month napoved = svetlo */}
                       {b.segments && (() => {
                         const { done, next, total } = b.segments;
                         const R = 9.5;
+                        // Pri velikih total (npr. artefakt 360) prikažemo zvezna loka, ne 360 segmentov.
+                        if (total > 24) {
+                          const C = 2 * Math.PI * R;
+                          const doneFrac = Math.max(0, Math.min(1, done / total));
+                          const nextFrac = Math.max(0, Math.min(1, next / total));
+                          return (
+                            <g pointerEvents="none">
+                              {/* podlaga (temno) */}
+                              <circle cx={bxp} cy={byp} r={R} fill="none" stroke="#2a2a2a" strokeWidth="3" />
+                              {/* napoved (svetlo) */}
+                              {nextFrac > doneFrac && (
+                                <circle cx={bxp} cy={byp} r={R} fill="none" stroke={z.color} strokeWidth="3"
+                                  strokeDasharray={`${C * nextFrac} ${C}`}
+                                  strokeDashoffset={C / 4}
+                                  transform={`rotate(-90 ${bxp} ${byp})`} opacity="0.4" />
+                              )}
+                              {/* dosežen napredek (polno) */}
+                              {doneFrac > 0 && (
+                                <circle cx={bxp} cy={byp} r={R} fill="none" stroke={z.color} strokeWidth="3"
+                                  strokeDasharray={`${C * doneFrac} ${C}`}
+                                  strokeDashoffset={C / 4}
+                                  transform={`rotate(-90 ${bxp} ${byp})`} />
+                              )}
+                            </g>
+                          );
+                        }
                         const gap = total > 4 ? 0.16 : 0.22;
                         const seg = (2 * Math.PI) / total;
                         const arcs: JSX.Element[] = [];
@@ -2013,10 +2048,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                           const large = (endA - startA) > Math.PI ? 1 : 0;
                           const state: 'done' | 'next' | 'empty' =
                             s < done ? 'done' : s < next ? 'next' : 'empty';
-                          const color =
-                            state === 'done' ? z.color
-                            : state === 'next' ? z.color
-                            : '#2a2a2a';
+                          const color = state === 'empty' ? '#2a2a2a' : z.color;
                           const opacity = state === 'next' ? 0.4 : 1;
                           arcs.push(
                             <path key={s} d={`M${sx} ${sy} A${R} ${R} 0 ${large} 1 ${ex} ${ey}`}
@@ -2117,13 +2149,14 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
 /** Izbira cilja delavnice (delavci) */
 function WorkshopSelector({ value, onChange }: { value: WorkshopObjective; onChange: (o: WorkshopObjective) => void }) {
   const opts: Array<{ id: WorkshopObjective; icon: string; label: string; color: string; desc: string }> = [
-    { id: 'weapon', icon: '🔨', label: 'Orožje', color: '#cc4433', desc: 'Vsaka 2 mes.: +orožje na delavca, porabi material.' },
-    { id: 'wall',   icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: 'Obzidje (6 delavec-mes.), porabi material. +20 % obrambe.' },
+    { id: 'weapon',   icon: '⚔️', label: 'Orožje',   color: '#cc4433', desc: '6 delavec-mesecev za 1 orožje (−1 material). Napredek se ohrani ob preklopu.' },
+    { id: 'wall',     icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: '12 delavec-mesecev za 1 obzidje (−1 material). +20 % obrambe. Ohrani napredek.' },
+    { id: 'artifact', icon: '💎', label: 'Artefakt', color: '#ffd84a', desc: '360 delavec-mesecev (30 let z 1 delavcem) za 1 artefakt (−1 material). Ohrani napredek.' },
   ];
   const sel = opts.find(o => o.id === value);
   return (
     <div className="scout-objectives compact">
-      <div className="so-row" style={{ gridTemplateColumns: 'repeat(2,1fr)' }}>
+      <div className="so-row" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
         {opts.map(o => (
           <button key={o.id} className={`so-btn ${value === o.id ? 'sel' : ''}`}
             style={value === o.id ? { borderColor: o.color, color: o.color } : {}}
@@ -2916,29 +2949,27 @@ export default function App() {
               <div className="ps-row"><span className="dim small">⚙ Material:</span><b>{game.resources.material ?? 0}</b></div>
               <div className="ps-row"><span className="dim small">⚔ Orožje:</span><b>{game.resources.combat}</b></div>
               <div className="ps-row"><span className="dim small">🧱 Obzidje:</span><b>{game.wallsBuilt ?? 0}</b></div>
-              {workshopObj === 'weapon' ? (
-                <>
-                  <div className="ps-row"><span className="dim small">Cikel orožja:</span><b>{(game.weaponWorkshopProgress ?? 0)} / 2 meseca</b></div>
-                  <div className="ps-row"><span className="dim small">Naslednja serija:</span>
-                    <b style={{ color: '#cc7733' }}>{workers > 0 ? `+${Math.min(workers, game.resources.material ?? 0)} orožja` : '–'}</b></div>
-                </>
-              ) : (() => {
-                const wp = game.wallProgress ?? 0;
-                const need = Math.max(0, 6 - wp);
+              {(() => {
+                const cfg = workshopObj === 'weapon'
+                  ? { label: 'orožja', total: 6, prog: game.weaponWorkshopProgress ?? 0, color: '#cc7733' }
+                  : workshopObj === 'wall'
+                    ? { label: 'obzidja', total: 12, prog: game.wallProgress ?? 0, color: '#aabb88' }
+                    : { label: 'artefakta', total: 360, prog: game.artifactWorkshopProgress ?? 0, color: '#ffd84a' };
+                const need = Math.max(0, cfg.total - cfg.prog);
                 const months = workers > 0 ? Math.ceil(need / workers) : Infinity;
                 return (
                   <>
-                    <div className="ps-row"><span className="dim small">Napredek obzidja:</span><b>{wp} / 6 delavec-mesecev</b></div>
-                    <div className="ps-row"><span className="dim small">Do obzidja (pri {workers} delavcih):</span>
-                      <b style={{ color: '#aabb88' }}>{workers > 0 ? `${months} mesec(ev)` : '∞'}</b></div>
+                    <div className="ps-row"><span className="dim small">Napredek {cfg.label}:</span>
+                      <b>{cfg.prog} / {cfg.total} delavec-mesecev</b></div>
+                    <div className="ps-row"><span className="dim small">Do izdelka (pri {workers} delavcih):</span>
+                      <b style={{ color: cfg.color }}>{workers > 0 ? `${months} mesec(ev)` : '∞'}</b></div>
                   </>
                 );
               })()}
             </div>
             <p className="field-note dim small">
-              Delavci iz materiala izdelujejo orožje ali gradijo obzidje. <b>Obzidje</b> potrebuje <b>6 delavec-mesecev</b>:
-              z {workers || 'N'} delavci to traja <b>{workers > 0 ? Math.ceil(6 / workers) : '∞'} mesec(ev)</b> na obzidje (več delavcev = hitreje).
-              Vsak mesec gradnje porabi do {workers || 'N'} materiala.
+              Vsak izdelek potrebuje določeno število <b>delavec-mesecev</b>: <b>orožje 6</b>, <b>obzidje 12</b>, <b>artefakt 360</b> (30 let z 1 delavcem). Vsak izdelek porabi 1 material.
+              Napredek <b>se ohrani</b> ob preklopu med stvarmi — lahko preklopiš na drugo in se kasneje vrneš tu, kjer si končal.
             </p>
           </div>
           )}
@@ -3261,7 +3292,7 @@ export default function App() {
             rations={rations} onRations={setRations}
             workshopObj={workshopObj} onWorkshop={setWorkshopObj}
             researchObj={researchObj} onResearch={setResearchObj}
-            workshop={{ wallsBuilt: game.wallsBuilt ?? 0, weaponProgress: game.weaponWorkshopProgress ?? 0, wallProgress: game.wallProgress ?? 0, workers }}
+            workshop={{ wallsBuilt: game.wallsBuilt ?? 0, weaponProgress: game.weaponWorkshopProgress ?? 0, wallProgress: game.wallProgress ?? 0, artifactProgress: game.artifactWorkshopProgress ?? 0, workers }}
             pop={{ total: game.population, inCamp: Math.max(0, game.population - inMissions), away: inMissions, free: freePeople }} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>

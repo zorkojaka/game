@@ -18,6 +18,7 @@ import {
   SCOUT_INTEL_YIELD, SCOUT_FOG_YIELD, CLAN_ACTIVITY_BY_PHASE, CLAN_ACTIVITY_EXPOSURE_MODIFIER,
   CLAN_ACTIVITY_HIDDEN_MODIFIER, PHASE_EVENT_BASE_DAMAGE, PREPARED_DAMAGE_REDUCTION,
   M_OS, RATIONS_LEVELS, DEFAULT_RATIONS,
+  WEAPON_WORKER_MONTHS, WALL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS,
   RAID_BASE_CHANCE, RAID_POP_SCALING_MAX, RAID_POP_REFERENCE, RAID_AI_KNOWLEDGE_BONUS,
   RAID_HIDING_REDUCTION, RAID_CLAN_ABSORPTION, RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT,
   SCOUT_BASE_SUCCESS, SCOUT_INTEL_BONUS_PER_100, SCOUT_ESPIONAGE_BONUS,
@@ -230,6 +231,7 @@ export function newGame(seed?: number): GameState {
     weaponWorkshopScouts: 0,
     wallProgress: 0,
     wallsBuilt: 0,
+    artifactWorkshopProgress: 0,
     rngSeed,
     rngCallCount: 0,
     lastRoundLog: null,
@@ -320,44 +322,63 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     }
   }
 
-  // 4. DELAVCI — delavnica orožja ali gradnja zidu
+  // 4. DELAVCI — delavnica (delavec-meseci; napredek se ohrani ob preklopu)
   const workers = assignment.workers ?? 0;
-  const workshopObj: 'weapon' | 'wall' = assignment.workshopObjective ?? 'weapon';
+  const workshopObj: 'weapon' | 'wall' | 'artifact' = assignment.workshopObjective ?? 'weapon';
   let weaponWorkshopProgress = state.weaponWorkshopProgress ?? 0;
   let weaponWorkshopScouts = state.weaponWorkshopScouts ?? 0;
   let wallProgress = state.wallProgress ?? 0;
   let wallsBuilt = state.wallsBuilt ?? 0;
+  let artifactWorkshopProgress = state.artifactWorkshopProgress ?? 0;
 
   if (workers > 0) {
     if (workshopObj === 'weapon') {
       if (material <= 0) {
-        workshopEvents.push(`🔨 Delavnica orožja stoji — ni materiala.`);
+        workshopEvents.push(`⚔️ Delavnica orožja stoji — ni materiala.`);
       } else {
-        weaponWorkshopScouts = workers;
-        weaponWorkshopProgress += 1;
-        if (weaponWorkshopProgress >= 2) {
-          const possible = Math.min(weaponWorkshopScouts, material);
-          combat += possible;
-          material -= possible;
-          workshopEvents.push(`🔨 Delavnica orožja: +${possible} orožja (−${possible} materiala).`);
-          weaponWorkshopProgress = 0;
+        weaponWorkshopProgress += workers;
+        const possible = Math.floor(weaponWorkshopProgress / WEAPON_WORKER_MONTHS);
+        if (possible > 0) {
+          const made = Math.min(possible, material);
+          combat += made;
+          material -= made;
+          weaponWorkshopProgress -= made * WEAPON_WORKER_MONTHS;
+          workshopEvents.push(`⚔️ Delavnica orožja: +${made} orožja (−${made} materiala). Napredek: ${weaponWorkshopProgress}/${WEAPON_WORKER_MONTHS} delavec-mesecev.`);
         } else {
-          workshopEvents.push(`🔨 Delavnica orožja dela (mesec ${weaponWorkshopProgress}/2)…`);
+          workshopEvents.push(`⚔️ Delavnica orožja: ${weaponWorkshopProgress}/${WEAPON_WORKER_MONTHS} delavec-mesecev.`);
         }
+        weaponWorkshopScouts = workers;
       }
     } else if (workshopObj === 'wall') {
       if (material <= 0) {
         workshopEvents.push(`🧱 Gradnja obzidja stoji — ni materiala.`);
       } else {
         wallProgress += workers;
-        const materialCost = Math.min(material, workers);
-        material -= materialCost;
-        if (wallProgress >= 6) {
-          wallsBuilt += 1;
-          wallProgress = 0;
-          workshopEvents.push(`🧱 Obrambno obzidje dograjeno! Skupaj ${wallsBuilt} obzidij, +20 % obrambe (−${materialCost} materiala).`);
+        const possible = Math.floor(wallProgress / WALL_WORKER_MONTHS);
+        if (possible > 0) {
+          const made = Math.min(possible, material);
+          wallsBuilt += made;
+          material -= made;
+          wallProgress -= made * WALL_WORKER_MONTHS;
+          workshopEvents.push(`🧱 Obrambno obzidje dograjeno! +${made} obzidje (−${made} materiala). Skupaj ${wallsBuilt}, +${20*made} % obrambe. Napredek: ${wallProgress}/${WALL_WORKER_MONTHS}.`);
         } else {
-          workshopEvents.push(`🧱 Gradnja obzidja: ${Math.min(6, wallProgress)}/6 delavec-mesecev (−${materialCost} materiala).`);
+          workshopEvents.push(`🧱 Gradnja obzidja: ${wallProgress}/${WALL_WORKER_MONTHS} delavec-mesecev.`);
+        }
+      }
+    } else if (workshopObj === 'artifact') {
+      if (material <= 0) {
+        workshopEvents.push(`💎 Delavnica artefaktov stoji — ni materiala.`);
+      } else {
+        artifactWorkshopProgress += workers;
+        const possible = Math.floor(artifactWorkshopProgress / ARTIFACT_WORKER_MONTHS);
+        if (possible > 0) {
+          const made = Math.min(possible, material);
+          artifacts += made;
+          material -= made;
+          artifactWorkshopProgress -= made * ARTIFACT_WORKER_MONTHS;
+          workshopEvents.push(`💎 ARTEFAKT IZDELAN! +${made} artefakt (−${made} materiala). Napredek: ${artifactWorkshopProgress}/${ARTIFACT_WORKER_MONTHS}.`);
+        } else {
+          workshopEvents.push(`💎 Delavnica artefaktov: ${artifactWorkshopProgress}/${ARTIFACT_WORKER_MONTHS} delavec-mesecev.`);
         }
       }
     }
@@ -802,7 +823,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     otherClans,
     expeditions: tickedExps,
     completedExpeditions: [...oldCompletedExps, ...finishedExps],
-    weaponWorkshopProgress, weaponWorkshopScouts, wallProgress, wallsBuilt,
+    weaponWorkshopProgress, weaponWorkshopScouts, wallProgress, wallsBuilt, artifactWorkshopProgress,
     rngCallCount: rng.calls,
     lastRoundLog: log,
     status,

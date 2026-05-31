@@ -144,6 +144,13 @@ export const INTEL_COMBAT_BONUS_MAX      = 0.25;
 export const WEAPON_DESTROY_MIN_PCT = 0.20;
 export const WEAPON_DESTROY_MAX_PCT = 0.80;
 
+// ─── Delavnice — delavec-meseci na izdelek ────────────────────────────────
+// 1 delavec za 1 izdelek: orožje 6 mes, obzidje 12 mes, artefakt 360 mes (30 let).
+// Več delavcev pospeši (vsak prispeva svoj mesec).
+export const WEAPON_WORKER_MONTHS   = 6;
+export const WALL_WORKER_MONTHS     = 12;
+export const ARTIFACT_WORKER_MONTHS = 360;
+
 // ─── AI napad na kamp (raid) ─────────────────────────────────────────────────
 // P(raid) = base + popScaling * popFactor + aiKnowBonus * aiKnow
 // modificirano z osjo (hiding -50 %) in klansko aktivnostjo (drugi klani odvračajo)

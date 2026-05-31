@@ -103,7 +103,7 @@ export function tileId(t: { q: number; r: number }): string {
   return `${t.q},${t.r}`;
 }
 
-export type WorkshopObjective = 'weapon' | 'wall';
+export type WorkshopObjective = 'weapon' | 'wall' | 'artifact';
 export type ResearchObjective = 'robots' | 'weakpoints';
 
 export interface Assignment {
@@ -228,11 +228,12 @@ export interface GameState {
   expeditions: Expedition[];
   completedExpeditions: Expedition[];
 
-  // Delavnice v kampu — izvidniki, ki delajo na razvoju orožja ali zidu
-  weaponWorkshopProgress: number;  // skupna scout-meseca; vsakič ko >= scoutsAtStart * 2 → produciraj
-  weaponWorkshopScouts: number;    // št. izvidnikov ob startu tekoče delavnice
-  wallProgress: number;            // scout-meseci na zidu (6 scout-mesecev = 1 zid)
-  wallsBuilt: number;              // skupno število zgrajenih zidov
+  // Delavnice v kampu — delavec-mesecev na vsako stvar (napredek se ohrani ob preklopu)
+  weaponWorkshopProgress: number;     // delavec-mesecev za orožje (vsakih 6 = +1 orožje)
+  weaponWorkshopScouts: number;       // legacy, ohranjeno za star state
+  wallProgress: number;               // delavec-mesecev za obzidje (vsakih 12 = +1 obzidje)
+  wallsBuilt: number;                 // skupno število zgrajenih obzidij
+  artifactWorkshopProgress: number;   // delavec-mesecev za artefakt (vsakih 360 = +1 artefakt)
 
   // RNG (determinizem)
   rngSeed: number;

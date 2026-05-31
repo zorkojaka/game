@@ -86,7 +86,7 @@ export function tileId(t: { q: number; r: number }): string {
   return `${t.q},${t.r}`;
 }
 
-export type WorkshopObjective = 'weapon' | 'wall';
+export type WorkshopObjective = 'weapon' | 'wall' | 'artifact';
 export type ResearchObjective = 'robots' | 'weakpoints';
 
 export interface Assignment {
@@ -175,6 +175,7 @@ export interface GameState {
   weaponWorkshopScouts: number;
   wallProgress: number;
   wallsBuilt: number;
+  artifactWorkshopProgress: number;
   rngSeed: number;
   status: 'active' | 'victory' | 'defeat_extinction' | 'defeat_overwhelmed';
   lastRoundLog: RoundLog | null;
