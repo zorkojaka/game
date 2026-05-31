@@ -7,8 +7,8 @@
   --bg2:      #131313;
   --border:   #1e1e1e;
   --border2:  #2a2a2a;
-  --text:     #c0c0c0;
-  --dim:      #484848;
+  --text:     #d4d4d4;
+  --dim:      #8a8a8a;
   --red:      #cc3333;
   --orange:   #e06c30;
   --green:    #22884d;
@@ -17,7 +17,7 @@
   --font:     'Courier New', Courier, monospace;
 }
 
-html { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; }
+html { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14.5px; }
 body { min-height: 100vh; }
 #root { max-width: 1140px; margin: 0 auto; padding: .75rem 1rem; }
 
@@ -34,9 +34,9 @@ h3 {
   font-size: .68rem; text-transform: uppercase; letter-spacing: .12em;
   color: var(--dim); margin: 0;
 }
-.dim   { color: var(--dim); }
-.small { font-size: .72rem; }
-b      { color: var(--text); }
+.dim   { color: #8a8a8a; }        /* svetlejši — boljši kontrast na črni */
+.small { font-size: .8rem; }      /* ~11.5px namesto ~9.4px */
+b      { color: var(--text); font-weight: 600; }
 
 /* ─── Animations ───────────────────────────────────────────────────────────── */
 @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }

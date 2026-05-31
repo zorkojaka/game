@@ -1541,7 +1541,7 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, onCampAdjust, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, pop }: {
+function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, pop }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   draftKind: 'scout' | 'attack';
@@ -1554,7 +1554,9 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
   otherClans: OtherClan[];
   drawingMode: boolean;
   camp: { defenders: number; researchers: number; workers: number; foragers: number };
+  freePeople: number;
   onCampAdjust: (which: 'd' | 'f' | 'w' | 'r', delta: number) => void;
+  onCampSet: (which: 'd' | 'f' | 'w' | 'r', value: number) => void;
   repelProbability: number;  // 0–1, za polnjenje obrambne linije
   rations: number; onRations: (n: number) => void;
   workshopObj: WorkshopObjective; onWorkshop: (o: WorkshopObjective) => void;
@@ -1879,7 +1881,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                   fontSize="8" fill="#0a2a18" fontWeight="bold" fontFamily="'Courier New', monospace"
                   pointerEvents="none">{workshop.wallsBuilt}</text>
               )}
-              <text x={p.x} y={p.y - SIZE * 0.12} textAnchor="middle" fontSize="6.5" fill="#88a596"
+              <text x={p.x} y={p.y - SIZE * 0.12} textAnchor="middle" fontSize="8" fill="#a8bdaf"
                 fontFamily="'Courier New', monospace" letterSpacing="0.5">{z.label}</text>
               {/* − število + (gumbi znotraj heksa, znaki centrirani) */}
               {(() => {
@@ -1901,6 +1903,12 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                       <text x={p.x + bx} y={cy} textAnchor="middle" dominantBaseline="central"
                         fontSize="12" fill={z.color} fontWeight="bold" fontFamily="'Courier New', monospace">+</text>
                     </g>
+                    {/* Slider — nastavi vrednost neposredno (max = trenutno + prosti) */}
+                    <foreignObject x={p.x - SIZE * 0.62} y={p.y + SIZE * 0.40} width={SIZE * 1.24} height={14}>
+                      <input type="range" min={0} max={z.count + freePeople} value={z.count}
+                        onChange={(e) => onCampSet(z.adj, parseInt(e.target.value))}
+                        style={{ width: '100%', height: 8, accentColor: z.color, cursor: 'pointer' }} />
+                    </foreignObject>
                   </>
                 );
               })()}
@@ -2681,6 +2689,16 @@ export default function App() {
     else if (which === 'w') setWorkers(next);
     else setResearchers(next);
   }
+  // Nastavi absolutno vrednost (slider) — omeji na trenutno + proste, ne more presegati skupne razpoložljive populacije.
+  function setRole(which: 'd' | 'f' | 'w' | 'r', value: number) {
+    const cur = { d: defenders, f: foragers, w: workers, r: researchers }[which];
+    const maxAllowed = cur + freePeople;
+    const next = Math.max(0, Math.min(maxAllowed, value));
+    if (which === 'd') setDefenders(next);
+    else if (which === 'f') setForagers(next);
+    else if (which === 'w') setWorkers(next);
+    else setResearchers(next);
+  }
 
   function autoFitAllocation() {
     if (assigned === 0 || availablePop === 0) return;
@@ -3289,7 +3307,9 @@ export default function App() {
             expeditions={game.expeditions ?? []}
             wps={game.aiWeakPoints} otherClans={game.otherClans ?? []} drawingMode={true}
             camp={{ defenders, researchers, workers, foragers }}
+            freePeople={freePeople}
             onCampAdjust={(which, delta) => bumpRole(which, delta)}
+            onCampSet={(which, value) => setRole(which, value)}
             repelProbability={odds?.raidRepelProbability ?? 0}
             rations={rations} onRations={setRations}
             workshopObj={workshopObj} onWorkshop={setWorkshopObj}
