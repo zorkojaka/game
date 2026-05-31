@@ -1576,7 +1576,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
     { q: 0, r: 3, icon: '🔬', label: 'RAZISKAVE', count: camp.researchers, color: '#3377cc', adj: 'r' as const },
     { q: 0, r: 4, icon: '🌾', label: 'PREHRANA',  count: camp.foragers,    color: '#6aa630', adj: 'f' as const },
     { q: 1, r: 4, icon: '🔨', label: 'DELAVNICE', count: camp.workers,     color: '#cc7733', adj: 'w' as const },
-    { q: 1, r: 3, icon: '🛡', label: 'OBRAMBA',   count: camp.defenders,   color: '#66aabb', adj: 'd' as const },
+    { q: 1, r: 3, icon: '🛡️', label: 'OBRAMBA',   count: camp.defenders,   color: '#66aabb', adj: 'd' as const },
   ];
   const campZoneIds = new Set(CAMP_ZONES.map(z => `${z.q},${z.r}`));
   const CAMP_EXTENT = SIZE * 2.1;  // prostor za zunanje kontrolne gumbe okoli kampa
@@ -1924,7 +1924,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
             const px = -dy, py = dx;  // pravokotno za razporeditev gumbov
             // Definiraj gumbe glede na zono
-            type Btn = { label: string; active: boolean; onClick: () => void; title: string; sub?: string; progress?: number };
+            type Btn = { label: string; active: boolean; onClick: () => void; title: string; sub?: string; segments?: { done: number; total: number } };
             let btns: Btn[] = [];
             if (z.adj === 'f') {
               btns = [1,2,3,4,5].map(lvl => {
@@ -1938,16 +1938,12 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               });
             } else if (z.adj === 'w') {
               btns = [
-                { label: '⚔', active: workshopObj === 'weapon', onClick: () => onWorkshop('weapon'),
+                { label: '⚔️', active: workshopObj === 'weapon', onClick: () => onWorkshop('weapon'),
                   title: 'Orožje: fiksen 2-mesečni cikel; količina = min(delavci, material). Več delavcev = več orožja, ne hitreje.',
-                  sub: workshopObj === 'weapon' ? `${workshop.weaponProgress}/2m` : '2m',
-                  progress: workshopObj === 'weapon' ? workshop.weaponProgress / 2 : 0 },
+                  segments: { done: workshopObj === 'weapon' ? workshop.weaponProgress : 0, total: 2 } },
                 { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),
-                  title: 'Obzidje: 6 delavec-mesecev za 1 obzidje, porabi material. Več delavcev = hitreje.',
-                  sub: workshopObj === 'wall'
-                    ? (workshop.workers > 0 ? `${Math.ceil(Math.max(0, 6 - workshop.wallProgress) / workshop.workers)}m` : `${workshop.wallProgress}/6`)
-                    : (workshop.workers > 0 ? `${Math.ceil(6 / workshop.workers)}m` : '∞'),
-                  progress: workshopObj === 'wall' ? workshop.wallProgress / 6 : 0 },
+                  title: 'Obzidje: 6 delavec-mesecev za 1 obzidje. Več delavcev = hitreje (vsak mesec napolni toliko segmentov, kolikor je delavcev).',
+                  segments: { done: workshopObj === 'wall' ? workshop.wallProgress : 0, total: 6 } },
               ];
             } else if (z.adj === 'r') {
               btns = [
@@ -1970,19 +1966,29 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                       <circle cx={bxp} cy={byp} r="7.5"
                         fill={b.active ? z.color : '#0a0a0a'}
                         stroke={z.color} strokeWidth={b.active ? 2 : 1} />
-                      {/* Napredek izdelave kot lok okoli gumba */}
-                      {b.progress !== undefined && b.progress > 0 && (() => {
+                      {/* Napredek izdelave kot segmenti okoli gumba (X od skupaj N) */}
+                      {b.segments && (() => {
+                        const { done, total } = b.segments;
                         const R = 10.5;
-                        const C = 2 * Math.PI * R;
-                        const frac = Math.max(0, Math.min(1, b.progress));
-                        return (
-                          <circle cx={bxp} cy={byp} r={R}
-                            fill="none" stroke={z.color} strokeWidth="1.6"
-                            strokeDasharray={`${C * frac} ${C * (1 - frac)}`}
-                            strokeDashoffset={C / 4}
-                            transform={`rotate(-90 ${bxp} ${byp})`}
-                            opacity="0.9" />
-                        );
+                        const gap = total > 4 ? 0.10 : 0.15;   // radians med segmenti
+                        const seg = (2 * Math.PI) / total;
+                        const arcs: JSX.Element[] = [];
+                        for (let s = 0; s < total; s++) {
+                          const startA = -Math.PI / 2 + s * seg + gap / 2;
+                          const endA   = -Math.PI / 2 + (s + 1) * seg - gap / 2;
+                          const sx = bxp + R * Math.cos(startA);
+                          const sy = byp + R * Math.sin(startA);
+                          const ex = bxp + R * Math.cos(endA);
+                          const ey = byp + R * Math.sin(endA);
+                          const large = (endA - startA) > Math.PI ? 1 : 0;
+                          const filled = s < done;
+                          arcs.push(
+                            <path key={s} d={`M${sx} ${sy} A${R} ${R} 0 ${large} 1 ${ex} ${ey}`}
+                              fill="none" stroke={filled ? z.color : '#2a2a2a'} strokeWidth="2.2"
+                              strokeLinecap="round" />
+                          );
+                        }
+                        return <g pointerEvents="none">{arcs}</g>;
                       })()}
                       <text x={bxp} y={byp} textAnchor="middle" dominantBaseline="central"
                         fontSize="9" style={{ pointerEvents: 'none' }}>{b.label}</text>
