@@ -181,6 +181,7 @@ b      { color: var(--text); }
   border-radius: 10px;
 }
 .top-menu-wrap { flex: 1 1 0; display: flex; justify-content: flex-end; }
+.top-spacer { flex: 1 1 0; }
 .top-sep { width: 1px; align-self: stretch; background: #2a3442; margin: 0 .25rem; }
 
 /* Srednji del: meni+levo / karta / desno */
@@ -277,7 +278,12 @@ b      { color: var(--text); }
   border-radius: 10px;
   flex-wrap: wrap;
 }
-.step-track { display: flex; align-items: center; gap: 1.5rem; }
+.step-track { display: flex; align-items: center; gap: 1.5rem; flex: 1 1 0; }
+.bb-phases { flex: 0 0 auto; display: flex; justify-content: center; }
+.bb-phases .phase-header { gap: .5rem; padding: 0; }
+.bb-phases .ph-block { padding: .25rem .5rem; }
+.bb-phases .ph-block .ph-rounds .round-dot { width: 5px; height: 5px; }
+.bb-phases .ph-total-cell { font-size: .65rem; }
 .step { display: flex; align-items: center; gap: .45rem; position: relative; }
 .step:not(:last-child)::after {
   content: '';
@@ -299,7 +305,7 @@ b      { color: var(--text); }
 .step.done .step-dot { background: #14301f; color: #2bbb5e; border-color: #1f6f3a; }
 .step-label { font-size: .72rem; color: #8aa596; }
 .step.active .step-label { color: #e8f5ee; }
-.bottom-actions { display: flex; align-items: center; gap: .75rem; }
+.bottom-actions { display: flex; align-items: center; gap: .75rem; flex: 1 1 0; justify-content: flex-end; }
 .bottom-actions .exec-btn { margin: 0; width: auto; min-width: 220px; }
 .back-btn {
   background: none; border: 1px solid #2a3038; border-radius: 8px;

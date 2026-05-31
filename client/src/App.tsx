@@ -2640,7 +2640,7 @@ export default function App() {
       )}
       {/* ─── ZGORNJA VRSTICA: faza + viri ─── */}
       <header className="top-bar">
-        <PhaseHeader game={game} />
+        <div className="top-spacer" />
         <div className="top-res">
           <BigStat icon="👥" label="Populacija" value={game.population}      color="#d8d8d8" />
           <BigStat icon="🍞" label="Hrana"      value={game.resources.survival} color="#cc8800"
@@ -3181,6 +3181,7 @@ export default function App() {
             </div>
           ))}
         </div>
+        <div className="bb-phases"><PhaseHeader game={game} /></div>
         <div className="bottom-actions">
           <button className="back-btn" onClick={() => setTab('food')}>← Nazaj na kamp</button>
           <button className="exec-btn" onClick={handleRound} disabled={loading || over}>
