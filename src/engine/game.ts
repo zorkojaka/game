@@ -1,7 +1,7 @@
 // Glavni game engine — čiste funkcije (state, action) → new state
 // Brez side effectov, brez IO
 
-import type { GameState, PlayerAction, RoundLog, Assignment, AIPhase, RaidResult, ScoutResult, HumanAxis, Mission, AIUnits, ResearchObjective } from './types.js';
+import type { GameState, PlayerAction, RoundLog, Assignment, AIPhase, RaidResult, ScoutResult, HumanAxis, Mission, AIUnits, ResearchObjective, CampArea } from './types.js';
 import type { RNGState } from './rng.js';
 import { createRNG, rngBool, rngInt, rngNext, seedFromString } from './rng.js';
 import { resolveCombat } from './combat.js';
@@ -26,6 +26,8 @@ import {
   INITIAL_AI_INSIGHT, INSIGHT_PER_ROUND, INSIGHT_PHASE_CAP,
   RAID_BASE_CHANCE, RAID_POP_SCALING_MAX, RAID_POP_REFERENCE, RAID_AI_KNOWLEDGE_BONUS,
   RAID_HIDING_REDUCTION, RAID_CLAN_ABSORPTION, RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT,
+  RAID_BREACH_AREAS, RAID_AREA_PEOPLE_LOSS,
+  RAID_DESTROY_FOOD_PCT, RAID_DESTROY_WEAPONS_PCT, RAID_DESTROY_MATERIAL_PCT, RAID_DESTROY_WALL_LEVELS,
   SCOUT_BASE_SUCCESS, SCOUT_INTEL_BONUS_PER_100, SCOUT_ESPIONAGE_BONUS,
   SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_HIDING_REDUCTION, SCOUT_AI_KNOWLEDGE_BONUS,
   SCOUT_PARTIAL_EFFECTIVE, SCOUT_CAPTURED_LOSS_MIN, SCOUT_CAPTURED_LOSS_MAX,
@@ -201,31 +203,11 @@ function resolveRaid(
   // People-killer enote (faza 3) povečajo smrtnost med ljudmi
   const lethality = 1 + PEOPLEKILLER_LETHALITY_PER_UNIT * aiUnits.peopleKillers;
 
-  let defendersLost = 0, foragersLost = 0, aiRobotsDestroyed = 0;
-  switch (outcome) {
-    case 'victory':
-      defendersLost     = Math.floor(defenders * 0.05 * lethality);
-      foragersLost      = 0;
-      aiRobotsDestroyed = Math.floor(aiForce * 0.80);
-      break;
-    case 'partial':
-      defendersLost     = Math.floor(defenders * 0.25 * lethality);
-      foragersLost      = Math.floor(assignment.foragers * 0.15 * lethality);
-      aiRobotsDestroyed = Math.floor(aiForce * 0.35);
-      break;
-    case 'defeat':
-      defendersLost     = Math.floor(defenders * 0.60 * lethality);
-      foragersLost      = Math.floor(assignment.foragers * 0.40 * lethality);
-      aiRobotsDestroyed = Math.floor(aiForce * 0.12);
-      break;
-    case 'annihilation':
-      defendersLost     = defenders;
-      foragersLost      = Math.floor(assignment.foragers * 0.70 * lethality);
-      aiRobotsDestroyed = Math.floor(aiForce * 0.03);
-      break;
-  }
-  // defendersLost ne sme preseči števila branilcev
-  defendersLost = Math.min(defenders, defendersLost);
+  // Front-line žrtve branilcev + uničenje AI po izidu
+  const frontFrac:   Record<typeof outcome, number> = { victory: 0.05, partial: 0.25, defeat: 0.60, annihilation: 1.00 };
+  const destroyFrac: Record<typeof outcome, number> = { victory: 0.80, partial: 0.35, defeat: 0.12, annihilation: 0.03 };
+  let defendersLost = outcome === 'annihilation' ? defenders : Math.floor(defenders * frontFrac[outcome] * lethality);
+  const aiRobotsDestroyed = Math.floor(aiForce * destroyFrac[outcome]);
 
   // Uničenje orožja v skladišču (kar ni v rabi, ko napadejo)
   const weaponsInUse = defenders + assignment.combatants;
@@ -237,10 +219,32 @@ function resolveRaid(
     weaponsDestroyed = Math.floor(weaponsIdle * pctRoll / 100);
   }
 
+  // Preboj obrambe → koliko območij kampa AI opustoši (naključno izbrana)
+  const breachCount = RAID_BREACH_AREAS[outcome];
+  const allAreas: CampArea[] = ['food', 'workshop', 'research', 'defense'];
+  const scored = allAreas.map(a => { const [r, rn] = rngNext(rng); rng = rn; return { a, r }; });
+  scored.sort((x, y) => x.r - y.r);
+  const breachedAreas = scored.slice(0, breachCount).map(s => s.a);
+
+  // Žrtve med ljudmi v prebitih območjih (delež dodeljenih tej vlogi)
+  const peopleLossFrac = (outcome === 'partial' || outcome === 'defeat' || outcome === 'annihilation')
+    ? RAID_AREA_PEOPLE_LOSS[outcome] * lethality : 0;
+  const foragersLost    = breachedAreas.includes('food')     ? Math.floor((assignment.foragers ?? 0)    * peopleLossFrac) : 0;
+  const workersLost     = breachedAreas.includes('workshop') ? Math.floor((assignment.workers ?? 0)     * peopleLossFrac) : 0;
+  const researchersLost = breachedAreas.includes('research') ? Math.floor((assignment.researchers ?? 0) * peopleLossFrac) : 0;
+  if (breachedAreas.includes('defense')) {
+    defendersLost += Math.floor(defenders * peopleLossFrac);
+  }
+  defendersLost = Math.min(defenders, defendersLost);
+
+  // Uničenje virov v prebitih območjih (na žive vrednosti se uporabi v processRound)
   return {
     result: {
       occurred: true, outcome,
-      defendersLost, foragersLost, aiRobotsDestroyed, weaponsDestroyed,
+      defendersLost, foragersLost, workersLost, researchersLost,
+      aiRobotsDestroyed, weaponsDestroyed,
+      survivalDestroyed: 0, materialDestroyed: 0, wallsDestroyed: 0,
+      breachedAreas,
       successProbability: p,
     },
     rng,
@@ -522,25 +526,46 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   if (raidRoll < pRaid) {
     const { result: raidRes, rng: rngR2 } = resolveRaid(state, assignment, rng);
     rng = rngR2;
-    raidLog = raidRes;
-    const defSave = Math.floor(raidRes.defendersLost * 0.10 * defenseLvl);
-    const actualDef = Math.max(0, raidRes.defendersLost - defSave);
-    const forSave = Math.floor(raidRes.foragersLost  * 0.10 * defenseLvl);
-    const actualFor = Math.max(0, raidRes.foragersLost  - forSave);
-    population -= actualDef + actualFor;
-    combat = Math.max(0, combat - actualDef);
-    combat = Math.max(0, combat - raidRes.weaponsDestroyed);
-    applyDestroy(raidRes.aiRobotsDestroyed);
-    // Branilci poberejo material iz uničenih robotov
-    material += raidRes.aiRobotsDestroyed;
-    if (defSave > 0 || forSave > 0) {
-      raidLog = { ...raidRes, defendersLost: actualDef, foragersLost: actualFor };
+    // Obrambni nivo malo zmanjša žrtve med ljudmi
+    const save = (n: number) => Math.max(0, n - Math.floor(n * 0.10 * defenseLvl));
+    const actualDef = save(raidRes.defendersLost);
+    const actualFor = save(raidRes.foragersLost);
+    const actualWrk = save(raidRes.workersLost);
+    const actualRes = save(raidRes.researchersLost);
+    // Žrtve so povsod, kjer je AI prebil — vsaka vloga izgubi svoje ljudi
+    population -= actualDef + actualFor + actualWrk + actualRes;
+    combat = Math.max(0, combat - actualDef);                    // padli branilci → izgubljeno orožje
+    combat = Math.max(0, combat - raidRes.weaponsDestroyed);     // skladiščno (idle) orožje
+
+    // Uničenje virov v prebitih območjih (na žive vrednosti tega meseca)
+    let weaponsDestroyed = raidRes.weaponsDestroyed;
+    let survivalDestroyed = 0, materialDestroyed = 0, wallsDestroyed = 0;
+    for (const area of raidRes.breachedAreas) {
+      if (area === 'food') {
+        const d = Math.round(survival * RAID_DESTROY_FOOD_PCT); survival = Math.max(0, survival - d); survivalDestroyed += d;
+      } else if (area === 'workshop') {
+        const d = Math.round(combat * RAID_DESTROY_WEAPONS_PCT); combat = Math.max(0, combat - d); weaponsDestroyed += d;
+      } else if (area === 'research') {
+        const d = Math.round(material * RAID_DESTROY_MATERIAL_PCT); material = Math.max(0, material - d); materialDestroyed += d;
+      } else if (area === 'defense') {
+        const d = Math.min(wallsBuilt, RAID_DESTROY_WALL_LEVELS); wallsBuilt = Math.max(0, wallsBuilt - d); wallsDestroyed += d;
+      }
     }
+
+    applyDestroy(raidRes.aiRobotsDestroyed);
+    material += raidRes.aiRobotsDestroyed;  // branilci poberejo material iz uničenih robotov
+    raidLog = {
+      ...raidRes,
+      defendersLost: actualDef, foragersLost: actualFor, workersLost: actualWrk, researchersLost: actualRes,
+      weaponsDestroyed, survivalDestroyed, materialDestroyed, wallsDestroyed,
+    };
     aiKnowledge = Math.min(1, aiKnowledge + (raidRes.outcome === 'victory' ? 0.03 : raidRes.outcome === 'partial' ? 0.07 : 0.15));
   } else {
     raidLog = { occurred: false, outcome: null,
-      defendersLost: 0, foragersLost: 0,
+      defendersLost: 0, foragersLost: 0, workersLost: 0, researchersLost: 0,
       aiRobotsDestroyed: 0, weaponsDestroyed: 0,
+      survivalDestroyed: 0, materialDestroyed: 0, wallsDestroyed: 0,
+      breachedAreas: [],
       successProbability: raidRepelProbability(state, assignment) };
   }
 

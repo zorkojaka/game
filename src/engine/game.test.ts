@@ -182,6 +182,26 @@ describe('aiInsight — odpira AI drevo, fazni stropi', () => {
   });
 });
 
+describe('raid — preboj obrambe opustoši območja', () => {
+  it('število prebitih območij ustreza izidu (victory 0 … annihilation 4)', () => {
+    const expectedByOutcome: Record<string, number> = { victory: 0, partial: 1, defeat: 2, annihilation: 4 };
+    let found = false;
+    for (let seed = 1; seed <= 80 && !found; seed++) {
+      let s: GameState = { ...newGame(seed), phase: 'understand', aiPhaseProgress: 1,
+        aiUnits: { scouts: 100, attackers: 75, peopleKillers: 0 }, aiRobots: 175, aiKnowledge: 0.7 };
+      for (let i = 0; i < 12 && s.status === 'active'; i++) {
+        s = processRound(s, action({ foragers: 30, defenders: 1, workers: 2, researchers: 2, rations: 3 }));
+        const r = s.lastRoundLog?.raid;
+        if (r?.occurred && r.outcome) {
+          expect(r.breachedAreas.length).toBe(expectedByOutcome[r.outcome]);
+          found = true; break;
+        }
+      }
+    }
+    expect(found).toBe(true);
+  });
+});
+
 describe('axisHistory (#6 — vir za CompletedRun)', () => {
   it('izbrana os se inkrementira', () => {
     const g = newGame(3);

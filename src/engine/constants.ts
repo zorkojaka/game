@@ -243,6 +243,24 @@ export const RAID_CLAN_ABSORPTION      = 0.50;  // do 50 % bremena prevzamejo dr
 export const RAID_AI_FORCE_PCT         = 0.50;  // 50 % efektivne AI sile sodeluje pri raidu (5× težje)
 export const DEFENDER_EQUIPMENT_MULT   = 0.40;  // obrambno orožje učinkuje manj kot ofenzivno
 
+// ─── Preboj obrambe: koliko območij kampa AI opustoši po izidu raida ───────────
+// (več kot prebije obrambo → več območij; "vsa" pri popolnem porazu)
+export const RAID_BREACH_AREAS: Record<'victory' | 'partial' | 'defeat' | 'annihilation', number> = {
+  victory: 0,        // obramba zdržala
+  partial: 1,        // malo prebije → eno območje
+  defeat: 2,         // več prebije → dve območji
+  annihilation: 4,   // zelo prebije → vsa območja
+};
+// Žrtve med ljudmi v prebitem območju (delež dodeljenih tej vlogi), po izidu
+export const RAID_AREA_PEOPLE_LOSS: Record<'partial' | 'defeat' | 'annihilation', number> = {
+  partial: 0.20, defeat: 0.40, annihilation: 0.70,
+};
+// Delež uničenega vira na prebito območje
+export const RAID_DESTROY_FOOD_PCT     = 0.25; // prehrana → hrana
+export const RAID_DESTROY_WEAPONS_PCT  = 0.20; // delavnice → orožje
+export const RAID_DESTROY_MATERIAL_PCT = 0.30; // raziskave → material
+export const RAID_DESTROY_WALL_LEVELS  = 1;    // obramba → poruši toliko stopenj obzidja
+
 // ─── Izvidniške misije — uspeh in ujetje ─────────────────────────────────────
 export const SCOUT_BASE_SUCCESS        = 0.80;  // 80 % baza
 export const SCOUT_INTEL_BONUS_PER_100 = 0.10;  // +10 % uspeha na 100 intela

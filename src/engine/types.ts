@@ -142,14 +142,22 @@ export interface Mission {
   resultNarrative?: string;
 }
 
+export type CampArea = 'food' | 'workshop' | 'research' | 'defense';
+
 // Izid AI napada na kamp
 export interface RaidResult {
   occurred: boolean;
   outcome: 'victory' | 'partial' | 'defeat' | 'annihilation' | null;
   defendersLost: number;
   foragersLost: number;
+  workersLost: number;        // žrtve v delavnici (če prebito)
+  researchersLost: number;    // žrtve v raziskavah (če prebito)
   aiRobotsDestroyed: number;
-  weaponsDestroyed: number;
+  weaponsDestroyed: number;   // uničeno orožje (skladišče + delavnica)
+  survivalDestroyed: number;  // uničena hrana (prehrana prebita)
+  materialDestroyed: number;  // uničen material (raziskave prebite)
+  wallsDestroyed: number;     // porušene stopnje obzidja (obramba prebita)
+  breachedAreas: CampArea[];  // katera območja kampa je AI opustošil
   successProbability: number;
 }
 

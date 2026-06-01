@@ -1474,8 +1474,17 @@ function RoundLog({ log }: { log: RoundLog }) {
               {outcomeLabel(r.outcome)}
             </div>
             <div className="rl-odds dim small">{Math.round(r.successProbability * 100)}% obramba</div>
+            {(r.breachedAreas?.length ?? 0) > 0 && (
+              <div className="rl-neg">⚠ Prebita območja: {r.breachedAreas.map(a => ({ food: 'prehrana', workshop: 'delavnice', research: 'raziskave', defense: 'obramba' } as Record<string, string>)[a] ?? a).join(', ')}</div>
+            )}
             {r.defendersLost > 0   && <div className="rl-neg">− {r.defendersLost} branilcev</div>}
             {r.foragersLost > 0    && <div className="rl-neg">− {r.foragersLost} nabiralcev</div>}
+            {(r.workersLost ?? 0) > 0     && <div className="rl-neg">− {r.workersLost} delavcev</div>}
+            {(r.researchersLost ?? 0) > 0 && <div className="rl-neg">− {r.researchersLost} raziskovalcev</div>}
+            {(r.survivalDestroyed ?? 0) > 0 && <div className="rl-neg">− {r.survivalDestroyed} hrane</div>}
+            {(r.weaponsDestroyed ?? 0) > 0  && <div className="rl-neg">− {r.weaponsDestroyed} orožja</div>}
+            {(r.materialDestroyed ?? 0) > 0 && <div className="rl-neg">− {r.materialDestroyed} materiala</div>}
+            {(r.wallsDestroyed ?? 0) > 0    && <div className="rl-neg">− {r.wallsDestroyed} obzidja</div>}
             {r.aiRobotsDestroyed > 0 && <div className="rl-pos">− {r.aiRobotsDestroyed} AI robotov</div>}
           </div>
         )}
