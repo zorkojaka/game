@@ -2794,12 +2794,16 @@ export default function App() {
       <header className="top-bar">
         <div className="top-spacer" />
         <div className="top-res">
-          <BigStat icon="👥" label="Klan skupaj" value={totalClan}                                    color="#d8d8d8" />
-          <BigStat icon="🏠" label="V kampu"     value={campPop}                                      color="#9ec0ad" />
-          <BigStat icon="🎯" label="Na odpravi"  value={inMissions}                                   color="#d6a96a" />
-          <BigStat icon="💤" label="Prosti"      value={freePeople}
-            color={freePeople > 0 ? '#66cc88' : '#7a8a82'} />
-          <span className="top-sep" />
+          {/* LEVO — ljudje (stranska metrika) */}
+          <div className="tr-group tr-side">
+            <BigStat icon="👥" label="Klan skupaj" value={totalClan}  color="#d8d8d8" />
+            <BigStat icon="🏠" label="V kampu"     value={campPop}    color="#9ec0ad" />
+            <BigStat icon="🎯" label="Na odpravi"  value={inMissions} color="#d6a96a" />
+            <BigStat icon="💤" label="Prosti"      value={freePeople}
+              color={freePeople > 0 ? '#66cc88' : '#7a8a82'} />
+          </div>
+
+          {/* SREDINA — viri (poudarjeni) */}
           {(() => {
             const foodDelta = foodNextMonth - game.resources.survival;
             const matAvail = game.resources.material ?? 0;
@@ -2813,12 +2817,10 @@ export default function App() {
             const weaponDelta = wpMade;
             const materialDelta = -(wpMade * 1 + wlMade * 4 + arMade * 20);
             const intelDelta = researchIntel;
-            const robotsDelta = 0;          // težko predvideti — odvisno od napadov
-            const clansAlly = (game.otherClans ?? []).filter(c => c.allied).length * 4;
             const fmt = (n: number) => n > 0 ? `+${n}` : n < 0 ? `${n}` : '';
             const col = (n: number) => n > 0 ? '#22cc88' : n < 0 ? '#cc4444' : '#888';
             return (
-              <>
+              <div className="tr-group tr-main">
                 <BigStat icon="🍞" label="Hrana"      value={game.resources.survival} color="#cc8800"
                   note={fmt(foodDelta) || '±0'} noteColor={col(foodDelta)} />
                 <BigStat icon="⚔"  label="Orožje"     value={game.resources.combat}   color="#cc4433"
@@ -2834,24 +2836,25 @@ export default function App() {
                 {(game.wallsBuilt ?? 0) > 0 && (
                   <BigStat icon="🧱" label="Obzidje"   value={game.wallsBuilt}         color="#aabb88" />
                 )}
-                <span className="top-sep" />
-                <BigStat icon="🤖" label="AI roboti" value={game.aiRobots}                      color="#cc3333"
-                  note={fmt(robotsDelta)} noteColor={col(robotsDelta)} />
-                <BigStat icon="🌍" label="Klani"     value={Math.round(game.clanActivity * 100)} color="#88aa66" unit="%"
-                  note={clansAlly > 0 ? `+${clansAlly}%` : ''} noteColor={'#22cc88'} />
-              </>
+              </div>
             );
           })()}
+
+          {/* DESNO — AI / situacija (stranska metrika) */}
           {(() => {
+            const clansAlly = (game.otherClans ?? []).filter(c => c.allied).length * 4;
             const ourK = calcOurKnowledge(game.aiTree);
             const aiK  = game.aiKnowledge;
             const ourColor = ourK >= 0.6 ? '#22cc88' : ourK >= 0.3 ? '#3377cc' : '#5a7a99';
             const aiColor  = aiK  >= 0.7 ? '#cc2222' : aiK  >= 0.4 ? '#cc7700' : '#aa5a5a';
             return (
-              <>
-                <BigStat icon="🔭" label="Mi vemo" value={Math.round(ourK * 100)} color={ourColor} unit="%" />
-                <BigStat icon="👁" label="AI ve"   value={Math.round(aiK * 100)}  color={aiColor}  unit="%" />
-              </>
+              <div className="tr-group tr-side">
+                <BigStat icon="🤖" label="AI roboti" value={game.aiRobots}                       color="#cc3333" />
+                <BigStat icon="🌍" label="Klani"     value={Math.round(game.clanActivity * 100)} color="#88aa66" unit="%"
+                  note={clansAlly > 0 ? `+${clansAlly}%` : ''} noteColor={'#22cc88'} />
+                <BigStat icon="🔭" label="Mi vemo"   value={Math.round(ourK * 100)} color={ourColor} unit="%" />
+                <BigStat icon="👁" label="AI ve"     value={Math.round(aiK * 100)}  color={aiColor}  unit="%" />
+              </div>
             );
           })()}
         </div>

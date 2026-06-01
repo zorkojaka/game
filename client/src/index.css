@@ -170,19 +170,41 @@ b      { color: var(--text); font-weight: 600; }
 }
 .top-bar > .phase-header { flex: 1 1 0; min-width: 0; }
 .top-res {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  flex-wrap: wrap;
-  padding: .35rem .75rem;
+  align-items: stretch;
+  gap: .6rem;
+  flex-wrap: nowrap;            /* nikoli prelom v novo vrstico */
+  padding: .35rem .6rem;
   background: #11171f;
   border: 1px solid #232c36;
   border-radius: 10px;
+  min-width: 0;
+  overflow-x: auto;            /* če bi vseeno preseglo širino, drsi vodoravno (brez preloma) */
 }
+.tr-group { display: flex; align-items: center; gap: .5rem; flex-wrap: nowrap; }
+.tr-group .big-stat { flex: 0 0 auto; min-width: 0; }   /* širina po vsebini — številke ne prelomijo */
+
+/* SREDINA = viri: poudarjeni (večji, vpadljivejši, uokvirjeni) */
+.tr-main { gap: .55rem; padding: 0 .6rem; border-left: 1px solid #2a3442; border-right: 1px solid #2a3442; }
+.tr-main .big-stat { padding: 6px 11px; background: #141c26; }
+.tr-main .bs-icon  { font-size: 1.6rem; width: 1.9rem; height: 1.9rem; }
+.tr-main .bs-val   { font-size: 1.6rem; }
+.tr-main .bs-label { font-size: .62rem; opacity: .9; }
+
+/* STRANSKE metrike (levo/desno): manjše in zatemnjene */
+.tr-side { opacity: .8; }
+.tr-side .big-stat { padding: 4px 7px; }
+.tr-side .bs-icon  { font-size: 1.05rem; width: 1.3rem; height: 1.3rem; }
+.tr-side .bs-val   { font-size: .98rem; }
+.tr-side .bs-label { font-size: .54rem; }
+
 .top-menu-wrap { flex: 1 1 0; display: flex; justify-content: flex-end; }
 .top-spacer { flex: 1 1 0; }
 .top-sep { width: 1px; align-self: stretch; background: #2a3442; margin: 0 .25rem; }
+
+/* Številke nikoli ne prelomijo v novo vrstico */
+.big-stat, .bs-val, .bs-label { white-space: nowrap; }
 
 .top-pop {
   display: flex; flex-direction: column; gap: 2px;
