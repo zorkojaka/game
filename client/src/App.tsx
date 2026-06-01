@@ -2403,7 +2403,7 @@ export default function App() {
   const [missionR,     setMissionR]     = useState<Record<string, number>>({});
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
-  const [tab,          setTab]          = useState<'defense' | 'food' | 'workshop' | 'research' | 'map' | 'attack' | 'active' | 'tree' | 'missions' | 'log'>('food');
+  const [tab,          setTab]          = useState<'defense' | 'food' | 'workshop' | 'research' | 'map' | 'attack' | 'active' | 'tree' | 'log'>('food');
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
   const [draftPeople,  setDraftPeople]  = useState(5);
   const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
@@ -2879,7 +2879,6 @@ export default function App() {
             { id: 'map',      icon: '🗺', label: 'Izvidniki' },
             { id: 'attack',   icon: '⚔️', label: 'Napad' },
             { id: 'active',   icon: '⏳', label: 'V teku' },
-            { id: 'missions', icon: '🎯', label: 'Misije' },
             { id: 'tree',     icon: '🔬', label: 'Drevo' },
           ] as const).map(m => (
             <button key={m.id} className={`sm-btn ${tab === m.id ? 'active' : ''} ${'mobileOnly' in m && m.mobileOnly ? 'sm-mobile-only' : ''}`}
@@ -3031,6 +3030,7 @@ export default function App() {
 
           {/* ─── IZVIDNIKI / MAPA — nova odprava + aktivne odprave ─── */}
           {tab === 'map' && (
+          <>
           <div className="panel">
             <div className="panel-head">
               <h3>🗺 NOVA ODPRAVA</h3>
@@ -3131,10 +3131,13 @@ export default function App() {
               </div>
             )}
           </div>
+          <AlliesPanel clans={game.otherClans ?? []} />
+          </>
           )}
 
           {/* ─── NAPAD — pošlji napadalce po poti, spopad ob prihodu ─── */}
           {tab === 'attack' && (
+          <>
           <div className="panel">
             <div className="panel-head">
               <h3>⚔ NOV NAPAD</h3>
@@ -3211,6 +3214,14 @@ export default function App() {
               )}
             </div>
           </div>
+          <Missions wps={game.aiWeakPoints} aiTree={game.aiTree}
+            active={game.activeMissions ?? []} plan={missions} planR={missionR}
+            onPlanChange={setMissionAssignment} onRationsChange={setMissionRations}
+            odds={odds} availablePop={availablePop} selectedWpId={targetWP}
+            artifacts={game.resources.artifacts ?? 0}
+            onUseArtifact={setArtifactTargetWp}
+            artifactTargetWpId={artifactTargetWp} />
+          </>
           )}
 
           {/* ─── V TEKU — pregled vseh aktivnih odprav in napadov ─── */}
@@ -3287,19 +3298,6 @@ export default function App() {
           </div>
           )}
 
-          {/* ─── ZAVIHEK: Misije človeštva + Šibke točke AI ─── */}
-          {tab === 'missions' && (
-          <div className="band band-missions">
-            <AlliesPanel clans={game.otherClans ?? []} />
-            <Missions wps={game.aiWeakPoints} aiTree={game.aiTree}
-              active={game.activeMissions ?? []} plan={missions} planR={missionR}
-              onPlanChange={setMissionAssignment} onRationsChange={setMissionRations}
-              odds={odds} availablePop={availablePop} selectedWpId={targetWP}
-              artifacts={game.resources.artifacts ?? 0}
-              onUseArtifact={setArtifactTargetWp}
-              artifactTargetWpId={artifactTargetWp} />
-          </div>
-          )}
          </FitScale>
          {/* ─── LOG (mobilno) — dnevnik dogodkov, lasten scroll, brez skaliranja ─── */}
          {tab === 'log' && (
