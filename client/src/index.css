@@ -1693,6 +1693,7 @@ input[type=range]::-moz-range-thumb {
 }
 .scout-objectives.compact .so-icon { font-size: .95rem; }
 .so-label-mini { font-size: .55rem; line-height: 1; }
+.so-research-lvl { font-size: .5rem; line-height: 1; margin-top: 2px; color: #88bbdd; opacity: .9; }
 
 /* Skrij raid-warning, intel-bonus, status-row če so še kje */
 .status-row, .raid-warning, .intel-bonus { display: none; }

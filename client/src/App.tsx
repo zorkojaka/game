@@ -1980,8 +1980,9 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               ];
             } else if (z.adj === 'r') {
               btns = [
-                { label: '🤖', active: researchObj === 'robots',     onClick: () => onResearch('robots'),     title: 'AI roboti: +veliko intela → boljši % v vseh bojih' },
-                { label: '🎯', active: researchObj === 'weakpoints', onClick: () => onResearch('weakpoints'), title: 'Ranljivosti: razkrij vozlišča AI načrtovalnega drevesa' },
+                { label: '🤖', active: researchObj === 'robots', onClick: () => onResearch('robots'), title: 'AI roboti: +veliko intela → boljši % v vseh bojih' },
+                { label: '⚔️', active: researchObj === 'weapon', onClick: () => onResearch('weapon'), title: 'Raziskava orožja: vsaka stopnja podvoji napad (120 razisk.-mes.)' },
+                { label: '🧱', active: researchObj === 'wall',   onClick: () => onResearch('wall'),   title: 'Raziskava obzidja: vsaka stopnja podvoji obrambo (120 razisk.-mes.)' },
               ];
             }
             if (!btns.length) return null;
@@ -2162,11 +2163,37 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
 }
 
 /** Izbira cilja delavnice (delavci) */
-function WorkshopSelector({ value, onChange }: { value: WorkshopObjective; onChange: (o: WorkshopObjective) => void }) {
-  const opts: Array<{ id: WorkshopObjective; icon: string; label: string; color: string; desc: string }> = [
-    { id: 'weapon',   icon: '⚔️', label: 'Orožje',   color: '#cc4433', desc: '6 delavec-mesecev za 1 orožje (−1 material). Napredek se ohrani ob preklopu.' },
-    { id: 'wall',     icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: '12 delavec-mesecev za 1 obzidje (−4 materiala). +20 % obrambe. Ohrani napredek.' },
+function WorkshopSelector({ value, onChange, weaponLevel, wallLevel }: { value: WorkshopObjective; onChange: (o: WorkshopObjective) => void; weaponLevel: number; wallLevel: number }) {
+  const opts: Array<{ id: WorkshopObjective; icon: string; label: string; color: string; desc: string; research?: number }> = [
+    { id: 'weapon',   icon: '⚔️', label: 'Orožje',   color: '#cc4433', desc: '6 delavec-mesecev za 1 orožje (−1 material). Napredek se ohrani ob preklopu.', research: weaponLevel },
+    { id: 'wall',     icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: '12 delavec-mesecev za 1 obzidje (−4 materiala). +20 % obrambe. Ohrani napredek.', research: wallLevel },
     { id: 'artifact', icon: '💎', label: 'Artefakt', color: '#ffd84a', desc: '360 delavec-mesecev (30 let z 1 delavcem) za 1 artefakt (−20 materiala). Ohrani napredek.' },
+  ];
+  const sel = opts.find(o => o.id === value);
+  return (
+    <div className="scout-objectives compact">
+      <div className="so-row" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+        {opts.map(o => (
+          <button key={o.id} className={`so-btn ${value === o.id ? 'sel' : ''}`}
+            style={value === o.id ? { borderColor: o.color, color: o.color } : {}}
+            onClick={() => onChange(o.id)} title={`${o.label} — ${o.desc}${o.research !== undefined ? ` · raziskava Lv${o.research} (napad/obramba ×${Math.pow(2, o.research)})` : ''}`}>
+            <span className="so-icon">{o.icon}</span>
+            <span className="so-label-mini">{o.label}</span>
+            {o.research !== undefined && <span className="so-research-lvl" title={`Stopnja raziskanosti: ${o.research} (×${Math.pow(2, o.research)})`}>🔬 Lv{o.research}</span>}
+          </button>
+        ))}
+      </div>
+      {sel && <div className="so-desc-line dim small">{sel.desc}</div>}
+    </div>
+  );
+}
+
+/** Izbira cilja raziskave (raziskovalci) */
+function ResearchSelector({ value, onChange, weaponLevel, wallLevel }: { value: ResearchObjective; onChange: (o: ResearchObjective) => void; weaponLevel: number; wallLevel: number }) {
+  const opts: Array<{ id: ResearchObjective; icon: string; label: string; color: string; desc: string; lvl?: number }> = [
+    { id: 'robots', icon: '🤖', label: 'AI roboti', color: '#cc8800', desc: '+veliko intela → boljši % v vseh bojih.' },
+    { id: 'weapon', icon: '⚔️', label: 'Orožje',   color: '#cc4433', desc: 'Vsaka stopnja podvoji napad orožja. 120 razisk.-mes. na stopnjo.', lvl: weaponLevel },
+    { id: 'wall',   icon: '🧱', label: 'Obzidje',  color: '#aabb88', desc: 'Vsaka stopnja podvoji obrambo obzidja. 120 razisk.-mes. na stopnjo.', lvl: wallLevel },
   ];
   const sel = opts.find(o => o.id === value);
   return (
@@ -2177,31 +2204,7 @@ function WorkshopSelector({ value, onChange }: { value: WorkshopObjective; onCha
             style={value === o.id ? { borderColor: o.color, color: o.color } : {}}
             onClick={() => onChange(o.id)} title={`${o.label} — ${o.desc}`}>
             <span className="so-icon">{o.icon}</span>
-            <span className="so-label-mini">{o.label}</span>
-          </button>
-        ))}
-      </div>
-      {sel && <div className="so-desc-line dim small">{sel.desc}</div>}
-    </div>
-  );
-}
-
-/** Izbira cilja raziskave (raziskovalci) */
-function ResearchSelector({ value, onChange }: { value: ResearchObjective; onChange: (o: ResearchObjective) => void }) {
-  const opts: Array<{ id: ResearchObjective; icon: string; label: string; color: string; desc: string }> = [
-    { id: 'robots',     icon: '🤖', label: 'AI roboti',   color: '#cc8800', desc: '+veliko intela → boljši % v vseh bojih.' },
-    { id: 'weakpoints', icon: '🎯', label: 'Ranljivosti', color: '#cc3333', desc: 'Razkrij vozlišča AI načrtovalnega drevesa.' },
-  ];
-  const sel = opts.find(o => o.id === value);
-  return (
-    <div className="scout-objectives compact">
-      <div className="so-row" style={{ gridTemplateColumns: 'repeat(2,1fr)' }}>
-        {opts.map(o => (
-          <button key={o.id} className={`so-btn ${value === o.id ? 'sel' : ''}`}
-            style={value === o.id ? { borderColor: o.color, color: o.color } : {}}
-            onClick={() => onChange(o.id)} title={`${o.label} — ${o.desc}`}>
-            <span className="so-icon">{o.icon}</span>
-            <span className="so-label-mini">{o.label}</span>
+            <span className="so-label-mini">{o.label}{o.lvl !== undefined ? ` Lv${o.lvl}` : ''}</span>
           </button>
         ))}
       </div>
@@ -2398,7 +2401,7 @@ export default function App() {
   const [workers,      setWorkers]      = useState(5);   // DELAVCI — delavnica
   const [researchers,  setResearchers]  = useState(5);   // RAZISKOVALCI — raziskava
   const [workshopObj,  setWorkshopObj]  = useState<WorkshopObjective>('weapon');
-  const [researchObj,  setResearchObj]  = useState<ResearchObjective>('weakpoints');
+  const [researchObj,  setResearchObj]  = useState<ResearchObjective>('robots');
   const [missions,     setMissions]     = useState<Record<string, number>>({});
   const [missionR,     setMissionR]     = useState<Record<string, number>>({});
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
@@ -2503,7 +2506,7 @@ export default function App() {
       if (/Nova faza/.test(log.narrative)) icons.push({ icon: '🌑', color: '#cc8800', title: 'Fazni prehod' });
       if ((game.consecutiveStarvationMonths ?? 0) > 0) icons.push({ icon: '💀', color: '#cc2222', title: 'Lakota' });
 
-      const ourKnow = calcOurKnowledge(game.aiTree);
+      const ourKnow = game.aiInsight ?? calcOurKnowledge(game.aiTree);
       const aiKnow  = game.aiKnowledge;
 
       const entry: EventEntry = {
@@ -2534,7 +2537,7 @@ export default function App() {
       const g = await createGame();
       setGame(g);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('defense'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('weakpoints'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
+      setAxis('defense'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('robots'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
     } finally { setLoading(false); }
   };
 
@@ -2846,7 +2849,7 @@ export default function App() {
           {/* DESNO — AI / situacija (stranska metrika) */}
           {(() => {
             const clansAlly = (game.otherClans ?? []).filter(c => c.allied).length * 4;
-            const ourK = calcOurKnowledge(game.aiTree);
+            const ourK = game.aiInsight ?? calcOurKnowledge(game.aiTree);
             const aiK  = game.aiKnowledge;
             const ourColor = ourK >= 0.6 ? '#22cc88' : ourK >= 0.3 ? '#3377cc' : '#5a7a99';
             const aiColor  = aiK  >= 0.7 ? '#cc2222' : aiK  >= 0.4 ? '#cc7700' : '#aa5a5a';
@@ -2984,7 +2987,7 @@ export default function App() {
                   <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('w', 1)}>+</button>
                 </span>
               </div>
-              <div className="ps-row"><span className="dim small">Cilj:</span><WorkshopSelector value={workshopObj} onChange={setWorkshopObj} /></div>
+              <div className="ps-row"><span className="dim small">Cilj:</span><WorkshopSelector value={workshopObj} onChange={setWorkshopObj} weaponLevel={game.weaponResearchLevel ?? 0} wallLevel={game.wallResearchLevel ?? 0} /></div>
               <div className="ps-row"><span className="dim small">⚙ Material:</span><b>{game.resources.material ?? 0}</b></div>
               <div className="ps-row"><span className="dim small">⚔ Orožje:</span><b>{game.resources.combat}</b></div>
               <div className="ps-row"><span className="dim small">🧱 Obzidje:</span><b>{game.wallsBuilt ?? 0}</b></div>
@@ -3026,11 +3029,31 @@ export default function App() {
                   <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('r', 1)}>+</button>
                 </span>
               </div>
-              <div className="ps-row"><span className="dim small">Cilj:</span><ResearchSelector value={researchObj} onChange={setResearchObj} /></div>
-              <div className="ps-row"><span className="dim small">+ Intel / mesec:</span><b style={{ color: '#3388cc' }}>+{researchIntel}</b></div>
-              <div className="ps-row"><span className="dim small">👁 Intel zaloga:</span><b>{game.resources.intelligence}</b></div>
+              <div className="ps-row"><span className="dim small">Cilj:</span><ResearchSelector value={researchObj} onChange={setResearchObj} weaponLevel={game.weaponResearchLevel ?? 0} wallLevel={game.wallResearchLevel ?? 0} /></div>
+              {researchObj === 'robots' && <>
+                <div className="ps-row"><span className="dim small">+ Intel / mesec:</span><b style={{ color: '#3388cc' }}>+{researchIntel}</b></div>
+                <div className="ps-row"><span className="dim small">👁 Intel zaloga:</span><b>{game.resources.intelligence}</b></div>
+              </>}
+              {researchObj === 'weapon' && (() => {
+                const lvl = game.weaponResearchLevel ?? 0; const prog = game.weaponResearchProgress ?? 0;
+                const months = researchers > 0 ? Math.ceil((120 - prog) / researchers) : Infinity;
+                return <>
+                  <div className="ps-row"><span className="dim small">⚔ Orožje — stopnja:</span><b style={{ color: '#cc4433' }}>Lv{lvl} (napad ×{Math.pow(2, lvl)})</b></div>
+                  <div className="ps-row"><span className="dim small">Napredek do Lv{lvl + 1}:</span><b>{prog} / 120 razisk.-mes.</b></div>
+                  <div className="ps-row"><span className="dim small">Do stopnje (pri {researchers}):</span><b style={{ color: '#cc4433' }}>{researchers > 0 ? `${months} mesec(ev)` : '∞'}</b></div>
+                </>;
+              })()}
+              {researchObj === 'wall' && (() => {
+                const lvl = game.wallResearchLevel ?? 0; const prog = game.wallResearchProgress ?? 0;
+                const months = researchers > 0 ? Math.ceil((120 - prog) / researchers) : Infinity;
+                return <>
+                  <div className="ps-row"><span className="dim small">🧱 Obzidje — stopnja:</span><b style={{ color: '#aabb88' }}>Lv{lvl} (obramba ×{Math.pow(2, lvl)})</b></div>
+                  <div className="ps-row"><span className="dim small">Napredek do Lv{lvl + 1}:</span><b>{prog} / 120 razisk.-mes.</b></div>
+                  <div className="ps-row"><span className="dim small">Do stopnje (pri {researchers}):</span><b style={{ color: '#aabb88' }}>{researchers > 0 ? `${months} mesec(ev)` : '∞'}</b></div>
+                </>;
+              })()}
             </div>
-            <p className="field-note dim small">Raziskovalci zbirajo intel. Cilj „roboti" izboljša boje, „ranljivosti" razkriva AI načrt.</p>
+            <p className="field-note dim small">Raziskovalci: „AI roboti" dajo intel (boljši boji); „Orožje" in „Obzidje" vsaka stopnja podvoji napad/obrambo (120 razisk.-mes. na stopnjo). AI drevo se odpira samodejno z znanjem o AI.</p>
           </div>
           )}
 

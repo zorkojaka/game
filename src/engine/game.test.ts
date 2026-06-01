@@ -150,6 +150,38 @@ describe('encounterScoutFactor — manj izvidnikov → manj srečanj', () => {
   });
 });
 
+describe('raziskave orožja/obzidja (×2, 120 r-mes)', () => {
+  it('120 raziskovalcev v eni rundi dvigne stopnjo orožja na 1', () => {
+    const g = newGame(8);
+    const r = processRound(g, { assignment: { axis: 'defense', combatants: 0, defenders: 0, foragers: 0, workers: 0, researchers: 120, rations: 3, researchObjective: 'weapon' } });
+    expect(r.weaponResearchLevel).toBe(1);
+  });
+  it('obzidje: 240 raziskovalcev → stopnja 2', () => {
+    const g = newGame(8);
+    const r = processRound(g, { assignment: { axis: 'defense', combatants: 0, defenders: 0, foragers: 0, workers: 0, researchers: 240, rations: 3, researchObjective: 'wall' } });
+    expect(r.wallResearchLevel).toBe(2);
+  });
+});
+
+describe('aiInsight — odpira AI drevo, fazni stropi', () => {
+  it('start 1 %', () => {
+    expect(newGame(1).aiInsight).toBeCloseTo(0.01, 5);
+  });
+  it('raste po rundi in je omejen na fazni strop (find ≤ 0.30)', () => {
+    let s = newGame(1);
+    for (let i = 0; i < 20 && s.status === 'active' && s.phase === 'find'; i++) {
+      s = processRound(s, action({ foragers: 40 }));
+      expect(s.aiInsight).toBeLessThanOrEqual(0.30 + 1e-9);
+    }
+  });
+  it('z dovolj insighta se razkrije vsaj eno vozlišče drevesa', () => {
+    const base = newGame(1);
+    const g: GameState = { ...base, aiInsight: 0.55, phase: 'understand' };
+    const r = processRound(g, action({ foragers: 5 }));
+    expect(r.aiTree.some(n => n.visibility === 'revealed')).toBe(true);
+  });
+});
+
 describe('axisHistory (#6 — vir za CompletedRun)', () => {
   it('izbrana os se inkrementira', () => {
     const g = newGame(3);

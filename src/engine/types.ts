@@ -106,7 +106,7 @@ export function tileId(t: { q: number; r: number }): string {
 }
 
 export type WorkshopObjective = 'weapon' | 'wall' | 'artifact';
-export type ResearchObjective = 'robots' | 'weakpoints';
+export type ResearchObjective = 'robots' | 'weapon' | 'wall';
 
 export interface Assignment {
   axis: HumanAxis;
@@ -244,6 +244,15 @@ export interface GameState {
   wallProgress: number;               // delavec-mesecev za obzidje (vsakih 12 = +1 obzidje)
   wallsBuilt: number;                 // skupno število zgrajenih obzidij
   artifactWorkshopProgress: number;   // delavec-mesecev za artefakt (vsakih 360 = +1 artefakt)
+
+  // Raziskave nadgradenj (vsak level ×2 učinka; 120 raziskovalec-mesecev na level)
+  weaponResearchLevel: number;        // orožje: napad ×2 na level
+  weaponResearchProgress: number;     // raziskovalec-mesecev proti naslednjemu levelu
+  wallResearchLevel: number;          // obzidje: obramba ×2 na level
+  wallResearchProgress: number;
+
+  // Naše znanje o AI [0,1] — odpira AI drevo (start 1 %, faze do 30/60/90 %)
+  aiInsight: number;
 
   // RNG (determinizem)
   rngSeed: number;

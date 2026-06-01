@@ -213,6 +213,24 @@ export const WEAPON_MATERIAL_COST   = 1;
 export const WALL_MATERIAL_COST     = 4;
 export const ARTIFACT_MATERIAL_COST = 20;
 
+// ─── Raziskovalne nadgradnje (orožje/obzidje) ──────────────────────────────────
+// Vsak level podvoji učinek (napad orožja oz. obramba obzidja).
+export const RESEARCH_LEVEL_WORKER_MONTHS = 120; // raziskovalec-mesecev za naslednji level (npr. 10 razisk. × 12 mes.)
+export const RESEARCH_EFFECT_MULT = 2;           // ×2 na level
+/** Multiplikator učinka pri danem nivoju raziskave (level 0 = ×1, 1 = ×2, 2 = ×4 …). */
+export function researchMult(level: number): number {
+  return Math.pow(RESEARCH_EFFECT_MULT, Math.max(0, level | 0));
+}
+
+// ─── Naše znanje o AI (odpira AI drevo) ────────────────────────────────────────
+export const INITIAL_AI_INSIGHT = 0.01;  // na začetku vemo 1 %
+export const INSIGHT_PER_ROUND   = 0.03; // postopno odpiranje na rundo (clamp na fazni strop)
+export const INSIGHT_PHASE_CAP: Record<AIPhase, number> = {
+  find:       0.30, // faza 1 odpre do 30 %
+  understand: 0.60, // faza 2 do 60 %
+  eliminate:  0.90, // faza 3 do 90 %
+};
+
 // ─── AI napad na kamp (raid) ─────────────────────────────────────────────────
 // P(raid) = base + popScaling * popFactor + aiKnowBonus * aiKnow
 // modificirano z osjo (hiding -50 %) in klansko aktivnostjo (drugi klani odvračajo)

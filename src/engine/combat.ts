@@ -11,6 +11,7 @@ import {
   AI_FOREKNOWLEDGE_BONUS,
   AI_WEAK_POINT_EXPLOIT_BONUS,
   aiDefensePower,
+  researchMult,
   RATIONS_LEVELS,
   DEFAULT_RATIONS,
   INTEL_COMBAT_BONUS_PER_100,
@@ -20,14 +21,15 @@ import {
 export function calcHumanStrength(
   assignment: Assignment,
   combatResources: number,
-  _phase: AIPhase
+  _phase: AIPhase,
+  weaponMult: number = 1
 ): number {
   // Obroki vplivajo na moč ljudi. M_os je odstranjen — bonusi pridejo iz intela in nadgradenj.
   const tier = RATIONS_LEVELS[assignment.rations ?? DEFAULT_RATIONS] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
-  // Oprema: omejena s številom ljudi v boju
+  // Oprema: omejena s številom ljudi v boju; raziskava orožja podvoji prispevek opreme
   const equipUsed = Math.min(combatResources, assignment.combatants);
   const base = assignment.combatants * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult
-    + equipUsed * COMBAT_EQUIPMENT_MULTIPLIER;
+    + equipUsed * COMBAT_EQUIPMENT_MULTIPLIER * weaponMult;
   return base;
 }
 
@@ -130,7 +132,8 @@ export function resolveCombat(
   exploitingWeakPoint: boolean = false
 ): { result: CombatResult; rng: RNGState } {
   const intelMult = intelCombatMultiplier(state.resources.intelligence);
-  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase) * intelMult;
+  const weaponMult = researchMult(state.weaponResearchLevel ?? 0);
+  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase, weaponMult) * intelMult;
   const aiStr = calcAIStrength(state, state.phase);
   const weakBonus = exploitingWeakPoint ? AI_WEAK_POINT_EXPLOIT_BONUS : 0;
   const p = calcSuccessProbability(humanStr, aiStr, weakBonus);

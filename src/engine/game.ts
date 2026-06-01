@@ -1,11 +1,11 @@
 // Glavni game engine — čiste funkcije (state, action) → new state
 // Brez side effectov, brez IO
 
-import type { GameState, PlayerAction, RoundLog, Assignment, AIPhase, RaidResult, ScoutResult, HumanAxis, Mission, AIUnits } from './types.js';
+import type { GameState, PlayerAction, RoundLog, Assignment, AIPhase, RaidResult, ScoutResult, HumanAxis, Mission, AIUnits, ResearchObjective } from './types.js';
 import type { RNGState } from './rng.js';
 import { createRNG, rngBool, rngInt, rngNext, seedFromString } from './rng.js';
 import { resolveCombat } from './combat.js';
-import { spendIntelOnFog, revealNodeRetroactive } from './fog.js';
+import { revealTreeByInsight, revealNodeRetroactive } from './fog.js';
 import { generateMap, generateOtherClans, spendScoutsOnMap, visibilityFromProgress } from './map.js';
 import { tickExpedition } from './expedition.js';
 import { tileId } from './types.js';
@@ -22,6 +22,8 @@ import {
   M_OS, RATIONS_LEVELS, DEFAULT_RATIONS,
   WEAPON_WORKER_MONTHS, WALL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS,
   WEAPON_MATERIAL_COST, WALL_MATERIAL_COST, ARTIFACT_MATERIAL_COST,
+  RESEARCH_LEVEL_WORKER_MONTHS, researchMult,
+  INITIAL_AI_INSIGHT, INSIGHT_PER_ROUND, INSIGHT_PHASE_CAP,
   RAID_BASE_CHANCE, RAID_POP_SCALING_MAX, RAID_POP_REFERENCE, RAID_AI_KNOWLEDGE_BONUS,
   RAID_HIDING_REDUCTION, RAID_CLAN_ABSORPTION, RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT,
   SCOUT_BASE_SUCCESS, SCOUT_INTEL_BONUS_PER_100, SCOUT_ESPIONAGE_BONUS,
@@ -124,9 +126,11 @@ export function raidRepelProbability(state: GameState, assignment: Assignment): 
   const axisH = state.axisHistory ?? { hiding: 0, espionage: 0, defense: 0 };
   const defenseLvl = Math.floor((axisH.defense ?? 0) / 3);
   const intelB = intelCombatBonus(state);
-  const wallBonus = 1 + 0.20 * (state.wallsBuilt ?? 0);  // vsak zid: +20 % moč obrambe
+  const weaponMult = researchMult(state.weaponResearchLevel ?? 0);  // raziskava orožja ×2/level
+  const wallMult = researchMult(state.wallResearchLevel ?? 0);      // raziskava obzidja ×2/level
+  const wallBonus = 1 + 0.20 * wallMult * (state.wallsBuilt ?? 0);  // vsak zid: +20 % (× raziskava)
   const base = defenders * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult * (1 + 0.10 * defenseLvl);
-  const equip = Math.min(state.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT;
+  const equip = Math.min(state.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT * weaponMult;
   const defStr = (base + equip) * (1 + intelB) * wallBonus;
   // Raid izvaja vsa AI sila (vsi tipi enot napadajo) — moč po njihovem napadu
   const aiStr = aiAttackPower(readAIUnits(state)) * (1 - state.clanActivity) * RAID_AI_FORCE_PCT;
@@ -282,6 +286,11 @@ export function newGame(seed?: number): GameState {
     wallProgress: 0,
     wallsBuilt: 0,
     artifactWorkshopProgress: 0,
+    weaponResearchLevel: 0,
+    weaponResearchProgress: 0,
+    wallResearchLevel: 0,
+    wallResearchProgress: 0,
+    aiInsight: INITIAL_AI_INSIGHT,
     rngSeed,
     rngCallCount: 0,
     lastRoundLog: null,
@@ -346,31 +355,51 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   let material = state.resources.material ?? 0;
   let artifacts = state.resources.artifacts ?? 0;
 
-  // 3. RAZISKOVALCI — intel + razkrivanje AI drevesa / boost
+  // 3. RAZISKOVALCI — intel boost + raziskave nadgradenj (orožje/obzidje)
   const researchers = assignment.researchers ?? assignment.scouts ?? 0;
-  const researchObj: 'robots' | 'weakpoints' = assignment.researchObjective ?? 'weakpoints';
+  const researchObj: ResearchObjective = assignment.researchObjective ?? 'robots';
   const intelGained = Math.floor(researchers * SCOUT_INTEL_YIELD * rations.strengthMult);
   let intelligence = state.resources.intelligence + intelGained;
 
-  let aiTree = state.aiTree;
-  let revealed: string[] = [];
   let mapTiles = state.mapTiles ?? generateMap();
   let otherClans = (state.otherClans ?? generateOtherClans()).map(c => ({ ...c }));
   const workshopEvents: string[] = [];
 
+  // Raziskovalne nadgradnje — stanje
+  let weaponResearchLevel    = state.weaponResearchLevel ?? 0;
+  let weaponResearchProgress = state.weaponResearchProgress ?? 0;
+  let wallResearchLevel      = state.wallResearchLevel ?? 0;
+  let wallResearchProgress   = state.wallResearchProgress ?? 0;
+
   if (researchers > 0) {
-    if (researchObj === 'weakpoints') {
-      const fogEfficiency = assignment.axis === 'espionage' ? M_OS[state.phase].espionage : 0.15;
-      const espionageBonus = 1 + 0.20 * espionageLvl;
-      const budget = Math.floor(researchers * SCOUT_FOG_YIELD * fogEfficiency * espionageBonus * rations.strengthMult);
-      const r = spendIntelOnFog(aiTree, budget);
-      aiTree = r.nodes;
-      revealed = r.revealed;
-    } else if (researchObj === 'robots') {
+    if (researchObj === 'robots') {
       const intelBonus = Math.floor(researchers * SCOUT_INTEL_YIELD * 3 * rations.strengthMult);
       intelligence += intelBonus;
+    } else if (researchObj === 'weapon') {
+      weaponResearchProgress += researchers;
+      while (weaponResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS) {
+        weaponResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
+        weaponResearchLevel += 1;
+        workshopEvents.push(`🔬 Raziskava orožja dokončana — stopnja ${weaponResearchLevel}! Napad orožja ×${researchMult(weaponResearchLevel)}.`);
+      }
+    } else if (researchObj === 'wall') {
+      wallResearchProgress += researchers;
+      while (wallResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS) {
+        wallResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
+        wallResearchLevel += 1;
+        workshopEvents.push(`🔬 Raziskava obzidja dokončana — stopnja ${wallResearchLevel}! Obramba obzidja ×${researchMult(wallResearchLevel)}.`);
+      }
     }
   }
+
+  // Naše znanje o AI (insight) → postopno odpiranje AI drevesa do faznega stropa
+  const aiInsight = Math.min(
+    INSIGHT_PHASE_CAP[state.phase],
+    (state.aiInsight ?? INITIAL_AI_INSIGHT) + INSIGHT_PER_ROUND,
+  );
+  let aiTree = revealTreeByInsight(state.aiTree, aiInsight);
+  const prevRevealed = new Set(state.aiTree.filter(n => n.visibility === 'revealed').map(n => n.id));
+  const revealed: string[] = aiTree.filter(n => n.visibility === 'revealed' && !prevRevealed.has(n.id)).map(n => n.id);
 
   // 4. DELAVCI — delavnica (delavec-meseci; napredek se ohrani ob preklopu)
   const workers = assignment.workers ?? 0;
@@ -878,6 +907,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     aiPhaseProgress: phaseComplete ? 0 : aiPhaseProgress,
     aiRobots,
     aiUnits,
+    aiInsight,
     aiKnowledge: finalAiKnowledge,
     aiTree: finalTree,
     aiWeakPoints,
@@ -894,6 +924,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     expeditions: tickedExps,
     completedExpeditions: [...oldCompletedExps, ...finishedExps],
     weaponWorkshopProgress, weaponWorkshopScouts, wallProgress, wallsBuilt, artifactWorkshopProgress,
+    weaponResearchLevel, weaponResearchProgress, wallResearchLevel, wallResearchProgress,
     rngCallCount: rng.calls,
     lastRoundLog: log,
     status,
@@ -970,7 +1001,7 @@ function buildNarrative(
 // Izračun obeta za dano dodelitev — UI prikaže pred akcijo
 export function previewOdds(state: GameState, assignment: Assignment) {
   const intelB = intelCombatBonus(state);
-  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase) * (1 + intelB);
+  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase, researchMult(state.weaponResearchLevel ?? 0)) * (1 + intelB);
   const aiStr = calcAIStrength(state, state.phase);
   const p = calcSuccessProbability(humanStr, aiStr);
 

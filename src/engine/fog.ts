@@ -10,6 +10,24 @@ export function intelRequiredForVisibility(target: Visibility): number {
   return target === 'partial' ? INTEL_TO_PARTIAL : INTEL_TO_REVEALED;
 }
 
+/**
+ * Razkrij AI drevo glede na naše znanje o AI (insight ∈ [0,1]).
+ * Vozlišča se odpirajo po vrsti: višji insight razkrije več. Nikoli ne degradira
+ * že razkritih vozlišč (npr. retroaktivno razkritih ob izvedbi faze).
+ */
+export function revealTreeByInsight(nodes: AITreeNode[], insight: number): AITreeNode[] {
+  const N = nodes.length;
+  if (N === 0) return nodes;
+  return nodes.map((n, i) => {
+    if (n.visibility === 'revealed') return n;
+    const threshold = (i + 1) / N;       // koliko insighta zahteva to vozlišče za polno razkritje
+    let vis: Visibility = n.visibility;
+    if (insight >= threshold) vis = 'revealed';
+    else if (insight >= threshold - 0.5 / N && vis === 'unknown') vis = 'partial';
+    return vis === n.visibility ? n : { ...n, visibility: vis };
+  });
+}
+
 // Proaktivno odgrinjanje — porabimo intel, upgrade vozlišče
 export function revealNodeProactive(
   node: AITreeNode,
