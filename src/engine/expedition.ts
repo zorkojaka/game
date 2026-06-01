@@ -76,8 +76,15 @@ export function tickExpedition(
   const finds: ExpeditionFinds = { material: 0, weapons: 0, artifacts: 0 };
   let curIdx = exp.currentIndex;
   let assignedNow = exp.assigned;
+  // Način skrivanja: napredujemo 2× v 3 mesecih (trajanje +50 %). Preskočimo vsak 3. mesec.
+  const stealth = !!exp.stealth;
+  const skipThisMonth = stealth && (exp.monthsElapsed % 3 === 2);
 
   for (let stepsThisMonth = 0; stepsThisMonth < TILES_PER_MONTH; stepsThisMonth++) {
+    if (skipThisMonth) {
+      events.push(`🌙 Skrivanje — počitek/obhod (mesec preskočen).`);
+      break;
+    }
     if (curIdx >= exp.path.length - 1) break;
     const nextStep = exp.path[curIdx + 1];
     const tIdx = newTiles.findIndex(t => t.q === nextStep.q && t.r === nextStep.r);
@@ -91,8 +98,9 @@ export function tickExpedition(
     const newProg = Math.min(1, tile.researchProgress + addProg);
     newTiles[tIdx] = { ...tile, researchProgress: newProg, visibility: visibilityFromProgress(newProg) };
 
-    // Srečanje
-    const pEnc = tileEncounterProbability(newTiles[tIdx], assignedNow, aiKnowledge);
+    // Srečanje — skrivanje razpolovi verjetnost
+    const pEncBase = tileEncounterProbability(newTiles[tIdx], assignedNow, aiKnowledge);
+    const pEnc = stealth ? pEncBase * 0.5 : pEncBase;
     const [encRoll, rng2] = rngNext(rng); rng = rng2;
     if (encRoll < pEnc) {
       const [pctRoll, rng3] = rngInt(rng, SCOUT_CAPTURED_LOSS_MIN * 100, SCOUT_CAPTURED_LOSS_MAX * 100);

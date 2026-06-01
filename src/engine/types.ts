@@ -82,6 +82,7 @@ export interface Expedition {
   status: ExpeditionStatus;
   monthsElapsed: number;
   encountersLog: string[];        // kratki opisi srečanj/dogodkov med potjo
+  stealth?: boolean;              // način skrivanja: trajanje +50 %, srečanja ×0.5, boj +20 %
 }
 
 export interface NewExpeditionInput {
@@ -90,6 +91,7 @@ export interface NewExpeditionInput {
   path: Array<{ q: number; r: number }>;
   assigned: number;
   rations: number;
+  stealth?: boolean;
 }
 
 export type ScoutObjective = 'ai_robots' | 'ai_weakpoints' | 'weapon_dev' | 'wall_dev';

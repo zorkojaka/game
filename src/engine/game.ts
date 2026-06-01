@@ -514,13 +514,15 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         if (r.exp.kind === 'mission') {
           // SPOPAD OB PRIHODU — napadalci udarijo na cilju, preživeli se vrnejo
           const aTier = RATIONS_LEVELS[r.exp.rations] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
+          const stealthBonus = r.exp.stealth ? 1.2 : 1.0;  // +20 % uspeha v boju
           let survivors = r.exp.assigned;
           if (r.exp.weakPointId) {
             // Napad na šibko točko AI
             const wpIdx = aiWeakPoints.findIndex(wp => wp.id === r.exp.weakPointId);
-            const p = missionSuccessProbability(
+            const pBase = missionSuccessProbability(
               { ...state, resources: { ...state.resources, intelligence } },
               r.exp.weakPointId, survivors, r.exp.rations);
+            const p = Math.min(0.98, pBase * stealthBonus);
             const [roll, rngA] = rngNext(rng); rng = rngA;
             const wpLabel = wpIdx >= 0 ? aiWeakPoints[wpIdx].label : 'šibka točka';
             if (roll < p && wpIdx >= 0) {
@@ -535,7 +537,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
             }
           } else {
             // Splošni napad na AI robote
-            const humanStr = survivors * 1.2 * aTier.strengthMult;
+            const humanStr = survivors * 1.2 * aTier.strengthMult * stealthBonus;
             const aiStr = Math.max(1, aiRobots * 0.05);
             const p = humanStr / (humanStr + aiStr);
             const [roll, rngA] = rngNext(rng); rng = rngA;
@@ -592,6 +594,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       status: 'traveling',
       monthsElapsed: 0,
       encountersLog: [],
+      stealth: inp.stealth,
     });
   }
 

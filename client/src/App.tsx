@@ -2384,7 +2384,7 @@ function FitScale({ children, deps }: { children: React.ReactNode; deps?: unknow
 export default function App() {
   const [game,       setGame]       = useState<GameState | null>(null);
   const [loading,    setLoading]    = useState(false);
-  const [axis,       setAxis]       = useState<HumanAxis>('hiding');
+  const [axis,       setAxis]       = useState<HumanAxis>('defense');
   const [combatants,   setCombatants]   = useState(0);
   const [defenders,    setDefenders]    = useState(15);
   const [foragers,     setForagers]     = useState(20);
@@ -2401,6 +2401,7 @@ export default function App() {
   const [draftPeople,  setDraftPeople]  = useState(5);
   const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
   const [draftKind,    setDraftKind]    = useState<'scout' | 'attack'>('scout');
+  const [draftStealth, setDraftStealth] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showRules,    setShowRules]    = useState(false);
   const [appMenuOpen,  setAppMenuOpen]  = useState(false);
@@ -2526,7 +2527,7 @@ export default function App() {
       const g = await createGame();
       setGame(g);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('hiding'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('weakpoints'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
+      setAxis('defense'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('weakpoints'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
     } finally { setLoading(false); }
   };
 
@@ -2611,7 +2612,10 @@ export default function App() {
 
   // Statistike za draft pot (mesecev + tveganje)
   const TILES_PER_MONTH_FE = 1;  // en korak = en mesec
-  const draftPathMonths = Math.max(0, Math.ceil((draftPath.length - 1) / TILES_PER_MONTH_FE));
+  const draftPathTiles = Math.max(0, draftPath.length - 1);
+  const draftPathMonths = draftStealth
+    ? Math.ceil(draftPathTiles * 1.5)        // skrivanje: +50 % trajanja
+    : Math.max(0, Math.ceil(draftPathTiles / TILES_PER_MONTH_FE));
   function tileEncounterMultFE(p: number, distFromCamp: number): number {
     let m = p < 0.25 ? 1.5 : p < 0.50 ? 1.2 : p < 1.0 ? 0.7 : 0.3;
     if (distFromCamp <= 1) m *= 0.5;
@@ -2665,6 +2669,7 @@ export default function App() {
       kind: kind === 'attack' ? 'mission' : 'scout',
       weakPointId: wpId,
       path: draftPath, assigned: draftPeople, rations: draftRations,
+      stealth: draftStealth,
     };
   }
   function confirmDraft(kind: 'scout' | 'attack') {
@@ -2873,10 +2878,6 @@ export default function App() {
 
         <div className="left-panel">
          <FitScale deps={[tab, game, defenders, foragers, workers, researchers, combatants, draftPath.length, pendingExpeditions.length]}>
-          {/* Fokus meseca (skrivanje / špijonaža / obramba) — vidno na vseh people-zavihkih */}
-          {(tab === 'defense' || tab === 'food' || tab === 'workshop' || tab === 'research') && (
-            <AxisFocusBar value={axis} onChange={setAxis} />
-          )}
           {/* Vrstica prostih ljudi (vsi people-zavihki) */}
           {(tab === 'defense' || tab === 'food' || tab === 'workshop' || tab === 'research') && (
             <div className="free-people">
@@ -3049,6 +3050,10 @@ export default function App() {
                     <span className="dim small">Obroki odprave:</span>
                     <RationsMini value={draftRations} onChange={setDraftRations} />
                   </div>
+                  <label className="stealth-toggle" title="Trajanje +50 %, srečanja ×0.5, boj +20 % uspeha.">
+                    <input type="checkbox" checked={draftStealth} onChange={e => setDraftStealth(e.target.checked)} />
+                    <span>🌙 Skrivanje — pot +50 %, srečanja ×0.5, boj +20 %</span>
+                  </label>
                   <div className="exp-takealong">
                     <div className="dim small" style={{ marginBottom: 2 }}>Vzamejo s seboj iz kampa:</div>
                     <div className="eta-row">
@@ -3071,7 +3076,7 @@ export default function App() {
                     const food = Math.round(e.assigned * months * t.foodMult);
                     return (
                       <div key={i} className="pending-exp-row">
-                        <span>🔭 {e.assigned} · {months}m · {t.emoji} 🍞{food}</span>
+                        <span>🔭 {e.assigned} · {months}m · {t.emoji} 🍞{food}{e.stealth ? ' · 🌙' : ''}</span>
                         <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
                       </div>
                     );
@@ -3136,7 +3141,7 @@ export default function App() {
                 const wp = tile?.hidesWeakPointId ? game.aiWeakPoints.find(w => w.id === tile.hidesWeakPointId) : undefined;
                 const wpDisc = !!wp?.discovered;
                 const targetLabel = wpDisc ? `◆ ${wp!.label}` : tile?.isAICore ? '☣ AI jedro' : `(${last.q},${last.r}) — splošni napad`;
-                const hStr = draftPeople * 1.2 * draftRTier.strengthMult;
+                const hStr = draftPeople * 1.2 * draftRTier.strengthMult * (draftStealth ? 1.2 : 1);
                 const aStr = Math.max(1, (game.aiRobots ?? 0) * 0.05);
                 const winP = hStr / (hStr + aStr);
                 return (
@@ -3162,6 +3167,10 @@ export default function App() {
                       <span className="dim small">Obroki:</span>
                       <RationsMini value={draftRations} onChange={setDraftRations} />
                     </div>
+                    <label className="stealth-toggle" title="Trajanje +50 %, srečanja ×0.5, boj +20 % uspeha.">
+                      <input type="checkbox" checked={draftStealth} onChange={e => setDraftStealth(e.target.checked)} />
+                      <span>🌙 Skrivanje — pot +50 %, srečanja ×0.5, boj +20 %</span>
+                    </label>
                     <div className="exp-takealong">
                       <div className="dim small" style={{ marginBottom: 2 }}>Vzamejo s seboj:</div>
                       <div className="eta-row">
@@ -3180,7 +3189,7 @@ export default function App() {
                   <div className="dim small" style={{ marginBottom: 4 }}>Potrjeni napadi (sproži ob izvedbi meseca):</div>
                   {pendingExpeditions.map((e, i) => e.kind === 'mission' && (
                     <div key={i} className="pending-exp-row">
-                      <span>⚔ {e.assigned} · {e.path.length - 1}m{e.weakPointId ? ' · ◆ šibka točka' : ''}</span>
+                      <span>⚔ {e.assigned} · {e.path.length - 1}m{e.weakPointId ? ' · ◆ šibka točka' : ''}{e.stealth ? ' · 🌙' : ''}</span>
                       <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
                     </div>
                   ))}
@@ -3209,7 +3218,7 @@ export default function App() {
                   const isAttack = e.kind === 'mission';
                   const color = isAttack ? '#cc3333' : '#ffd84a';
                   const wp = e.weakPointId ? game.aiWeakPoints.find(w => w.id === e.weakPointId) : undefined;
-                  const kindLabel = isAttack ? (wp ? `⚔ Napad na ◆ ${wp.label}` : '⚔ Napad') : '🔭 Izvidnica';
+                  const kindLabel = (isAttack ? (wp ? `⚔ Napad na ◆ ${wp.label}` : '⚔ Napad') : '🔭 Izvidnica') + (e.stealth ? ' · 🌙' : '');
                   return (
                     <div key={e.id} className="exp-card">
                       <div className="exp-head">

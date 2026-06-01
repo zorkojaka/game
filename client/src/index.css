@@ -269,6 +269,23 @@ b      { color: var(--text); font-weight: 600; }
 }
 .axis-focus-btn:hover { background: #131a22; }
 .axis-focus-btn.active { background: #0d1612 !important; }
+
+/* Stealth toggle (Skrivanje na odpravi/napadu) */
+.stealth-toggle {
+  display: flex; align-items: center; gap: .5rem;
+  margin: .4rem 0;
+  padding: .4rem .55rem;
+  background: #0b0f14;
+  border: 1px solid #2a3a4a;
+  border-radius: 8px;
+  font-size: .85rem;
+  color: #b0c0d0;
+  cursor: pointer;
+  user-select: none;
+}
+.stealth-toggle input { accent-color: #6aa6d9; cursor: pointer; }
+.stealth-toggle:hover { background: #11171f; border-color: #3a536e; }
+.stealth-toggle input:checked ~ span { color: #cce6ff; }
 .afb-icon { font-size: 1.05rem; line-height: 1; }
 .afb-label { font-size: .58rem; font-weight: bold; letter-spacing: .05em; }
 /* drevesa/misije v ozkem levem panelu — en stolpec */

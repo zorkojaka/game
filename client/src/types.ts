@@ -65,6 +65,7 @@ export interface Expedition {
   status: ExpeditionStatus;
   monthsElapsed: number;
   encountersLog: string[];
+  stealth?: boolean;
 }
 
 export interface NewExpeditionInput {
@@ -73,6 +74,7 @@ export interface NewExpeditionInput {
   path: Array<{ q: number; r: number }>;
   assigned: number;
   rations: number;
+  stealth?: boolean;
 }
 
 export type ScoutObjective = 'ai_robots' | 'ai_weakpoints' | 'weapon_dev' | 'wall_dev';
