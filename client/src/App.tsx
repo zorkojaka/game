@@ -2597,8 +2597,11 @@ export default function App() {
   const over = assigned > availablePop;
 
   const weaponCap = game ? Math.floor(game.resources.combat) : 0;
-  const armedTotal = combatants + defenders;
+  // Oboroženi = branilci + napadalci + VSI ki gredo na odpravo/misijo (vsak rabi orožje).
+  const draftArmed = draftPath.length >= 2 ? draftPeople : 0;
+  const armedTotal = combatants + defenders + pendingExpPpl + newMissionPeople + draftArmed;
   const overArmed  = armedTotal > weaponCap;
+  const weaponsLeft = Math.max(0, weaponCap - armedTotal);
 
   type SliderKey = 'd' | 'f' | 'w' | 'r';
   function setSliderClamped(which: SliderKey, newVal: number) {
@@ -2673,10 +2676,19 @@ export default function App() {
     return 1 - pNo;
   })();
   const canConfirmDraft = draftPath.length >= 2 && draftPeople > 0
-    && (assignedHome + plannedTotal + draftPeople <= availablePop);
+    && (assignedHome + plannedTotal + draftPeople <= availablePop)
+    && !overArmed;  // vsak član odprave rabi orožje
 
   function setMissionAssignment(wpId: string, n: number) {
-    const v = Math.max(0, Math.floor(n));
+    const thisCur = missions[wpId] ?? 0;
+    // Vse drugo že razporejeno (brez te misije)
+    const otherPop   = assignedHome + combatants + pendingExpPpl + (newMissionPeople - thisCur);
+    // Oboroženi drugje (branilci + napadalci + odprave + druge misije) — člani misije so napadalci
+    const otherArmed = defenders + combatants + pendingExpPpl + draftArmed + (newMissionPeople - thisCur);
+    const maxByPop     = availablePop - otherPop;
+    const maxByWeapons = weaponCap - otherArmed;
+    const cap = Math.max(0, Math.min(maxByPop, maxByWeapons));
+    const v = Math.max(0, Math.min(cap, Math.floor(n)));
     const newMap = { ...missions, [wpId]: v };
     if (v === 0) delete newMap[wpId];
     setMissions(newMap);
@@ -2716,6 +2728,8 @@ export default function App() {
   function bumpRole(which: 'd' | 'f' | 'w' | 'r', delta: number) {
     const cur = { d: defenders, f: foragers, w: workers, r: researchers }[which];
     if (delta > 0 && (assignedHome + plannedTotal) >= availablePop) return;
+    // Branilci so oboroženi → ne dovoli več od orožja
+    if (delta > 0 && which === 'd' && weaponsLeft <= 0) return;
     const next = Math.max(0, cur + delta);
     if (which === 'd') setDefenders(next);
     else if (which === 'f') setForagers(next);
@@ -2929,7 +2943,7 @@ export default function App() {
                 <span className="pa-pm">
                   <button className="pa-btn" disabled={defenders <= 0} onClick={() => bumpRole('d', -1)}>−</button>
                   <b className="pa-count">{defenders}</b>
-                  <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('d', 1)}>+</button>
+                  <button className="pa-btn" disabled={freePeople <= 0 || weaponsLeft <= 0} onClick={() => bumpRole('d', 1)}>+</button>
                 </span>
               </div>
               <div className="ps-row"><span className="dim small">⚠ Napad AI (ta mesec):</span>
@@ -2944,10 +2958,12 @@ export default function App() {
               <div className="ps-row"><span className="dim small">🧱 Bonus obrambe (obzidje):</span>
                 <b style={{ color: (game.wallsBuilt ?? 0) > 0 ? '#66cc88' : '#888' }}>
                   +{((game.wallsBuilt ?? 0) * 20)}%{(game.wallsBuilt ?? 0) > 0 ? ` (×${(1 + 0.20 * (game.wallsBuilt ?? 0)).toFixed(1)})` : ''}</b></div>
-              <div className="ps-row"><span className="dim small">⚔ Orožje (kapaciteta boja):</span><b>{weaponCap}</b></div>
+              <div className="ps-row"><span className="dim small">⚔ Orožje (skupna kapaciteta):</span><b>{weaponCap}</b></div>
+              <div className="ps-row"><span className="dim small">⚔ Oboroženih (branilci+odprave+misije):</span>
+                <b style={{ color: overArmed ? '#cc4444' : '#9ec0ad' }}>{armedTotal} / {weaponCap}</b></div>
             </div>
             {overArmed && (
-              <div className="weapon-warning">⚠ Premalo orožja: imaš {weaponCap}, v boju {armedTotal}. Engine skrči.</div>
+              <div className="weapon-warning">⚠ Premalo orožja: imaš {weaponCap}, oboroženih {armedTotal}. Vsak branilec, napadalec in član odprave/misije rabi orožje.</div>
             )}
             <p className="field-note dim small">
               „Napad AI" je verjetnost <b>na mesec</b> — neodvisna vsak mesec, zato se v več mesecih sešteje.
@@ -3219,7 +3235,7 @@ export default function App() {
                         <span className="pa-pm">
                           <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
                           <b className="pa-count">{draftPeople}</b>
-                          <button className="pa-btn" disabled={assignedHome + plannedTotal + draftPeople >= availablePop}
+                          <button className="pa-btn" disabled={assignedHome + plannedTotal + draftPeople >= availablePop || weaponsLeft <= 0}
                             onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
                         </span>
                       </div>
