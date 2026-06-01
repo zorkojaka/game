@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
-import { newGame, processRound } from './game.js';
+import { newGame, processRound, destroyAIUnits, totalAIRobots } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN } from './combat.js';
+import { encounterScoutFactor } from './expedition.js';
 import { createRNG } from './rng.js';
 import type { PlayerAction, GameState } from './types.js';
 
@@ -87,6 +88,62 @@ describe('lakota (#starvation)', () => {
     const r = processRound(g, action({ foragers: 0, rations: 3 }));
     expect(r.consecutiveStarvationMonths).toBe(1);
     expect(r.population).toBeLessThan(before);
+  });
+});
+
+describe('AI enote po fazah (scouts/attackers/peopleKillers)', () => {
+  it('faza 1 (find): samo 100 izvidniških enot = aiRobots', () => {
+    const g = newGame(1);
+    expect(g.aiUnits).toEqual({ scouts: 100, attackers: 0, peopleKillers: 0 });
+    expect(g.aiRobots).toBe(100);
+  });
+
+  it('prehod v understand pripelje 75 napadalnih enot', () => {
+    const g: GameState = { ...newGame(2), aiPhaseProgress: 11, round: 12 };
+    const r = processRound(g, action({ foragers: 5 }));
+    expect(r.phase).toBe('understand');
+    expect(r.aiUnits.attackers).toBe(75);
+    expect(r.aiRobots).toBe(r.aiUnits.scouts + 75 + r.aiUnits.peopleKillers);
+  });
+
+  it('prehod v eliminate pripelje 25 people-killer enot', () => {
+    const g: GameState = { ...newGame(2), phase: 'understand', aiPhaseProgress: 11, round: 12,
+      aiUnits: { scouts: 100, attackers: 75, peopleKillers: 0 }, aiRobots: 175 };
+    const r = processRound(g, action({ foragers: 5 }));
+    expect(r.phase).toBe('eliminate');
+    expect(r.aiUnits.peopleKillers).toBe(25);
+  });
+
+  it('faza 1 nima raidov (brez napadalnih enot)', () => {
+    // poženi nekaj rund v fazi find — raid se nikoli ne zgodi
+    let s = newGame(123);
+    for (let i = 0; i < 11 && s.status === 'active'; i++) {
+      s = processRound(s, action({ foragers: 40, defenders: 5 }));
+      expect(s.lastRoundLog?.raid?.occurred ?? false).toBe(false);
+    }
+  });
+});
+
+describe('destroyAIUnits — porazdeljeno uničenje', () => {
+  it('odšteje natanko count in nikoli pod 0', () => {
+    const u = { scouts: 100, attackers: 75, peopleKillers: 25 };
+    const r = destroyAIUnits(u, 40);
+    expect(totalAIRobots(r)).toBe(160);
+    expect(r.scouts).toBeGreaterThanOrEqual(0);
+    expect(r.attackers).toBeGreaterThanOrEqual(0);
+    expect(r.peopleKillers).toBeGreaterThanOrEqual(0);
+  });
+  it('uničenje več kot obstaja → vse na 0', () => {
+    const r = destroyAIUnits({ scouts: 10, attackers: 0, peopleKillers: 0 }, 999);
+    expect(totalAIRobots(r)).toBe(0);
+  });
+});
+
+describe('encounterScoutFactor — manj izvidnikov → manj srečanj', () => {
+  it('pri polnem številu ~1, pri 0 = minimum, monotono', () => {
+    expect(encounterScoutFactor(100)).toBeCloseTo(1, 5);
+    expect(encounterScoutFactor(0)).toBeLessThan(encounterScoutFactor(50));
+    expect(encounterScoutFactor(50)).toBeLessThan(encounterScoutFactor(100));
   });
 });
 

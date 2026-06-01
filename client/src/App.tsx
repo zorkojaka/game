@@ -78,9 +78,9 @@ function Bar({ ratio, color, height = 6 }: { ratio: number; color?: string; heig
 }
 
 /** Velika grafična kartica za en resurs: ikona + oznaka + številka (brez bar-a) */
-function BigStat({ icon, label, value, color, unit, note, noteColor }: { icon: string; label: string; value: number | string; color: string; unit?: string; note?: string; noteColor?: string }) {
+function BigStat({ icon, label, value, color, unit, note, noteColor, title }: { icon: string; label: string; value: number | string; color: string; unit?: string; note?: string; noteColor?: string; title?: string }) {
   return (
-    <div className="big-stat" style={{ borderColor: color }}>
+    <div className="big-stat" style={{ borderColor: color }} title={title}>
       <div className="bs-icon" style={{ color }}>{icon}</div>
       <div className="bs-body">
         <div className="bs-label dim small">{label}</div>
@@ -2644,13 +2644,16 @@ export default function App() {
     const SCOUT_CAPTURE_BASE_FE = 0.05;
     const SCOUT_CAPTURE_PER_SCOUT_FE = 0.004;
     const AI_KNOW_BONUS_FE = 0.20;
+    // Faktor glede na AI izvidniške enote (manj robotov → manj srečanj). Mora se ujemati z enginom.
+    const aiScouts = game.aiUnits?.scouts ?? game.aiRobots ?? 100;
+    const scoutFactor = Math.max(0, Math.min(1, 0.25 + 0.75 * Math.min(1, Math.max(0, aiScouts) / 100)));
     let pNo = 1;
     for (const step of draftPath.slice(1)) {
       const tile = game.mapTiles?.find(t => t.q === step.q && t.r === step.r);
       if (!tile) continue;
       const distFromCamp = hexDistFE({ q: tile.q, r: tile.r }, { q: clan.q, r: clan.r });
       const base = SCOUT_CAPTURE_BASE_FE + SCOUT_CAPTURE_PER_SCOUT_FE * draftPeople + AI_KNOW_BONUS_FE * game.aiKnowledge;
-      const p = Math.max(0, Math.min(0.85, base * tileEncounterMultFE(tile.researchProgress, distFromCamp)));
+      const p = Math.max(0, Math.min(0.85, base * tileEncounterMultFE(tile.researchProgress, distFromCamp) * scoutFactor));
       pNo *= (1 - p);
     }
     return 1 - pNo;
@@ -2849,7 +2852,10 @@ export default function App() {
             const aiColor  = aiK  >= 0.7 ? '#cc2222' : aiK  >= 0.4 ? '#cc7700' : '#aa5a5a';
             return (
               <div className="tr-group tr-side">
-                <BigStat icon="🤖" label="AI roboti" value={game.aiRobots}                       color="#cc3333" />
+                <BigStat icon="🤖" label="AI roboti" value={game.aiRobots}                       color="#cc3333"
+                  note={(() => { const u = game.aiUnits; return u ? `🔭${u.scouts} ⚔${u.attackers} ☠${u.peopleKillers}` : ''; })()}
+                  noteColor="#aa8888"
+                  title={(() => { const u = game.aiUnits; return u ? `Izvidniške: ${u.scouts} · Napadalne: ${u.attackers} · People-killer: ${u.peopleKillers}` : ''; })()} />
                 <BigStat icon="🌍" label="Klani"     value={Math.round(game.clanActivity * 100)} color="#88aa66" unit="%"
                   note={clansAlly > 0 ? `+${clansAlly}%` : ''} noteColor={'#22cc88'} />
                 <BigStat icon="🔭" label="Mi vemo"   value={Math.round(ourK * 100)} color={ourColor} unit="%" />

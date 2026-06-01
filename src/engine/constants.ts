@@ -15,6 +15,15 @@ export const INITIAL_COMBAT = 60;      // enote orožja
 export const INITIAL_INTELLIGENCE = 10; // začetni intel
 export const INITIAL_MATERIAL = 30;     // začetni material za delavnice
 export const INITIAL_AI_ROBOTS = 200;
+// AI sile prihajajo po fazah (skupno = 200 robotov ob koncu):
+export const AI_SCOUTS_INITIAL      = 100; // faza 1 (find): samo izvidniške enote
+export const AI_ATTACKERS_PHASE2     = 75;  // faza 2 (understand): pripeljane napadalne enote
+export const AI_PEOPLEKILLERS_PHASE3 = 25;  // faza 3 (eliminate): pripeljane people-killer enote
+// Skaliranje srečanj: gosteje ko je izvidnikov, večja možnost srečanja; manj robotov → manj srečanj
+export const ENCOUNTER_SCOUT_REFERENCE = 100;  // referenca = polno število izvidnikov
+export const ENCOUNTER_MIN_FACTOR      = 0.25; // tudi z malo izvidniki ostane nekaj možnosti
+// People-killer enote večajo smrtnost AI napadov (faza 3)
+export const PEOPLEKILLER_LETHALITY_PER_UNIT = 0.012; // +1.2 % žrtev na enoto (do ~+30 % pri 25)
 export const INITIAL_AI_KNOWLEDGE = 0.1; // AI malo ve o nas na začetku
 export const INITIAL_CLAN_ACTIVITY = 0.60; // drugi klani aktivni — 60 % AI-ja je zaseden
 

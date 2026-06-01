@@ -15,19 +15,30 @@ import {
 import {
   SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_AI_KNOWLEDGE_BONUS,
   SCOUT_CAPTURED_LOSS_MIN, SCOUT_CAPTURED_LOSS_MAX,
+  ENCOUNTER_SCOUT_REFERENCE, ENCOUNTER_MIN_FACTOR,
 } from './constants.js';
 
 export const TILES_PER_MONTH = 1;  // en korak = en mesec
 
 const CLAN_POS = { q: 0, r: 4 };
 
-/** Verjetnost srečanja na enem polju, glede na opremo izvidnikov + teren. */
-export function tileEncounterProbability(tile: HexTile, assigned: number, aiKnowledge: number): number {
+/**
+ * Faktor srečanj glede na število izvidniških enot AI.
+ * Manj izvidnikov (manj robotov) → manjša verjetnost srečanja. Pri polnem številu = 1.
+ */
+export function encounterScoutFactor(aiScouts: number): number {
+  const f = ENCOUNTER_MIN_FACTOR + (1 - ENCOUNTER_MIN_FACTOR) * Math.min(1, Math.max(0, aiScouts) / ENCOUNTER_SCOUT_REFERENCE);
+  return Math.max(0, Math.min(1, f));
+}
+
+/** Verjetnost srečanja na enem polju, glede na opremo izvidnikov + teren + AI izvidniške enote. */
+export function tileEncounterProbability(tile: HexTile, assigned: number, aiKnowledge: number, aiScouts: number = ENCOUNTER_SCOUT_REFERENCE): number {
   const distFromCamp = hexDistance({ q: tile.q, r: tile.r }, CLAN_POS);
   const base = SCOUT_CAPTURE_BASE
     + SCOUT_CAPTURE_PER_SCOUT * assigned
     + SCOUT_AI_KNOWLEDGE_BONUS * aiKnowledge;
-  return Math.max(0, Math.min(0.85, base * tileEncounterMultiplier(tile.researchProgress, distFromCamp)));
+  const p = base * tileEncounterMultiplier(tile.researchProgress, distFromCamp) * encounterScoutFactor(aiScouts);
+  return Math.max(0, Math.min(0.85, p));
 }
 
 /** Kumulativna verjetnost srečanja na celotni poti — za UI prikaz vnaprej. */
@@ -36,12 +47,13 @@ export function pathEncounterProbability(
   tiles: HexTile[],
   assigned: number,
   aiKnowledge: number,
+  aiScouts: number = ENCOUNTER_SCOUT_REFERENCE,
 ): number {
   let pNo = 1;
   for (const step of path.slice(1)) {  // izpusti startno polje (kamp)
     const tile = tiles.find(t => t.q === step.q && t.r === step.r);
     if (!tile) continue;
-    const pTile = tileEncounterProbability(tile, assigned, aiKnowledge);
+    const pTile = tileEncounterProbability(tile, assigned, aiKnowledge, aiScouts);
     pNo *= (1 - pTile);
   }
   return 1 - pNo;
@@ -66,6 +78,7 @@ export function tickExpedition(
   tiles: HexTile[],
   aiKnowledge: number,
   rng: RNGState,
+  aiScouts: number = ENCOUNTER_SCOUT_REFERENCE,
 ): { exp: Expedition; tiles: HexTile[]; rng: RNGState; populationDelta: number; events: string[]; finds: ExpeditionFinds } {
   if (exp.status !== 'traveling') return { exp, tiles, rng, populationDelta: 0, events: [], finds: { material: 0, weapons: 0, artifacts: 0 } };
 
@@ -99,7 +112,7 @@ export function tickExpedition(
     newTiles[tIdx] = { ...tile, researchProgress: newProg, visibility: visibilityFromProgress(newProg) };
 
     // Srečanje — skrivanje razpolovi verjetnost
-    const pEncBase = tileEncounterProbability(newTiles[tIdx], assignedNow, aiKnowledge);
+    const pEncBase = tileEncounterProbability(newTiles[tIdx], assignedNow, aiKnowledge, aiScouts);
     const pEnc = stealth ? pEncBase * 0.5 : pEncBase;
     const [encRoll, rng2] = rngNext(rng); rng = rng2;
     if (encRoll < pEnc) {

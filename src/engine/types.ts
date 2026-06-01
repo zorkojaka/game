@@ -153,6 +153,13 @@ export interface RaidResult {
   successProbability: number;
 }
 
+/** Razčlemba AI robotov po tipu enote. Vsota = aiRobots. */
+export interface AIUnits {
+  scouts: number;        // izvidniške enote (faza 1) — ženejo srečanja/odkrivanje
+  attackers: number;     // napadalne enote (faza 2) — ženejo raide na kamp
+  peopleKillers: number; // people-killer enote (faza 3) — večajo žrtve med napadi
+}
+
 // Izid izvidniške misije
 export interface ScoutResult {
   captured: boolean;          // ali jih je AI ujel
@@ -201,7 +208,8 @@ export interface GameState {
 
   // AI
   aiPhaseProgress: number;  // 0–12, koliko rund je AI v tej fazi porabil
-  aiRobots: number;
+  aiRobots: number;         // skupno število robotov (= vsota aiUnits)
+  aiUnits: AIUnits;         // razčlemba po tipu enote (evidenca)
   aiKnowledge: number;      // [0,1] koliko AI ve o nas
   aiTree: AITreeNode[];
   aiWeakPoints: AIWeakPoint[];
