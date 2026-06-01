@@ -4,15 +4,12 @@
 
 import type { CombatResult, GameState, Assignment, AIPhase } from './types.js';
 import type { RNGState } from './rng.js';
-import { rngBool, rngInt } from './rng.js';
+import { rngNext } from './rng.js';
 import {
   COMBAT_BASE_HUMAN_MULTIPLIER,
   COMBAT_EQUIPMENT_MULTIPLIER,
   AI_ROBOT_STRENGTH,
   AI_FOREKNOWLEDGE_BONUS,
-  VICTORY_THRESHOLD,
-  PARTIAL_THRESHOLD,
-  DEFEAT_THRESHOLD,
   AI_WEAK_POINT_EXPLOIT_BONUS,
   RATIONS_LEVELS,
   DEFAULT_RATIONS,
@@ -62,11 +59,25 @@ export function calcSuccessProbability(
 
 type Outcome = CombatResult['outcome'];
 
-function determineOutcome(p: number): Outcome {
-  if (p >= VICTORY_THRESHOLD) return 'victory';
-  if (p >= PARTIAL_THRESHOLD) return 'partial';
-  if (p >= DEFEAT_THRESHOLD) return 'defeat';
-  return 'annihilation';
+// Kako odločilen mora biti rezultat (razdalja od praga uspeha), da je zmaga "popolna"
+// oz. poraz "pokol". Manjše vrednosti = pogostejši ekstremi.
+export const DECISIVE_MARGIN = 0.25;
+
+/**
+ * Dejanski naključni izid glede na verjetnost uspeha `p`.
+ * Vrže RNG: če pade pod p, je uspeh (victory/partial glede na to kako prepričljivo),
+ * sicer neuspeh (defeat/annihilation). S tem `successProbability` res pomeni roll,
+ * ne deterministične mejne vrednosti. Še vedno seedan/deterministicen za isti seed.
+ */
+export function rollOutcome(p: number, rng: RNGState): { outcome: Outcome; rng: RNGState } {
+  const [roll, next] = rngNext(rng);
+  let outcome: Outcome;
+  if (roll < p) {
+    outcome = (p - roll) >= DECISIVE_MARGIN ? 'victory' : 'partial';
+  } else {
+    outcome = (roll - p) >= DECISIVE_MARGIN ? 'annihilation' : 'defeat';
+  }
+  return { outcome, rng: next };
 }
 
 // Plen sorazmeren z marginom zmage (isto za oba)
@@ -125,7 +136,8 @@ export function resolveCombat(
   const p = calcSuccessProbability(humanStr, aiStr, weakBonus);
 
   const mAxis = 1.0;  // M_os ni več v bojni moči
-  const outcome = determineOutcome(p);
+  const { outcome, rng: rngAfter } = rollOutcome(p, rng);
+  rng = rngAfter;
   const aiRobotsEngaged = Math.floor(state.aiRobots * (1 - state.clanActivity) * 0.3);
 
   const { humanLost, aiRobotsDestroyed, spoils, aiInfoGained, infoGained } =

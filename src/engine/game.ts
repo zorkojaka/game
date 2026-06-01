@@ -25,14 +25,14 @@ import {
   SCOUT_BASE_SUCCESS, SCOUT_INTEL_BONUS_PER_100, SCOUT_ESPIONAGE_BONUS,
   SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_HIDING_REDUCTION, SCOUT_AI_KNOWLEDGE_BONUS,
   SCOUT_PARTIAL_EFFECTIVE, SCOUT_CAPTURED_LOSS_MIN, SCOUT_CAPTURED_LOSS_MAX,
-  COMBAT_BASE_HUMAN_MULTIPLIER, AI_ROBOT_STRENGTH, VICTORY_THRESHOLD, PARTIAL_THRESHOLD, DEFEAT_THRESHOLD,
+  COMBAT_BASE_HUMAN_MULTIPLIER, AI_ROBOT_STRENGTH,
   STARVATION_LOSS_PCT_1ST, STARVATION_LOSS_PCT_2ND, STARVATION_LOSS_PCT_NTH,
   INTEL_COMBAT_BONUS_PER_100, INTEL_COMBAT_BONUS_MAX,
   WEAPON_DESTROY_MIN_PCT, WEAPON_DESTROY_MAX_PCT,
   MISSION_DURATION_MONTHS, MISSION_ENCOUNTER_BASE, MISSION_ENCOUNTER_PER_PERSON,
   MISSION_ENCOUNTER_AI_KNOW, MISSION_WP_DIFFICULTY, MISSION_MIN_TEAM,
 } from './constants.js';
-import { calcHumanStrength, calcAIStrength, calcSuccessProbability } from './combat.js';
+import { calcHumanStrength, calcAIStrength, calcSuccessProbability, rollOutcome } from './combat.js';
 
 // ─── Pomožne funkcije za nove mehanike ───────────────────────────────────────
 
@@ -134,21 +134,14 @@ export function missionSuccessProbability(state: GameState, weakPointId: string,
   return (teamPower * (1 + intelB)) / (teamPower * (1 + intelB) + diff);
 }
 
-type Outcome = 'victory' | 'partial' | 'defeat' | 'annihilation';
-function outcomeFromP(p: number): Outcome {
-  if (p >= VICTORY_THRESHOLD) return 'victory';
-  if (p >= PARTIAL_THRESHOLD) return 'partial';
-  if (p >= DEFEAT_THRESHOLD)  return 'defeat';
-  return 'annihilation';
-}
-
 /** Resolve raid — vsi branilci se borijo + uničenje neuporabljenega orožja. */
 function resolveRaid(
   state: GameState, assignment: Assignment, rng: RNGState
 ): { result: RaidResult; rng: RNGState } {
   const defenders = (assignment.defenders ?? 0) + (assignment.dayGuard ?? 0) + (assignment.nightGuard ?? 0);
   const p = raidRepelProbability(state, assignment);
-  const outcome = outcomeFromP(p);
+  const { outcome, rng: rngRoll } = rollOutcome(p, rng);
+  rng = rngRoll;
   const aiForce = Math.floor(state.aiRobots * (1 - state.clanActivity) * RAID_AI_FORCE_PCT);
 
   let defendersLost = 0, foragersLost = 0, aiRobotsDestroyed = 0;

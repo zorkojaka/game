@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, Fragment } from 'react';
 import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan } from './types';
 import { tileId } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
+// Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
+import { RATIONS_LEVELS, M_OS } from '../../src/engine/constants';
 
 // ─── Konstante ───────────────────────────────────────────────────────────────
 
@@ -17,19 +19,24 @@ const AXIS: Record<HumanAxis, { label: string; icon: string; desc: string }> = {
   defense:   { label: 'Obramba',   icon: '🛡',   desc: 'Zmanjšuje bojne izgube' },
 };
 
-const M_OS: Record<string, Record<HumanAxis, number>> = {
-  find:       { hiding: 1.4, espionage: 1.0, defense: 0.5 },
-  understand: { hiding: 0.8, espionage: 1.5, defense: 0.7 },
-  eliminate:  { hiding: 0.5, espionage: 0.9, defense: 1.4 },
-};
+// M_OS pride iz enginea (zgoraj uvožen). Podvajanje odpravljeno.
 
-const RATIONS: Record<number, { foodMult: number; popMin: number; popMax: number; strengthMult: number; label: string; emoji: string; color: string }> = {
-  1: { foodMult: 0.50, popMin: -5, popMax: -3, strengthMult: 0.55, label: 'Lakota',   emoji: '💀', color: '#cc2222' },
-  2: { foodMult: 0.75, popMin: -2, popMax: -1, strengthMult: 0.80, label: 'Skopo',    emoji: '🥄', color: '#cc7700' },
-  3: { foodMult: 1.00, popMin:  0, popMax:  0, strengthMult: 1.00, label: 'Normalno', emoji: '🍞', color: '#888888' },
-  4: { foodMult: 2.50, popMin:  1, popMax:  3, strengthMult: 1.30, label: 'Dobro',    emoji: '🥗', color: '#66aa44' },
-  5: { foodMult: 5.00, popMin:  3, popMax:  6, strengthMult: 1.60, label: 'Obilje',   emoji: '🥩', color: '#22cc88' },
+// Numerični del obrokov pride iz enginea (RATIONS_LEVELS); tu dodamo le UI predstavitev (color)
+// in po želji prepišemo emoji. Številke (foodMult/popMin/popMax/strengthMult) so single-source.
+type RationsRow = { foodMult: number; popMin: number; popMax: number; strengthMult: number; label: string; emoji: string; color: string };
+const RATIONS_UI: Record<number, { emoji: string; color: string }> = {
+  1: { emoji: '💀', color: '#cc2222' },
+  2: { emoji: '🥄', color: '#cc7700' },
+  3: { emoji: '🍞', color: '#888888' },
+  4: { emoji: '🥗', color: '#66aa44' },
+  5: { emoji: '🥩', color: '#22cc88' },
 };
+const RATIONS: Record<number, RationsRow> = Object.fromEntries(
+  Object.entries(RATIONS_LEVELS).map(([k, v]) => [Number(k), {
+    foodMult: v.foodMult, popMin: v.popMin, popMax: v.popMax, strengthMult: v.strengthMult,
+    label: v.label, emoji: RATIONS_UI[Number(k)].emoji, color: RATIONS_UI[Number(k)].color,
+  }])
+);
 
 const STORAGE_KEY = 'avh-runId';
 
@@ -2559,14 +2566,18 @@ export default function App() {
     } finally { setLoading(false); }
   };
 
-  const pop = game?.population ?? 0;
+  // game.population = ljudje V KAMPU (ljudje na misijah/odpravah so že odšteti ob odhodu).
+  const campPop = game?.population ?? 0;
   const inMissions = (game?.activeMissions ?? []).reduce((s, m) => s + m.assigned, 0)
                    + (game?.expeditions ?? []).reduce((s, e) => s + e.assigned, 0);
+  const totalClan = campPop + inMissions;  // cel klan = kamp + ljudje zunaj
+  const pop = campPop;  // ostane za kompatibilnost spodaj
   const newMissionPeople = Object.values(missions).reduce((s, v) => s + v, 0);
   const pendingExpPpl = pendingExpeditions.reduce((s, e) => s + e.assigned, 0);
   const plannedTotal = newMissionPeople + pendingExpPpl + combatants;  // rezervirani za odprave/misije/napad
   const assignedHome = defenders + foragers + workers + researchers;
-  const availablePop = Math.max(0, pop - inMissions);
+  // Ljudje na voljo za razporejanje = celoten kamp (ljudje zunaj so že izločeni iz campPop).
+  const availablePop = Math.max(0, campPop);
   const freePeople = Math.max(0, availablePop - assignedHome - plannedTotal);
   const assigned = assignedHome + plannedTotal;
   const over = assigned > availablePop;
@@ -2783,8 +2794,8 @@ export default function App() {
       <header className="top-bar">
         <div className="top-spacer" />
         <div className="top-res">
-          <BigStat icon="👥" label="Populacija"  value={game.population}                              color="#d8d8d8" />
-          <BigStat icon="🏠" label="V kampu"     value={Math.max(0, game.population - inMissions)}    color="#9ec0ad" />
+          <BigStat icon="👥" label="Klan skupaj" value={totalClan}                                    color="#d8d8d8" />
+          <BigStat icon="🏠" label="V kampu"     value={campPop}                                      color="#9ec0ad" />
           <BigStat icon="🎯" label="Na odpravi"  value={inMissions}                                   color="#d6a96a" />
           <BigStat icon="💤" label="Prosti"      value={freePeople}
             color={freePeople > 0 ? '#66cc88' : '#7a8a82'} />
