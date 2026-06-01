@@ -991,10 +991,30 @@ function buildNarrative(
 
   if (raid && raid.occurred) {
     const o = raid.outcome;
-    if (o === 'victory') parts.push(`AI je napadel kamp, obramba odbila (${raid.defendersLost} branilcev padlo v kampu).`);
-    else if (o === 'partial') parts.push(`AI je napadel kamp — odbili smo, a ${raid.defendersLost} branilcev in ${raid.foragersLost} nabiralcev v kampu je padlo.`);
-    else if (o === 'defeat') parts.push(`AI je napadel kamp in prebil obrambo — v kampu padlo ${raid.defendersLost} branilcev in ${raid.foragersLost} nabiralcev. Ljudje na odpravah ostali nepoškodovani.`);
-    else if (o === 'annihilation') parts.push(`AI je opustošil kamp — vsi branilci so padli, ${raid.foragersLost} nabiralcev je umrlo. Le odprave preživele.`);
+    if (o === 'victory') {
+      parts.push(`AI je napadel kamp, obramba je zdržala${raid.defendersLost > 0 ? ` (${raid.defendersLost} branilcev padlo)` : ''}.`);
+    } else {
+      const areaLabels: Record<string, string> = { food: 'prehrano', workshop: 'delavnice', research: 'raziskave', defense: 'obrambo' };
+      const breached = (raid.breachedAreas ?? []).map(a => areaLabels[a] ?? a);
+      // žrtve po vlogah
+      const losses: string[] = [];
+      if (raid.defendersLost > 0)   losses.push(`${raid.defendersLost} branilcev`);
+      if (raid.foragersLost > 0)    losses.push(`${raid.foragersLost} nabiralcev`);
+      if (raid.workersLost > 0)     losses.push(`${raid.workersLost} delavcev`);
+      if (raid.researchersLost > 0) losses.push(`${raid.researchersLost} raziskovalcev`);
+      // uničeni viri
+      const damage: string[] = [];
+      if (raid.survivalDestroyed > 0) damage.push(`${raid.survivalDestroyed} hrane`);
+      if (raid.weaponsDestroyed > 0)  damage.push(`${raid.weaponsDestroyed} orožja`);
+      if (raid.materialDestroyed > 0) damage.push(`${raid.materialDestroyed} materiala`);
+      if (raid.wallsDestroyed > 0)    damage.push(`${raid.wallsDestroyed} stopnjo obzidja`);
+      const verb = o === 'annihilation' ? 'je opustošil kamp' : 'je prebil obrambo';
+      let msg = `AI ${verb}`;
+      if (breached.length) msg += ` (prizadeta: ${breached.join(', ')})`;
+      if (losses.length) msg += ` — padlo ${losses.join(', ')}`;
+      if (damage.length) msg += `; uničeno ${damage.join(', ')}`;
+      parts.push(msg + '.');
+    }
   }
 
   if (scout?.captured) {

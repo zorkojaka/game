@@ -2490,6 +2490,8 @@ export default function App() {
       if (robotsKilled) ledger.push({ icon: '🤖', label: 'AI roboti', value: -robotsKilled });
       if (log.raid?.weaponsDestroyed)
         ledger.push({ icon: '💥', label: 'uničeno orožje', value: -log.raid.weaponsDestroyed });
+      if (log.raid?.wallsDestroyed)
+        ledger.push({ icon: '🧱', label: 'porušeno obzidje', value: -log.raid.wallsDestroyed });
       if (log.revealedNodes?.length)
         ledger.push({ icon: '🔍', label: 'AI vozlišča', value: log.revealedNodes.length });
       if (log.aiKnowledgeDelta && Math.round(log.aiKnowledgeDelta * 100) !== 0)
