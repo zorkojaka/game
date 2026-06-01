@@ -3,7 +3,7 @@ import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundL
 import { tileId } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
-import { RATIONS_LEVELS, M_OS } from '../../src/engine/constants';
+import { RATIONS_LEVELS, M_OS, aiDefensePower } from '../../src/engine/constants';
 
 // ─── Konstante ───────────────────────────────────────────────────────────────
 
@@ -3165,7 +3165,8 @@ export default function App() {
                 const wpDisc = !!wp?.discovered;
                 const targetLabel = wpDisc ? `◆ ${wp!.label}` : tile?.isAICore ? '☣ AI jedro' : `(${last.q},${last.r}) — splošni napad`;
                 const hStr = draftPeople * 1.2 * draftRTier.strengthMult * (draftStealth ? 1.2 : 1);
-                const aStr = Math.max(1, (game.aiRobots ?? 0) * 0.05);
+                const aiUnits = game.aiUnits ?? { scouts: game.aiRobots ?? 0, attackers: 0, peopleKillers: 0 };
+                const aStr = Math.max(1, aiDefensePower(aiUnits) * 0.05);
                 const winP = hStr / (hStr + aStr);
                 return (
                   <>

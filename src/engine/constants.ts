@@ -1,7 +1,7 @@
 // ─── Vse konstante so tukaj — spreminjaš med testiranjem ─────────────────────
 // Razvrstitev: začetno stanje | balans spopada | krivulja klanov | resursi | AI
 
-import type { AIPhase, HumanAxis } from './types.js';
+import type { AIPhase, HumanAxis, AIUnits } from './types.js';
 
 // ─── Strukturne konstante (ne balasiraj) ──────────────────────────────────────
 export const ROUNDS_PER_PHASE = 12;
@@ -15,15 +15,64 @@ export const INITIAL_COMBAT = 60;      // enote orožja
 export const INITIAL_INTELLIGENCE = 10; // začetni intel
 export const INITIAL_MATERIAL = 30;     // začetni material za delavnice
 export const INITIAL_AI_ROBOTS = 200;
-// AI sile prihajajo po fazah (skupno = 200 robotov ob koncu):
-export const AI_SCOUTS_INITIAL      = 100; // faza 1 (find): samo izvidniške enote
-export const AI_ATTACKERS_PHASE2     = 75;  // faza 2 (understand): pripeljane napadalne enote
-export const AI_PEOPLEKILLERS_PHASE3 = 25;  // faza 3 (eliminate): pripeljane people-killer enote
+
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  AI ENOTE — CENTRALNE NASTAVITVE ZA KALIBRACIJO TEŽAVNOSTI                 ║
+// ║  Spreminjaj te vrednosti za uravnoteženje. Vsaka enota: koliko jih pride   ║
+// ║  (po fazah), napad (raid), obramba (ko jih napademo), življenje (hp).      ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+export interface AIUnitDef {
+  arrivalPhase: AIPhase;  // v kateri fazi se pripeljejo
+  arrival: number;        // koliko enot
+  attack: number;         // ofenzivna moč (raid na kamp)
+  defense: number;        // obrambna moč (ko jih igralec napade)
+  hp: number;             // vzdržljivost — višji hp = težje uničljive
+}
+export const AI_UNIT_DEFS: Record<'scouts' | 'attackers' | 'peopleKillers', AIUnitDef> = {
+  // faza 1: izvidniki — šibki, a tudi oni napadajo (raidi v fazi 1)
+  scouts:        { arrivalPhase: 'find',      arrival: 100, attack: 0.4, defense: 0.5, hp: 1 },
+  // faza 2: napadalne enote — močnejši napad
+  attackers:     { arrivalPhase: 'understand', arrival: 75,  attack: 1.6, defense: 1.2, hp: 2 },
+  // faza 3: people-killer — zelo močna enota
+  peopleKillers: { arrivalPhase: 'eliminate',  arrival: 25,  attack: 3.5, defense: 2.6, hp: 4 },
+};
+// Združljivost s prejšnjimi imeni (en vir: AI_UNIT_DEFS):
+export const AI_SCOUTS_INITIAL      = AI_UNIT_DEFS.scouts.arrival;        // 100 (faza 1)
+export const AI_ATTACKERS_PHASE2     = AI_UNIT_DEFS.attackers.arrival;     // 75  (faza 2)
+export const AI_PEOPLEKILLERS_PHASE3 = AI_UNIT_DEFS.peopleKillers.arrival; // 25  (faza 3)
+
 // Skaliranje srečanj: gosteje ko je izvidnikov, večja možnost srečanja; manj robotov → manj srečanj
-export const ENCOUNTER_SCOUT_REFERENCE = 100;  // referenca = polno število izvidnikov
+export const ENCOUNTER_SCOUT_REFERENCE = AI_UNIT_DEFS.scouts.arrival; // referenca = polno število izvidnikov
 export const ENCOUNTER_MIN_FACTOR      = 0.25; // tudi z malo izvidniki ostane nekaj možnosti
-// People-killer enote večajo smrtnost AI napadov (faza 3)
+// People-killer enote dodatno večajo smrtnost AI napadov (poleg svojega napada)
 export const PEOPLEKILLER_LETHALITY_PER_UNIT = 0.012; // +1.2 % žrtev na enoto (do ~+30 % pri 25)
+/** Skupna ofenzivna moč danih enot (uporablja se za raide). */
+export function aiAttackPower(u: AIUnits): number {
+  return (u?.scouts ?? 0) * AI_UNIT_DEFS.scouts.attack
+    + (u?.attackers ?? 0) * AI_UNIT_DEFS.attackers.attack
+    + (u?.peopleKillers ?? 0) * AI_UNIT_DEFS.peopleKillers.attack;
+}
+/** Skupna obrambna moč danih enot (ko jih igralec napade). */
+export function aiDefensePower(u: AIUnits): number {
+  return (u?.scouts ?? 0) * AI_UNIT_DEFS.scouts.defense
+    + (u?.attackers ?? 0) * AI_UNIT_DEFS.attackers.defense
+    + (u?.peopleKillers ?? 0) * AI_UNIT_DEFS.peopleKillers.defense;
+}
+/** Povprečni hp prisotnih enot (za pretvorbo škode → uničene enote). */
+export function aiAverageHP(u: AIUnits): number {
+  const n = (u?.scouts ?? 0) + (u?.attackers ?? 0) + (u?.peopleKillers ?? 0);
+  if (n <= 0) return 1;
+  const hpSum = (u.scouts) * AI_UNIT_DEFS.scouts.hp
+    + (u.attackers) * AI_UNIT_DEFS.attackers.hp
+    + (u.peopleKillers) * AI_UNIT_DEFS.peopleKillers.hp;
+  return hpSum / n;
+}
+// Polna ofenzivna moč celotne AI vojske (referenca za skaliranje verjetnosti raida)
+export const AI_FULL_ATTACK_POWER =
+  AI_UNIT_DEFS.scouts.arrival * AI_UNIT_DEFS.scouts.attack
+  + AI_UNIT_DEFS.attackers.arrival * AI_UNIT_DEFS.attackers.attack
+  + AI_UNIT_DEFS.peopleKillers.arrival * AI_UNIT_DEFS.peopleKillers.attack;
+
 export const INITIAL_AI_KNOWLEDGE = 0.1; // AI malo ve o nas na začetku
 export const INITIAL_CLAN_ACTIVITY = 0.60; // drugi klani aktivni — 60 % AI-ja je zaseden
 

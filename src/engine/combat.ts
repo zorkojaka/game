@@ -8,9 +8,9 @@ import { rngNext } from './rng.js';
 import {
   COMBAT_BASE_HUMAN_MULTIPLIER,
   COMBAT_EQUIPMENT_MULTIPLIER,
-  AI_ROBOT_STRENGTH,
   AI_FOREKNOWLEDGE_BONUS,
   AI_WEAK_POINT_EXPLOIT_BONUS,
+  aiDefensePower,
   RATIONS_LEVELS,
   DEFAULT_RATIONS,
   INTEL_COMBAT_BONUS_PER_100,
@@ -38,11 +38,11 @@ export function intelCombatMultiplier(intelligence: number): number {
 
 export function calcAIStrength(
   state: GameState,
-  phase: AIPhase
+  _phase: AIPhase
 ): number {
-  // AI roboti filtrirani skozi aktivnost klanov
-  const effectiveRobots = state.aiRobots * (1 - state.clanActivity);
-  const base = effectiveRobots * AI_ROBOT_STRENGTH;
+  // AI brani z obrambno močjo enot (po tipih), filtrirano skozi aktivnost klanov
+  const units = state.aiUnits ?? { scouts: state.aiRobots, attackers: 0, peopleKillers: 0 };
+  const base = aiDefensePower(units) * (1 - state.clanActivity);
   // Bonus, če AI ve za nas
   const foreknowledge = state.aiKnowledge > 0.5 ? AI_FOREKNOWLEDGE_BONUS : 1.0;
   return base * foreknowledge;

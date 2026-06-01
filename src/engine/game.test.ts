@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { newGame, processRound, destroyAIUnits, totalAIRobots } from './game.js';
+import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN } from './combat.js';
 import { encounterScoutFactor } from './expedition.js';
 import { createRNG } from './rng.js';
@@ -114,13 +114,16 @@ describe('AI enote po fazah (scouts/attackers/peopleKillers)', () => {
     expect(r.aiUnits.peopleKillers).toBe(25);
   });
 
-  it('faza 1 nima raidov (brez napadalnih enot)', () => {
-    // poženi nekaj rund v fazi find — raid se nikoli ne zgodi
-    let s = newGame(123);
-    for (let i = 0; i < 11 && s.status === 'active'; i++) {
-      s = processRound(s, action({ foragers: 40, defenders: 5 }));
-      expect(s.lastRoundLog?.raid?.occurred ?? false).toBe(false);
-    }
+  it('faza 1 ima raide (tudi izvidniki napadajo) — verjetnost > 0', () => {
+    const g = newGame(123);
+    expect(raidProbability(g, 'defense')).toBeGreaterThan(0);
+  });
+
+  it('uničenje vseh robotov = zmaga tudi v fazi 1 (varovalo odstranjeno)', () => {
+    const base = newGame(5);
+    const g: GameState = { ...base, aiUnits: { scouts: 0, attackers: 0, peopleKillers: 0 }, aiRobots: 0 };
+    const r = processRound(g, action({ foragers: 5 }));
+    expect(r.status).toBe('victory');
   });
 });
 

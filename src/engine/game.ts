@@ -15,6 +15,7 @@ import {
   INITIAL_POPULATION, INITIAL_SURVIVAL, INITIAL_COMBAT, INITIAL_INTELLIGENCE, INITIAL_MATERIAL,
   INITIAL_AI_KNOWLEDGE, INITIAL_CLAN_ACTIVITY,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
+  AI_UNIT_DEFS, aiAttackPower, aiDefensePower, AI_FULL_ATTACK_POWER,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
   SCOUT_INTEL_YIELD, SCOUT_FOG_YIELD, CLAN_ACTIVITY_BY_PHASE, CLAN_ACTIVITY_EXPOSURE_MODIFIER,
   CLAN_ACTIVITY_HIDDEN_MODIFIER, PHASE_EVENT_BASE_DAMAGE, PREPARED_DAMAGE_REDUCTION,
@@ -26,7 +27,7 @@ import {
   SCOUT_BASE_SUCCESS, SCOUT_INTEL_BONUS_PER_100, SCOUT_ESPIONAGE_BONUS,
   SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_HIDING_REDUCTION, SCOUT_AI_KNOWLEDGE_BONUS,
   SCOUT_PARTIAL_EFFECTIVE, SCOUT_CAPTURED_LOSS_MIN, SCOUT_CAPTURED_LOSS_MAX,
-  COMBAT_BASE_HUMAN_MULTIPLIER, AI_ROBOT_STRENGTH,
+  COMBAT_BASE_HUMAN_MULTIPLIER,
   STARVATION_LOSS_PCT_1ST, STARVATION_LOSS_PCT_2ND, STARVATION_LOSS_PCT_NTH,
   INTEL_COMBAT_BONUS_PER_100, INTEL_COMBAT_BONUS_MAX,
   WEAPON_DESTROY_MIN_PCT, WEAPON_DESTROY_MAX_PCT,
@@ -72,33 +73,46 @@ export function readAIUnits(state: GameState): AIUnits {
   return { scouts: state.aiRobots ?? 0, attackers: 0, peopleKillers: 0 };
 }
 
-/** Uniči `count` robotov, porazdeljeno sorazmerno po tipih enot. */
+/**
+ * Uniči `count` robotov, porazdeljeno po tipih enot, uteženo z 1/hp
+ * (šibkejše enote — nižji hp — padejo prej; people-killerji preživijo dlje).
+ */
 export function destroyAIUnits(units: AIUnits, count: number): AIUnits {
   const total = totalAIRobots(units);
   if (count <= 0 || total <= 0) return { ...units };
   const c = Math.min(count, total);
-  const res: AIUnits = {
-    scouts: units.scouts - Math.floor(c * units.scouts / total),
-    attackers: units.attackers - Math.floor(c * units.attackers / total),
-    peopleKillers: units.peopleKillers - Math.floor(c * units.peopleKillers / total),
+  const w = {
+    scouts: units.scouts / AI_UNIT_DEFS.scouts.hp,
+    attackers: units.attackers / AI_UNIT_DEFS.attackers.hp,
+    peopleKillers: units.peopleKillers / AI_UNIT_DEFS.peopleKillers.hp,
   };
-  let remainder = c - (total - totalAIRobots(res));
-  const order: (keyof AIUnits)[] = ['scouts', 'attackers', 'peopleKillers'];
-  for (const k of order) { if (remainder <= 0) break; if (res[k] > 0) { res[k] -= 1; remainder -= 1; } }
+  const wSum = w.scouts + w.attackers + w.peopleKillers;
+  const res: AIUnits = { ...units };
+  let removed = 0;
+  if (wSum > 0) {
+    const dS = Math.min(units.scouts, Math.floor(c * w.scouts / wSum));
+    const dA = Math.min(units.attackers, Math.floor(c * w.attackers / wSum));
+    const dK = Math.min(units.peopleKillers, Math.floor(c * w.peopleKillers / wSum));
+    res.scouts -= dS; res.attackers -= dA; res.peopleKillers -= dK;
+    removed = dS + dA + dK;
+  }
+  let remainder = c - removed;
+  const order: (keyof AIUnits)[] = ['scouts', 'attackers', 'peopleKillers']; // ostanek: najprej najšibkejši
+  for (const k of order) { if (remainder <= 0) break; const take = Math.min(res[k], remainder); res[k] -= take; remainder -= take; }
   return res;
 }
 
-/** Verjetnost, da AI najde in napade kamp v tej rundi. Vezana na napadalne enote (faza 2+). */
+/** Verjetnost, da AI najde in napade kamp v tej rundi. Vezana na ofenzivno moč prisotnih enot (tudi izvidniki napadajo). */
 export function raidProbability(state: GameState, axis: HumanAxis): number {
-  const attackers = readAIUnits(state).attackers;
-  if (attackers <= 0) return 0;  // brez napadalnih enot (faza 1) ni raidov
+  const attackPow = aiAttackPower(readAIUnits(state));
+  if (attackPow <= 0) return 0;
   const popFactor = Math.min(1, state.population / RAID_POP_REFERENCE);
   let p = RAID_BASE_CHANCE
     + RAID_POP_SCALING_MAX * popFactor
     + RAID_AI_KNOWLEDGE_BONUS * state.aiKnowledge;
   if (axis === 'hiding') p *= (1 - RAID_HIDING_REDUCTION);
   p *= (1 - state.clanActivity * RAID_CLAN_ABSORPTION);
-  p *= Math.min(1, attackers / AI_ATTACKERS_PHASE2);  // manj napadalnih enot → manj raidov
+  p *= Math.min(1, attackPow / AI_FULL_ATTACK_POWER);  // šibkejša/maloštevilna sila → manj raidov
   return Math.max(0, Math.min(1, p));
 }
 
@@ -114,10 +128,8 @@ export function raidRepelProbability(state: GameState, assignment: Assignment): 
   const base = defenders * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult * (1 + 0.10 * defenseLvl);
   const equip = Math.min(state.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT;
   const defStr = (base + equip) * (1 + intelB) * wallBonus;
-  // Raid izvajajo napadalne enote (ne izvidniške)
-  const attackers = readAIUnits(state).attackers;
-  const aiForce = Math.floor(attackers * (1 - state.clanActivity) * RAID_AI_FORCE_PCT);
-  const aiStr = aiForce * AI_ROBOT_STRENGTH;
+  // Raid izvaja vsa AI sila (vsi tipi enot napadajo) — moč po njihovem napadu
+  const aiStr = aiAttackPower(readAIUnits(state)) * (1 - state.clanActivity) * RAID_AI_FORCE_PCT;
   return defStr / (defStr + Math.max(1, aiStr));
 }
 
@@ -180,8 +192,8 @@ function resolveRaid(
   const { outcome, rng: rngRoll } = rollOutcome(p, rng);
   rng = rngRoll;
   const aiUnits = readAIUnits(state);
-  // Raid izvajajo napadalne enote
-  const aiForce = Math.floor(aiUnits.attackers * (1 - state.clanActivity) * RAID_AI_FORCE_PCT);
+  // Število robotov, ki sodelujejo v raidu (za štetje uničenih) — vsi tipi
+  const aiForce = Math.floor(totalAIRobots(aiUnits) * (1 - state.clanActivity) * RAID_AI_FORCE_PCT);
   // People-killer enote (faza 3) povečajo smrtnost med ljudmi
   const lethality = 1 + PEOPLEKILLER_LETHALITY_PER_UNIT * aiUnits.peopleKillers;
 
@@ -575,9 +587,9 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
               expeditionEvents.push(`✗ Napad na ${wpLabel} ni uspel — ${lost} padlih, ${survivors} se vrača.`);
             }
           } else {
-            // Splošni napad na AI robote
+            // Splošni napad na AI robote — AI brani z obrambno močjo enot
             const humanStr = survivors * 1.2 * aTier.strengthMult * stealthBonus;
-            const aiStr = Math.max(1, aiRobots * 0.05);
+            const aiStr = Math.max(1, aiDefensePower(aiUnits) * 0.05);
             const p = humanStr / (humanStr + aiStr);
             const [roll, rngA] = rngNext(rng); rng = rngA;
             if (roll < p) {
@@ -826,10 +838,9 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     }
   }
 
-  // Zmaga — vsi weak points exploited, ali AI popolnoma iztrebljen ŠELE ko so vse enote prišle (faza eliminate)
-  if (aiWeakPoints.every(wp => wp.exploited)) {
-    status = 'victory';
-  } else if (aiRobots <= 0 && phase === 'eliminate') {
+  // Zmaga — AI popolnoma iztrebljen (tudi v fazi 1: če pobijemo vse izvidnike, AI ne more nadaljevati),
+  // ali vse šibke točke izkoriščene.
+  if (aiRobots <= 0 || aiWeakPoints.every(wp => wp.exploited)) {
     status = 'victory';
   }
 
