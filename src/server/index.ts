@@ -33,7 +33,7 @@ function requireAdmin(req: express.Request, res: express.Response): boolean {
   return true;
 }
 
-const VALID_AXES = new Set(['hiding', 'espionage', 'defense']);
+const VALID_AXES = new Set(['obzidje', 'orozje', 'roboti']);
 const INT_FIELDS = ['combatants', 'defenders', 'foragers', 'workers', 'researchers', 'scouts', 'dayGuard', 'nightGuard'] as const;
 
 /** Površinska validacija assignmenta. Vrne sporočilo napake ali null, če je veljaven. */

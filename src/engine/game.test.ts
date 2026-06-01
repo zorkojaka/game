@@ -8,7 +8,7 @@ import type { PlayerAction, GameState } from './types.js';
 function action(over: Partial<PlayerAction['assignment']> = {}): PlayerAction {
   return {
     assignment: {
-      axis: 'hiding',
+      axis: 'obzidje',
       combatants: 0, defenders: 0, foragers: 0, workers: 0, researchers: 0,
       rations: 3,
       ...over,
@@ -116,7 +116,7 @@ describe('AI enote po fazah (scouts/attackers/peopleKillers)', () => {
 
   it('faza 1 ima raide (tudi izvidniki napadajo) — verjetnost > 0', () => {
     const g = newGame(123);
-    expect(raidProbability(g, 'defense')).toBeGreaterThan(0);
+    expect(raidProbability(g, 'roboti')).toBeGreaterThan(0);
   });
 
   it('uničenje vseh robotov = zmaga tudi v fazi 1 (varovalo odstranjeno)', () => {
@@ -153,12 +153,12 @@ describe('encounterScoutFactor — manj izvidnikov → manj srečanj', () => {
 describe('raziskave orožja/obzidja (×2, 120 r-mes)', () => {
   it('120 raziskovalcev v eni rundi dvigne stopnjo orožja na 1', () => {
     const g = newGame(8);
-    const r = processRound(g, { assignment: { axis: 'defense', combatants: 0, defenders: 0, foragers: 0, workers: 0, researchers: 120, rations: 3, researchObjective: 'weapon' } });
+    const r = processRound(g, { assignment: { axis: 'roboti', combatants: 0, defenders: 0, foragers: 0, workers: 0, researchers: 120, rations: 3, researchObjective: 'weapon' } });
     expect(r.weaponResearchLevel).toBe(1);
   });
   it('obzidje: 240 raziskovalcev → stopnja 2', () => {
     const g = newGame(8);
-    const r = processRound(g, { assignment: { axis: 'defense', combatants: 0, defenders: 0, foragers: 0, workers: 0, researchers: 240, rations: 3, researchObjective: 'wall' } });
+    const r = processRound(g, { assignment: { axis: 'roboti', combatants: 0, defenders: 0, foragers: 0, workers: 0, researchers: 240, rations: 3, researchObjective: 'wall' } });
     expect(r.wallResearchLevel).toBe(2);
   });
 });
@@ -205,7 +205,7 @@ describe('raid — preboj obrambe opustoši območja', () => {
 describe('axisHistory (#6 — vir za CompletedRun)', () => {
   it('izbrana os se inkrementira', () => {
     const g = newGame(3);
-    const r = processRound(g, action({ axis: 'defense', foragers: 5 }));
-    expect(r.axisHistory.defense).toBe((g.axisHistory.defense ?? 0) + 1);
+    const r = processRound(g, action({ axis: 'roboti', foragers: 5 }));
+    expect(r.axisHistory.roboti).toBe((g.axisHistory.roboti ?? 0) + 1);
   });
 });

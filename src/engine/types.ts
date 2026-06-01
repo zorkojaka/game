@@ -3,7 +3,7 @@
 export type AIPhase = 'find' | 'understand' | 'eliminate';
 // Faza 1: Najti | Faza 2: Razumeti | Faza 3: Iztrebiti
 
-export type HumanAxis = 'hiding' | 'espionage' | 'defense';
+export type HumanAxis = 'obzidje' | 'orozje' | 'roboti';
 // Skrivanje | Špijonaža | Obramba
 
 export type Visibility = 'unknown' | 'partial' | 'revealed';

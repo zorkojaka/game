@@ -19,7 +19,7 @@ import {
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
   SCOUT_INTEL_YIELD, SCOUT_FOG_YIELD, CLAN_ACTIVITY_BY_PHASE, CLAN_ACTIVITY_EXPOSURE_MODIFIER,
   CLAN_ACTIVITY_HIDDEN_MODIFIER, PHASE_EVENT_BASE_DAMAGE, PREPARED_DAMAGE_REDUCTION,
-  M_OS, RATIONS_LEVELS, DEFAULT_RATIONS,
+  RATIONS_LEVELS, DEFAULT_RATIONS,
   WEAPON_WORKER_MONTHS, WALL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS,
   WEAPON_MATERIAL_COST, WALL_MATERIAL_COST, ARTIFACT_MATERIAL_COST,
   RESEARCH_LEVEL_WORKER_MONTHS, researchMult,
@@ -54,12 +54,12 @@ export function weaponCap(state: GameState): number {
 
 /** Os je zdaj določena iz Človekovega drevesa — uporabimo dominantno odločitev */
 export function currentAxis(state: GameState): HumanAxis {
-  const h = state.axisHistory ?? { hiding: 0, espionage: 0, defense: 0 };
+  const h = state.axisHistory ?? { obzidje: 0, orozje: 0, roboti: 0 };
   // Os, v katero smo največ vlagali, je trenutna "preferenca"
-  const max = Math.max(h.hiding ?? 0, h.espionage ?? 0, h.defense ?? 0);
-  if ((h.hiding ?? 0) === max) return 'hiding';
-  if ((h.espionage ?? 0) === max) return 'espionage';
-  return 'defense';
+  const max = Math.max(h.obzidje ?? 0, h.orozje ?? 0, h.roboti ?? 0);
+  if ((h.obzidje ?? 0) === max) return 'obzidje';
+  if ((h.orozje ?? 0) === max) return 'orozje';
+  return 'roboti';
 }
 
 /** Vsota vseh AI enot = skupno robotov. */
@@ -114,7 +114,6 @@ export function raidProbability(state: GameState, axis: HumanAxis): number {
   let p = RAID_BASE_CHANCE
     + RAID_POP_SCALING_MAX * popFactor
     + RAID_AI_KNOWLEDGE_BONUS * state.aiKnowledge;
-  if (axis === 'hiding') p *= (1 - RAID_HIDING_REDUCTION);
   p *= (1 - state.clanActivity * RAID_CLAN_ABSORPTION);
   p *= Math.min(1, attackPow / AI_FULL_ATTACK_POWER);  // šibkejša/maloštevilna sila → manj raidov
   return Math.max(0, Math.min(1, p));
@@ -125,13 +124,11 @@ export function raidRepelProbability(state: GameState, assignment: Assignment): 
   const defenders = (assignment.defenders ?? 0) + (assignment.dayGuard ?? 0) + (assignment.nightGuard ?? 0);
   if (defenders <= 0) return 0;
   const tier = RATIONS_LEVELS[assignment.rations ?? DEFAULT_RATIONS] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
-  const axisH = state.axisHistory ?? { hiding: 0, espionage: 0, defense: 0 };
-  const defenseLvl = Math.floor((axisH.defense ?? 0) / 3);
   const intelB = intelCombatBonus(state);
   const weaponMult = researchMult(state.weaponResearchLevel ?? 0);  // raziskava orožja ×2/level
   const wallMult = researchMult(state.wallResearchLevel ?? 0);      // raziskava obzidja ×2/level
   const wallBonus = 1 + 0.20 * wallMult * (state.wallsBuilt ?? 0);  // vsak zid: +20 % (× raziskava)
-  const base = defenders * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult * (1 + 0.10 * defenseLvl);
+  const base = defenders * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult;
   const equip = Math.min(state.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT * weaponMult;
   const defStr = (base + equip) * (1 + intelB) * wallBonus;
   // Raid izvaja vsa AI sila (vsi tipi enot napadajo) — moč po njihovem napadu
@@ -146,7 +143,6 @@ export function scoutSuccessProbability(state: GameState, assignment: Assignment
   let p = SCOUT_BASE_SUCCESS
     + SCOUT_INTEL_BONUS_PER_100 * (state.resources.intelligence / 100)
     + (tier.strengthMult - 1.0) * 0.5;
-  if (assignment.axis === 'espionage') p += SCOUT_ESPIONAGE_BONUS;
   return Math.max(0, Math.min(0.98, p));
 }
 
@@ -156,7 +152,6 @@ export function scoutCaptureProbability(state: GameState, assignment: Assignment
   let p = SCOUT_CAPTURE_BASE
     + SCOUT_CAPTURE_PER_SCOUT * (assignment.scouts ?? 0)
     + SCOUT_AI_KNOWLEDGE_BONUS * state.aiKnowledge;
-  if (assignment.axis === 'hiding') p *= (1 - SCOUT_HIDING_REDUCTION);
   return Math.max(0, Math.min(0.80, p));
 }
 
@@ -277,7 +272,7 @@ export function newGame(seed?: number): GameState {
     aiTree: generateAITree(),
     aiWeakPoints: generateAIWeakPoints(),
     clanActivity: INITIAL_CLAN_ACTIVITY,
-    axisHistory: { hiding: 0, espionage: 0, defense: 0 },
+    axisHistory: { obzidje: 0, orozje: 0, roboti: 0 },
     activeMissions: [],
     completedMissions: [],
     consecutiveStarvationMonths: 0,
@@ -335,10 +330,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   }
 
   // 0. Človekovo drevo napredka — bonusi iz zgodovine osi
-  const axisHistory = state.axisHistory ?? { hiding: 0, espionage: 0, defense: 0 };
-  const hidingLvl    = Math.floor((axisHistory.hiding    ?? 0) / 3);
-  const espionageLvl = Math.floor((axisHistory.espionage ?? 0) / 3);
-  const defenseLvl   = Math.floor((axisHistory.defense   ?? 0) / 3);
+  const axisHistory = state.axisHistory ?? { obzidje: 0, orozje: 0, roboti: 0 };
+  // (os Obzidje/Orožje/Roboti je zaenkrat brez mehanskih učinkov — beleži se le fokus za drevo)
 
   // 0.5. Obroki — vplivajo na porabo hrane, na moč ljudi in na rast populacije
   const rations = RATIONS_LEVELS[assignment.rations ?? DEFAULT_RATIONS] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
@@ -495,10 +488,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     rng = rngAfter;
     combatLog = result;
 
-    const defenseSave = Math.floor(result.humanLost * 0.10 * defenseLvl);
-    const actualHumanLost = Math.max(0, result.humanLost - defenseSave);
+    const actualHumanLost = result.humanLost;
     population -= actualHumanLost;
-    if (defenseSave > 0) combatLog = { ...result, humanLost: actualHumanLost };
     // Smrti v napadu = izguba orožja (1 padel = 1 izgubljeno orožje)
     combat = Math.max(0, combat - actualHumanLost);
     applyDestroy(result.aiRobotsDestroyed);
@@ -527,7 +518,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     const { result: raidRes, rng: rngR2 } = resolveRaid(state, assignment, rng);
     rng = rngR2;
     // Obrambni nivo malo zmanjša žrtve med ljudmi
-    const save = (n: number) => Math.max(0, n - Math.floor(n * 0.10 * defenseLvl));
+    const save = (n: number) => n;  // (obrambni bonus osi odstranjen)
     const actualDef = save(raidRes.defendersLost);
     const actualFor = save(raidRes.foragersLost);
     const actualWrk = save(raidRes.workersLost);
@@ -818,13 +809,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   }
 
   // 7. Klan aktivnost — krivulja + vedenjski modifikator
-  // Hiding lvl bonus: 25 % počasnejši padec na nivo
-  // Skrivamo se le če ni ofenzivnih akcij ven (combatants+scouts majhni)
-  const isHiding = assignment.axis === 'hiding' && assignment.combatants < 5 && (assignment.researchers ?? 0) < 8;
-  const rawClanDelta = isHiding
-    ? -CLAN_ACTIVITY_HIDDEN_MODIFIER
-    : -CLAN_ACTIVITY_EXPOSURE_MODIFIER;
-  const clanDelta = rawClanDelta * Math.max(0, 1 - 0.25 * hidingLvl);
+  // Padec klanske podpore (os skrivanja odstranjena — nevtralen padec)
+  const clanDelta = -CLAN_ACTIVITY_EXPOSURE_MODIFIER;
   const clanActivity = Math.max(0, Math.min(1, state.clanActivity + clanDelta + clanAllyBoost));
 
   // 8. AI surveillance gain (skupna izpostavljenost: combatants + scouts)

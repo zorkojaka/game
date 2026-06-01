@@ -20,7 +20,7 @@ export interface AIGenome {
 
 export const DEFAULT_GENOME: AIGenome = {
   aggressiveness: 0.5,
-  counterBias: { hiding: 0.33, espionage: 0.33, defense: 0.34 },
+  counterBias: { obzidje: 0.33, orozje: 0.33, roboti: 0.34 },
   phaseSpeed: 1.0,
   surveillanceIntensity: 0.4,
 };
@@ -37,9 +37,9 @@ export function adaptGenome(genome: AIGenome, history: AxisHistory): AIGenome {
     .sort(([, a], [, b]) => b - a)[0][0];
 
   const counter: Record<HumanAxis, HumanAxis> = {
-    hiding: 'espionage',     // AI kontira skrivanje z boljšim iskanjem
-    espionage: 'defense',    // AI kontira špijonažo z zaščito informacij
-    defense: 'hiding',       // AI kontira obrambo z izogibanjem soočenju
+    obzidje: 'orozje',
+    orozje: 'roboti',
+    roboti: 'obzidje',
   };
 
   const counterAxis = counter[dominant];

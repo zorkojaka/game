@@ -3,20 +3,20 @@ import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundL
 import { tileId } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
-import { RATIONS_LEVELS, M_OS, aiDefensePower } from '../../src/engine/constants';
+import { RATIONS_LEVELS, aiDefensePower } from '../../src/engine/constants';
 
 // ─── Konstante ───────────────────────────────────────────────────────────────
 
 const PHASE = {
-  find:       { num: 1, label: 'AI IŠČE',      full: 'FAZA 1 — AI IŠČE',      color: '#e06c30', bestAxis: 'hiding'    as HumanAxis },
-  understand: { num: 2, label: 'AI RAZUME',    full: 'FAZA 2 — AI RAZUME',    color: '#cc3333', bestAxis: 'espionage' as HumanAxis },
-  eliminate:  { num: 3, label: 'AI IZTREBLJA', full: 'FAZA 3 — AI IZTREBLJA', color: '#991111', bestAxis: 'defense'  as HumanAxis },
+  find:       { num: 1, label: 'AI IŠČE',      full: 'FAZA 1 — AI IŠČE',      color: '#e06c30' },
+  understand: { num: 2, label: 'AI RAZUME',    full: 'FAZA 2 — AI RAZUME',    color: '#cc3333' },
+  eliminate:  { num: 3, label: 'AI IZTREBLJA', full: 'FAZA 3 — AI IZTREBLJA', color: '#991111' },
 };
 
 const AXIS: Record<HumanAxis, { label: string; icon: string; desc: string }> = {
-  hiding:    { label: 'Skrivanje',  icon: '👁‍🗨', desc: 'Zmanjšuje AI nadzor' },
-  espionage: { label: 'Špijonaža', icon: '🕵',  desc: 'Odkriva AI načrte' },
-  defense:   { label: 'Obramba',   icon: '🛡',   desc: 'Zmanjšuje bojne izgube' },
+  obzidje: { label: 'Obzidje', icon: '🧱', desc: 'Fokus na obzidje' },
+  orozje:  { label: 'Orožje',  icon: '⚔️', desc: 'Fokus na orožje' },
+  roboti:  { label: 'Roboti',  icon: '🤖', desc: 'Fokus na robote' },
 };
 
 // M_OS pride iz enginea (zgoraj uvožen). Podvajanje odpravljeno.
@@ -300,34 +300,34 @@ function NodeCard({ node, flash }: { node: AITreeNode; flash?: boolean }) {
 type HumanNode = { axis: HumanAxis; level: 1 | 2 | 3; threshold: number; label: string; effect: string };
 
 const HUMAN_TREE: HumanNode[] = [
-  // Hiding ─ Skrivanje
-  { axis: 'hiding',    level: 1, threshold: 3, label: 'Tihi kamp',         effect: '−25 % padec klanske podpore' },
-  { axis: 'hiding',    level: 2, threshold: 6, label: 'Migracijska pot',   effect: '−50 % padec klanske podpore' },
-  { axis: 'hiding',    level: 3, threshold: 9, label: 'Globoki bunker',    effect: '−75 % padec klanske podpore' },
-  // Espionage ─ Špijonaža
-  { axis: 'espionage', level: 1, threshold: 3, label: 'Sled v omrežju',    effect: '+20 % moč proti megli' },
-  { axis: 'espionage', level: 2, threshold: 6, label: 'Globoka infiltrac.', effect: '+40 % moč proti megli' },
-  { axis: 'espionage', level: 3, threshold: 9, label: 'Hrbtenica AI',      effect: '+60 % moč proti megli' },
-  // Defense ─ Obramba
-  { axis: 'defense',   level: 1, threshold: 3, label: 'Trdnjava',          effect: '−10 % bojnih izgub' },
-  { axis: 'defense',   level: 2, threshold: 6, label: 'Bojna doktrina',    effect: '−20 % bojnih izgub' },
-  { axis: 'defense',   level: 3, threshold: 9, label: 'Protinapad',        effect: '−30 % bojnih izgub' },
+  // Obzidje
+  { axis: 'obzidje', level: 1, threshold: 3, label: 'Obzidje I',   effect: '' },
+  { axis: 'obzidje', level: 2, threshold: 6, label: 'Obzidje II',  effect: '' },
+  { axis: 'obzidje', level: 3, threshold: 9, label: 'Obzidje III', effect: '' },
+  // Orožje
+  { axis: 'orozje',  level: 1, threshold: 3, label: 'Orožje I',    effect: '' },
+  { axis: 'orozje',  level: 2, threshold: 6, label: 'Orožje II',   effect: '' },
+  { axis: 'orozje',  level: 3, threshold: 9, label: 'Orožje III',  effect: '' },
+  // Roboti
+  { axis: 'roboti',  level: 1, threshold: 3, label: 'Roboti I',    effect: '' },
+  { axis: 'roboti',  level: 2, threshold: 6, label: 'Roboti II',   effect: '' },
+  { axis: 'roboti',  level: 3, threshold: 9, label: 'Roboti III',  effect: '' },
 ];
 
 const HUMAN_AXIS_META: Record<HumanAxis, { icon: string; label: string; color: string }> = {
-  hiding:    { icon: '👁‍🗨', label: 'SKRIVANJE',  color: '#22aa88' },
-  espionage: { icon: '🕵',  label: 'ŠPIJONAŽA', color: '#3399cc' },
-  defense:   { icon: '🛡',   label: 'OBRAMBA',   color: '#66bb55' },
+  obzidje: { icon: '🧱', label: 'OBZIDJE', color: '#aabb88' },
+  orozje:  { icon: '⚔️', label: 'OROŽJE',  color: '#cc4433' },
+  roboti:  { icon: '🤖', label: 'ROBOTI',  color: '#cc8800' },
 };
 
-const EMPTY_HISTORY: Record<HumanAxis, number> = { hiding: 0, espionage: 0, defense: 0 };
+const EMPTY_HISTORY: Record<HumanAxis, number> = { obzidje: 0, orozje: 0, roboti: 0 };
 
 /** Izbira osi (fokusa) meseca — viden gumb skrivanje / špijonaža / obramba. */
 function AxisFocusBar({ value, onChange }: { value: HumanAxis; onChange: (a: HumanAxis) => void }) {
   const axes: Array<{ id: HumanAxis; effect: string }> = [
-    { id: 'hiding',    effect: '−50 % verjetnosti napada AI · upočasni padec aktivnosti klanov' },
-    { id: 'espionage', effect: 'bonus pri razkrivanju AI načrta · več intela iz vohunjenja' },
-    { id: 'defense',   effect: 'bonus pri odbijanju napadov · zaščita pred izgubami' },
+    { id: 'obzidje', effect: 'Fokus na obzidje' },
+    { id: 'orozje',  effect: 'Fokus na orožje' },
+    { id: 'roboti',  effect: 'Fokus na robote' },
   ];
   return (
     <div className="axis-focus">
@@ -356,7 +356,7 @@ function HumanTree({ axisHistory, currentAxis, onFocusChange }: {
   onFocusChange: (a: HumanAxis) => void;
 }) {
   const hist = { ...EMPTY_HISTORY, ...(axisHistory ?? {}) };
-  const axes: HumanAxis[] = ['hiding', 'espionage', 'defense'];
+  const axes: HumanAxis[] = ['obzidje', 'orozje', 'roboti'];
   const totalUnlocked = HUMAN_TREE.filter(n => hist[n.axis] >= n.threshold).length;
 
   return (
@@ -415,31 +415,53 @@ function HumanTree({ axisHistory, currentAxis, onFocusChange }: {
   );
 }
 
-/** AI drevo — vse faze */
+/** AI drevo — enaka vejna struktura kot naše drevo, veje = faze */
 function AITree({ nodes, justRevealed }: { nodes: AITreeNode[]; justRevealed: Set<string> }) {
   const phases: Array<keyof typeof PHASE> = ['find', 'understand', 'eliminate'];
   const revealedCount = nodes.filter(n => n.visibility === 'revealed').length;
-  const partialCount  = nodes.filter(n => n.visibility === 'partial').length;
   return (
-    <div className="panel ai-tree">
+    <div className="panel human-tree ai-tree">
       <div className="panel-head">
-        <h3>AI NAČRTOVALNO DREVO</h3>
-        <span className="panel-badge">
-          {revealedCount} odkritih · {partialCount} delnih · {nodes.length} skupaj
-        </span>
+        <h3>AI NAČRTOVALNO DREVO · odpira se z znanjem o AI</h3>
+        <span className="panel-badge">{revealedCount}/{nodes.length} razkritih</span>
       </div>
-      {phases.map(ph => (
-        <div key={ph} className="tree-section">
-          <div className="tree-ph-label" style={{ color: PHASE[ph].color }}>
-            ▸ {PHASE[ph].full}
-          </div>
-          <div className="node-grid">
-            {nodes.filter(n => n.phase === ph).map(n =>
-              <NodeCard key={n.id} node={n} flash={justRevealed.has(n.id)} />
-            )}
-          </div>
-        </div>
-      ))}
+      <div className="ht-branches">
+        {phases.map(ph => {
+          const meta = PHASE[ph];
+          const phNodes = nodes.filter(n => n.phase === ph);
+          const phRevealed = phNodes.filter(n => n.visibility === 'revealed').length;
+          return (
+            <div key={ph} className="ht-branch">
+              <div className="ht-br-head" style={{ color: meta.color }}>
+                <span className="ht-br-icon">{meta.num}</span>
+                <span className="ht-br-label">{meta.label}</span>
+                <span className="ht-br-count">{phRevealed}/{phNodes.length}</span>
+              </div>
+              <div className="ht-nodes">
+                {phNodes.map(n => {
+                  const unlocked = n.visibility === 'revealed';
+                  const partial  = n.visibility === 'partial';
+                  const flash = justRevealed.has(n.id);
+                  return (
+                    <div key={n.id} className={`ht-node ${unlocked ? 'unlocked' : 'locked'} ${flash ? 'flash' : ''}`}
+                         style={unlocked ? { borderColor: meta.color } : {}}>
+                      <div className="ht-node-head">
+                        <span className="ht-node-lvl" style={{ color: unlocked ? meta.color : partial ? '#888' : '#333' }}>
+                          {unlocked ? '◆' : partial ? '◐' : '?'}
+                        </span>
+                        <span className="ht-node-label" style={{ color: unlocked ? '#e0d0c8' : partial ? '#8a7a72' : '#3a3a3a' }}>
+                          {unlocked ? n.label : partial ? `${n.label.split(' ')[0]}…` : '[ZAKRITO]'}
+                        </span>
+                      </div>
+                      {unlocked && <div className="ht-node-eff" style={{ color: meta.color }}>moč {n.strength}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -919,28 +941,6 @@ function SliderRow({ icon, label, val, onChange, max, yieldText, probLabel, prob
           <span className="sr-prob-val" style={{ color: probColor(prob) }}>{Math.round(prob * 100)}%</span>
         </div>
       )}
-    </div>
-  );
-}
-
-/** Os: 3 gumbi z M_os */
-function AxisSelector({ phase, selected, onSelect }: { phase: keyof typeof PHASE; selected: HumanAxis; onSelect: (a: HumanAxis) => void }) {
-  const bestAxis = PHASE[phase].bestAxis;
-  return (
-    <div className="axis-group">
-      {(Object.keys(AXIS) as HumanAxis[]).map(a => {
-        const m = M_OS[phase][a];
-        const isRight = bestAxis === a;
-        const mColor = isRight ? '#22cc66' : m < 0.8 ? '#cc3333' : '#cc8800';
-        return (
-          <button key={a} className={`axis-btn ${selected === a ? 'sel' : ''} ${isRight ? 'right' : ''}`} onClick={() => onSelect(a)}>
-            <span className="ab-icon">{AXIS[a].icon}</span>
-            <span className="ab-label">{AXIS[a].label}</span>
-            <span className="ab-mos" style={{ color: mColor }}>×{m}</span>
-            {isRight && <span className="ab-right-tag">IDEALNA</span>}
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -2403,7 +2403,7 @@ function FitScale({ children, deps }: { children: React.ReactNode; deps?: unknow
 export default function App() {
   const [game,       setGame]       = useState<GameState | null>(null);
   const [loading,    setLoading]    = useState(false);
-  const [axis,       setAxis]       = useState<HumanAxis>('defense');
+  const [axis,       setAxis]       = useState<HumanAxis>('obzidje');
   const [combatants,   setCombatants]   = useState(0);
   const [defenders,    setDefenders]    = useState(15);
   const [foragers,     setForagers]     = useState(20);
@@ -2415,7 +2415,7 @@ export default function App() {
   const [missionR,     setMissionR]     = useState<Record<string, number>>({});
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
-  const [tab,          setTab]          = useState<'defense' | 'food' | 'workshop' | 'research' | 'map' | 'attack' | 'active' | 'tree' | 'log'>('food');
+  const [tab,          setTab]          = useState<'defense' | 'food' | 'workshop' | 'research' | 'map' | 'attack' | 'active' | 'log'>('food');
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
   const [draftPeople,  setDraftPeople]  = useState(5);
   const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
@@ -2548,7 +2548,7 @@ export default function App() {
       const g = await createGame();
       setGame(g);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('defense'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('robots'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
+      setAxis('obzidje'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('robots'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
     } finally { setLoading(false); }
   };
 
@@ -2899,7 +2899,6 @@ export default function App() {
             { id: 'map',      icon: '🗺', label: 'Izvidniki' },
             { id: 'attack',   icon: '⚔️', label: 'Napad' },
             { id: 'active',   icon: '⏳', label: 'V teku' },
-            { id: 'tree',     icon: '🔬', label: 'Drevo' },
           ] as const).map(m => (
             <button key={m.id} className={`sm-btn ${tab === m.id ? 'active' : ''} ${'mobileOnly' in m && m.mobileOnly ? 'sm-mobile-only' : ''}`}
               onClick={() => { setTab(m.id); if (m.id === 'attack') setDraftKind('attack'); else if (m.id === 'map') setDraftKind('scout'); }} title={m.label}>
@@ -3029,6 +3028,7 @@ export default function App() {
 
           {/* ─── RAZISKAVE ─── */}
           {tab === 'research' && (
+          <>
           <div className="panel command-panel">
             <div className="panel-head"><h3>🔬 RAZISKAVE</h3><span className="dim small">{researchers} raziskovalcev</span></div>
             <div className="field-stats">
@@ -3066,6 +3066,11 @@ export default function App() {
             </div>
             <p className="field-note dim small">Raziskovalci: „AI roboti" dajo intel (boljši boji); „Orožje" in „Obzidje" vsaka stopnja podvoji napad/obrambo (120 razisk.-mes. na stopnjo). AI drevo se odpira samodejno z znanjem o AI.</p>
           </div>
+          <div className="band band-trees">
+            <HumanTree axisHistory={game.axisHistory} currentAxis={axis} onFocusChange={setAxis} />
+            <AITree nodes={game.aiTree} justRevealed={justRevealed} />
+          </div>
+          </>
           )}
 
           {/* ─── IZVIDNIKI / MAPA — nova odprava + aktivne odprave ─── */}
@@ -3328,14 +3333,6 @@ export default function App() {
                 })}
               </div>
             )}
-          </div>
-          )}
-
-          {/* ─── DREVO — naš načrt + AI načrtovalno drevo (skill tree) ─── */}
-          {tab === 'tree' && (
-          <div className="band band-trees">
-            <HumanTree axisHistory={game.axisHistory} currentAxis={axis} onFocusChange={setAxis} />
-            <AITree nodes={game.aiTree} justRevealed={justRevealed} />
           </div>
           )}
 

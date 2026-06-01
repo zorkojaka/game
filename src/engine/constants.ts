@@ -83,26 +83,7 @@ export const SCOUT_INTEL_YIELD = 8;                 // en scout = 8 intel/rundo
 export const SCOUT_FOG_YIELD = 4;                   // en scout = 4 enote za čiščenje megle/rundo
 export const SURVIVOR_RESCUE_CHANCE = 0.15;         // verjetnost najdbe novih preživelih
 
-// ─── M_os — modifikator pravilnosti osi v dani fazi ──────────────────────────
-// Vsaka os je učinkovita v "pravi" fazi, manj v napačni
-// Vrednosti med 0.4 in 1.5
-export const M_OS: Record<AIPhase, Record<HumanAxis, number>> = {
-  find: {
-    hiding: 1.4,   // PRAVA os — skrivanje med iskanjem je odlično
-    espionage: 1.0,
-    defense: 0.5,  // Napačna os — braniti se med iskanjem ni smiselno
-  },
-  understand: {
-    hiding: 0.8,
-    espionage: 1.5, // PRAVA os — špijonaža med analizo je odlična
-    defense: 0.7,
-  },
-  eliminate: {
-    hiding: 0.5,   // Prepozno za skrivanje
-    espionage: 0.9,
-    defense: 1.4,  // PRAVA os — obramba med iztrebljenjem je ključna
-  },
-};
+// (M_os modifikator osi odstranjen — os Obzidje/Orožje/Roboti zaenkrat brez mehanskih učinkov)
 
 // ─── Balans spopada ─────────────────────────────────────────────────────────
 // Cilj: ~55 % AI zmag (napeto, ne nemogoče)
