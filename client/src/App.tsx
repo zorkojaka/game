@@ -2415,7 +2415,7 @@ export default function App() {
   const [missionR,     setMissionR]     = useState<Record<string, number>>({});
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
-  const [tab,          setTab]          = useState<'defense' | 'food' | 'workshop' | 'research' | 'map' | 'attack' | 'active' | 'log'>('food');
+  const [tab,          setTab]          = useState<'defense' | 'food' | 'workshop' | 'research' | 'map' | 'attack' | 'log'>('food');
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
   const [draftPeople,  setDraftPeople]  = useState(5);
   const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
@@ -2912,7 +2912,6 @@ export default function App() {
             { id: 'research', icon: '🔬', label: 'Raziskave' },
             { id: 'map',      icon: '🗺', label: 'Izvidniki' },
             { id: 'attack',   icon: '⚔️', label: 'Napad' },
-            { id: 'active',   icon: '⏳', label: 'V teku' },
           ] as const).map(m => (
             <button key={m.id} className={`sm-btn ${tab === m.id ? 'active' : ''} ${'mobileOnly' in m && m.mobileOnly ? 'sm-mobile-only' : ''}`}
               onClick={() => { setTab(m.id); if (m.id === 'attack') setDraftKind('attack'); else if (m.id === 'map') setDraftKind('scout'); }} title={m.label}>
@@ -3287,71 +3286,6 @@ export default function App() {
           )}
 
           {/* ─── V TEKU — pregled vseh aktivnih odprav in napadov ─── */}
-          {tab === 'active' && (
-          <div className="panel command-panel">
-            <div className="panel-head">
-              <h3>⏳ V TEKU</h3>
-              <span className="dim small">{(game.expeditions ?? []).length} aktivnih · {inMissions} ljudi zunaj</span>
-            </div>
-            {(game.expeditions ?? []).length === 0 && (game.activeMissions ?? []).length === 0 ? (
-              <p className="field-note dim small">Trenutno ni aktivnih odprav ali napadov. Pošlji jih iz zavihkov Izvidniki ali Napad.</p>
-            ) : (
-              <div className="active-expeditions">
-                {(game.expeditions ?? []).map(e => {
-                  const total = Math.max(1, e.path.length - 1);
-                  const done = e.currentIndex;
-                  const remaining = Math.max(0, total - done);
-                  const target = e.path[e.path.length - 1];
-                  const isAttack = e.kind === 'mission';
-                  const color = isAttack ? '#cc3333' : '#ffd84a';
-                  const wp = e.weakPointId ? game.aiWeakPoints.find(w => w.id === e.weakPointId) : undefined;
-                  const kindLabel = (isAttack ? (wp ? `⚔ Napad na ◆ ${wp.label}` : '⚔ Napad') : '🔭 Izvidnica') + (e.stealth ? ' · 🌙' : '');
-                  return (
-                    <div key={e.id} className="exp-card">
-                      <div className="exp-head">
-                        <span className="exp-kind" style={{ color }}>{kindLabel} · {e.assigned} ljudi</span>
-                        <span className="dim small">→ ({target?.q},{target?.r})</span>
-                      </div>
-                      <div className="exp-progress">
-                        <div className="ep-track">
-                          <div className="ep-fill" style={{ width: `${(done / total) * 100}%`, background: color }} />
-                        </div>
-                        <span className="dim small">mesec {done} / {total}</span>
-                      </div>
-                      <div className="exp-events dim small">
-                        {remaining === 0 ? 'prihod ta mesec' : `še ${remaining} mesec(ev) do cilja`}
-                        {e.encountersLog.length > 0 && ` · ${e.encountersLog.slice(-1)[0]}`}
-                      </div>
-                    </div>
-                  );
-                })}
-                {(game.activeMissions ?? []).map(m => {
-                  const total = Math.max(1, m.monthsTotal);
-                  const done = total - m.monthsRemaining;
-                  const wp = game.aiWeakPoints.find(w => w.id === m.weakPointId);
-                  return (
-                    <div key={m.weakPointId} className="exp-card">
-                      <div className="exp-head">
-                        <span className="exp-kind" style={{ color: '#cc8800' }}>🎯 Misija na ◆ {wp?.label ?? m.weakPointId} · {m.assigned} ljudi</span>
-                        <span className="dim small">{Math.round(m.successProbability * 100)}% uspeh</span>
-                      </div>
-                      <div className="exp-progress">
-                        <div className="ep-track">
-                          <div className="ep-fill" style={{ width: `${(done / total) * 100}%`, background: '#cc8800' }} />
-                        </div>
-                        <span className="dim small">mesec {done} / {total}</span>
-                      </div>
-                      <div className="exp-events dim small">
-                        {m.monthsRemaining === 0 ? 'razrešitev ta mesec' : `še ${m.monthsRemaining} mesec(ev)`}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          )}
-
          </FitScale>
          {/* ─── LOG (mobilno) — dnevnik dogodkov, lasten scroll, brez skaliranja ─── */}
          {tab === 'log' && (
@@ -3405,13 +3339,75 @@ export default function App() {
         </div>
       </section>
 
-      {/* DESNO: dnevnik dogodkov (zgoraj, scrollable) + akcije (spodaj) */}
+      {/* DESNO: dnevnik dogodkov (zgoraj, scrollable) + V teku (pod trakom) */}
       <aside className="right-col">
         <div className="panel rc-log">
           <div className="panel-head"><h3>DNEVNIK DOGODKOV</h3></div>
           <div className="rc-log-scroll">
             <EventLog entries={eventLog} />
           </div>
+        </div>
+        <div className="panel rc-active">
+          <div className="panel-head">
+            <h3>⏳ V TEKU</h3>
+            <span className="dim small">{(game.expeditions ?? []).length} aktivnih · {inMissions} ljudi zunaj</span>
+          </div>
+          {(game.expeditions ?? []).length === 0 && (game.activeMissions ?? []).length === 0 ? (
+            <p className="field-note dim small">Trenutno ni aktivnih odprav ali napadov. Pošlji jih iz zavihkov Izvidniki ali Napad.</p>
+          ) : (
+            <div className="active-expeditions">
+              {(game.expeditions ?? []).map(e => {
+                const total = Math.max(1, e.path.length - 1);
+                const done = e.currentIndex;
+                const remaining = Math.max(0, total - done);
+                const target = e.path[e.path.length - 1];
+                const isAttack = e.kind === 'mission';
+                const color = isAttack ? '#cc3333' : '#ffd84a';
+                const wp = e.weakPointId ? game.aiWeakPoints.find(w => w.id === e.weakPointId) : undefined;
+                const kindLabel = (isAttack ? (wp ? `⚔ Napad na ◆ ${wp.label}` : '⚔ Napad') : '🔭 Izvidnica') + (e.stealth ? ' · 🌙' : '');
+                return (
+                  <div key={e.id} className="exp-card">
+                    <div className="exp-head">
+                      <span className="exp-kind" style={{ color }}>{kindLabel} · {e.assigned} ljudi</span>
+                      <span className="dim small">→ ({target?.q},{target?.r})</span>
+                    </div>
+                    <div className="exp-progress">
+                      <div className="ep-track">
+                        <div className="ep-fill" style={{ width: `${(done / total) * 100}%`, background: color }} />
+                      </div>
+                      <span className="dim small">mesec {done} / {total}</span>
+                    </div>
+                    <div className="exp-events dim small">
+                      {remaining === 0 ? 'prihod ta mesec' : `še ${remaining} mesec(ev) do cilja`}
+                      {e.encountersLog.length > 0 && ` · ${e.encountersLog.slice(-1)[0]}`}
+                    </div>
+                  </div>
+                );
+              })}
+              {(game.activeMissions ?? []).map(m => {
+                const total = Math.max(1, m.monthsTotal);
+                const done = total - m.monthsRemaining;
+                const wp = game.aiWeakPoints.find(w => w.id === m.weakPointId);
+                return (
+                  <div key={m.weakPointId} className="exp-card">
+                    <div className="exp-head">
+                      <span className="exp-kind" style={{ color: '#cc8800' }}>🎯 Misija na ◆ {wp?.label ?? m.weakPointId} · {m.assigned} ljudi</span>
+                      <span className="dim small">{Math.round(m.successProbability * 100)}% uspeh</span>
+                    </div>
+                    <div className="exp-progress">
+                      <div className="ep-track">
+                        <div className="ep-fill" style={{ width: `${(done / total) * 100}%`, background: '#cc8800' }} />
+                      </div>
+                      <span className="dim small">mesec {done} / {total}</span>
+                    </div>
+                    <div className="exp-events dim small">
+                      {m.monthsRemaining === 0 ? 'razrešitev ta mesec' : `še ${m.monthsRemaining} mesec(ev)`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </aside>
 
