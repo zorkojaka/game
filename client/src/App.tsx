@@ -578,15 +578,15 @@ function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsCha
   artifactTargetWpId: string;
 }) {
   return (
-    <div className="panel">
-      <div className="panel-head">
-        <h3>ODPRAVE PROTI ŠIBKIM TOČKAM AI</h3>
-        <span className="panel-badge">{wps.filter(w => w.exploited).length}/{wps.length} uničenih</span>
+    <div className="panel def-panel">
+      <div className="def-head"><span className="def-head-icon">◆</span>
+        <div><h3>ŠIBKE TOČKE AI</h3><div className="def-sub">ODPRAVE PROTI AI</div></div>
+        <span className="panel-badge" style={{ marginLeft: 'auto' }}>{wps.filter(w => w.exploited).length}/{wps.length} uničenih</span>
       </div>
       {wps.map(wp => {
         const fog = wpFogLevel(wp, aiTree);
-        const cls = wp.exploited ? 'exploited' : fog === 'known' ? 'discovered' : fog === 'suspected' ? 'suspected' : 'hidden';
         const icon = wp.exploited ? '✓' : fog === 'known' ? '◆' : fog === 'suspected' ? '◌' : '?';
+        const color = wp.exploited ? '#33cc88' : fog === 'known' ? '#cc8800' : fog === 'suspected' ? '#886644' : '#555';
         const name = wp.exploited || fog === 'known' ? wp.label
                    : fog === 'suspected' ? suspectedHint(wp)
                    : '[ZAKRITO]';
@@ -600,12 +600,13 @@ function Missions({ wps, aiTree, active, plan, planR, onPlanChange, onRationsCha
 
         const isTargeted = selectedWpId === wp.id;
         return (
-          <div key={wp.id} className={`wp-card mission-card ${cls} ${isTargeted ? 'targeted' : ''}`}>
-            <div className="wp-icon">{icon}</div>
+          <div key={wp.id} className="def-card" style={{ borderLeft: `3px solid ${color}`, outline: isTargeted ? '1px solid #cc3333' : 'none' }}>
             <div className="wp-body">
-              {isTargeted && <span className="wp-target-badge">🎯 IZBRANO ZA NAPAD</span>}
-              <div className="wp-name">{name}</div>
-              {wp.exploited && <span className="wp-done-tag">UNIČENO</span>}
+              <div className="def-ally-head">
+                <span style={{ color, fontWeight: 700 }}>{icon} {name}</span>
+                {wp.exploited && <span className="wp-done-tag">UNIČENO</span>}
+                {isTargeted && !wp.exploited && <span className="dim small" style={{ color: '#cc3333' }}>🎯 IZBRANO</span>}
+              </div>
               {activeM && (
                 <>
                   <div className="mission-timer">
@@ -1288,30 +1289,23 @@ function AlliesPanel({ clans }: { clans: OtherClan[] }) {
   const discovered = clans.filter(c => c.discovered);
   const allied = clans.filter(c => c.allied);
   return (
-    <div className="panel">
-      <div className="panel-head">
-        <h3>ZAVEZNIKI</h3>
-        <span className="panel-badge teal">{allied.length} zavez. · {discovered.length}/{clans.length} najdenih</span>
-      </div>
-      <div className="dim small" style={{ marginBottom: 8 }}>
-        Drugi človeški klani so skriti v megli. Razišči njihov heks, da jih najdeš, nato pošlji
-        odpravo (Izvidniki) do njih za zavezništvo — odslej mesečno pomagajo.
+    <div className="panel def-panel">
+      <div className="def-head"><span className="def-head-icon">🤝</span>
+        <div><h3>ZAVEZNIKI</h3><div className="def-sub">DRUGI KLANI</div></div>
+        <span className="panel-badge teal" style={{ marginLeft: 'auto' }}>{allied.length} zavez. · {discovered.length}/{clans.length}</span>
       </div>
       {clans.map(c => {
         const s = specInfo[c.specialty];
-        const status = c.allied ? 'available' : c.discovered ? 'available' : 'locked';
         const color = c.allied ? '#33cc88' : c.discovered ? '#c0a050' : '#555';
         return (
-          <div key={c.id} className={`hm-card ${status}`} style={{ borderLeftColor: color }}>
-            <div className="hm-head">
-              <span className="hm-title" style={{ color }}>
-                {c.discovered ? `⛺ ${c.label}` : '⛺ ??? neznan klan'}
-              </span>
-              <span className="hm-months dim small">{c.discovered ? `(${c.q},${c.r})` : '?'}</span>
+          <div key={c.id} className="def-card" style={{ borderLeft: `3px solid ${color}` }}>
+            <div className="def-ally-head">
+              <span style={{ color, fontWeight: 700 }}>{c.discovered ? `⛺ ${c.label}` : '⛺ ??? neznan klan'}</span>
+              <span className="dim small">{c.discovered ? `(${c.q},${c.r})` : '?'}</span>
             </div>
-            <div className="hm-desc dim small">
+            <div className="def-stat-note" style={{ fontSize: '.68rem' }}>
               {c.allied
-                ? `🤝 Zaveznik — ${s.icon} ${s.gift}; dviguje aktivnost klanov (manj AI napadov).`
+                ? `🤝 Zaveznik — ${s.icon} ${s.gift}; dviguje aktivnost klanov.`
                 : c.discovered
                   ? `Specialnost: ${s.icon} ${s.label}. Pošlji odpravo na (${c.q},${c.r}) za zavezništvo.`
                   : 'Neznana lokacija — razišči mapo, da ga najdeš.'}
@@ -1319,6 +1313,11 @@ function AlliesPanel({ clans }: { clans: OtherClan[] }) {
           </div>
         );
       })}
+      <div className="def-how">
+        <div className="def-how-title">KAKO DELUJE</div>
+        <div className="def-how-row"><span className="def-how-ic">🔭</span><span>Razišči heks klana, da ga najdeš v megli.</span></div>
+        <div className="def-how-row"><span className="def-how-ic">🤝</span><span>Pošlji odpravo do njega za zavezništvo — nato mesečno pomaga.</span></div>
+      </div>
     </div>
   );
 }

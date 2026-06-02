@@ -2071,3 +2071,5 @@ input[type=range]::-moz-range-thumb {
 .def-build-prog { margin-top: .5rem; display: flex; flex-direction: column; gap: .35rem; }
 
 .def-upgrade-btn:disabled { opacity: .4; cursor: default; }
+
+.def-ally-head { display: flex; justify-content: space-between; align-items: center; gap: .4rem; margin-bottom: .25rem; font-size: .82rem; }
