@@ -1962,15 +1962,12 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                       <text x={p.x + bx} y={cy} textAnchor="middle" dominantBaseline="central"
                         fontSize="12" fill={z.color} fontWeight="bold" fontFamily="'Courier New', monospace">+</text>
                     </g>
-                    {/* tanka podčrtana črta pod −število+ vrstico (v barvi cone) */}
-                    <line x1={p.x - bx - 7.5} y1={cy + 12} x2={p.x + bx + 7.5} y2={cy + 12}
-                      stroke={z.color} strokeWidth="1" opacity="0.45" pointerEvents="none" />
-                    {/* Slider — sleek, barvno polnjenje do thumb-a, okrogel gumb */}
+                    {/* Slider tik pod −število+ vrstico (nadomesti podčrtano črto) */}
                     {(() => {
                       const max = z.count + freePeople;
                       const pct = max > 0 ? (z.count / max) * 100 : 0;
                       return (
-                        <foreignObject x={p.x - SIZE * 0.62} y={p.y + SIZE * 0.42} width={SIZE * 1.24} height={16}>
+                        <foreignObject x={p.x - bx - 7.5} y={cy + 7} width={2 * bx + 15} height={16}>
                           <input type="range" min={0} max={max} value={z.count}
                             onChange={(e) => onCampSet(z.adj, parseInt(e.target.value))}
                             className="cz-slider"
