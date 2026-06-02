@@ -73,9 +73,10 @@ export function pathMonths(path: Array<{ q: number; r: number }>): number {
 export function returnMonths(path: Array<{ q: number; r: number }>): number {
   if (path.length < 2) return 0;
   const last = path[path.length - 1];
-  const d = hexDistance({ q: last.q, r: last.r }, CLAN_POS);
-  if (d <= 1) return d;                     // sosednji kampa (1) ali na kampu (0)
-  return pathMonths(path);                  // sicer retrace cele poti
+  // Vrnejo se naravnost domov od zadnjega heksa; nikoli dlje kot retrace cele poti.
+  // Krožna pot, ki se konča ob kampu → kratek povratek; ravna pot ven → enako kot retrace.
+  const home = hexDistance({ q: last.q, r: last.r }, CLAN_POS);
+  return Math.min(pathMonths(path), home);
 }
 
 /** Skupni čas odprave: pot tja + povratek. */

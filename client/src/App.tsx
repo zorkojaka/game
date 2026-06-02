@@ -2665,11 +2665,12 @@ export default function App() {
   // Povratek: če zadnji heks meji na kamp → neposredno (0–1 m), sicer nazaj po isti poti.
   const draftReturnMonths = (() => {
     if (draftPath.length < 2) return 0;
+    const oneWay = Math.max(0, draftPath.length - 1);
     const clan = game?.mapTiles?.find(t => t.isClanCamp);
-    if (!clan) return Math.max(0, draftPath.length - 1);
+    if (!clan) return oneWay;
     const last = draftPath[draftPath.length - 1];
-    const d = hexDistFE({ q: last.q, r: last.r }, { q: clan.q, r: clan.r });
-    return d <= 1 ? d : Math.max(0, draftPath.length - 1);
+    const home = hexDistFE({ q: last.q, r: last.r }, { q: clan.q, r: clan.r });
+    return Math.min(oneWay, home);  // naravnost domov, nikoli dlje od retrace
   })();
   const draftTotalMonths = draftPathMonths + draftReturnMonths;
   function tileEncounterMultFE(p: number, distFromCamp: number): number {
@@ -2810,8 +2811,7 @@ export default function App() {
     const oneWay = Math.max(0, path.length - 1);
     if (path.length < 2) return 0;
     const last = path[path.length - 1];
-    const ret = clanTile ? (hexDistFE({ q: last.q, r: last.r }, { q: clanTile.q, r: clanTile.r }) <= 1
-      ? hexDistFE({ q: last.q, r: last.r }, { q: clanTile.q, r: clanTile.r }) : oneWay) : oneWay;
+    const ret = clanTile ? Math.min(oneWay, hexDistFE({ q: last.q, r: last.r }, { q: clanTile.q, r: clanTile.r })) : oneWay;
     return oneWay + ret;
   };
   const pendingExpFood = pendingExpeditions.reduce((s, e) => {
