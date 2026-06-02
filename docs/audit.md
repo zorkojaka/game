@@ -2,7 +2,9 @@
 
 Datum pregleda: 2026-06-02
 
-Sprint update: veja `dev/research-ai-logic` je po tem auditu implementirala novi research-driven AI loop. Za aktualne spremembe glej [research-ai-logic.md](research-ai-logic.md). Preostale ugotovitve v tem auditu so uporabne kot zgodovinski pregled in tehnični dolg, ne kot popolnoma aktualen opis po sprintu.
+Zadnja posodobitev audita: 2026-06-02
+
+Sprint update: veja `dev/research-ai-logic` je po prvem auditu implementirala novi research-driven AI loop in je bila nato fast-forwardana na `main`. Za opis glavne sistemske spremembe glej tudi [research-ai-logic.md](research-ai-logic.md). Spodnji audit je posodobljen z naknadnimi popravki kode, ki so bili narejeni po research sprintu.
 
 ## Povzetek
 
@@ -23,10 +25,116 @@ Projekt je po prejšnjem auditu opazno posodobljen. Glavne izboljšave:
 
 Največji preostali problem ni več samo arhitektura, ampak skladnost razlag in pravil:
 
-- `RulesModal` še vedno razlaga staro zasnovo `skrivanje / špijonaža / obramba`, čeprav so osi zdaj `obzidje / orozje / roboti`.
-- UI ocena napada po poti ne vključuje vseh engine bonusov in ne uporablja iste formule kot realni spopad.
-- Še vedno obstajata dva sistema za napade na šibke točke: novi path-based `expeditions` in stari `activeMissions`.
+- `RulesModal` je bil posodobljen na research-driven sistem, vendar so razlage še vedno raztresene po UI in engine komentarjih.
+- UI ocene so bile delno usklajene z engine logiko, vendar je treba še sistematično centralizirati preview formule.
+- Stari `activeMissions` sistem je v normalnem gameplayu izklopljen, a ostaja migracijska kompatibilnost za stare shranjene seje.
 - `processRound` in `App.tsx` sta še večja monolita kot prej.
+
+## Kaj je bilo implementirano po auditu
+
+### Research-driven AI loop
+
+Commit: `2b221ee Implement research-driven AI progression`.
+
+Glavne spremembe:
+
+- `aiInsight` ni več pasiven timer. Raste glede na raziskovalce in izbrani research target.
+- Če je cilj raziskav `robots`, insight raste s polno hitrostjo: `researchers * AI_INSIGHT_PER_RESEARCHER * rations.strengthMult`.
+- Če je cilj `weapon` ali `wall`, insight raste samo z manjšim faktorjem `NON_ROBOT_RESEARCH_INSIGHT_FACTOR`.
+- AI drevo ima konkretne tematske node:
+  - `Izvidniške enote`, `Senzorji in optika`, `Vzorec patruljiranja`;
+  - `Napadalne enote`, `Napajalni členki`, `Taktika frontalnega pritiska`;
+  - `People-killer enote`, `Termalno jedro`, `Prioritetni algoritem tarč`.
+- Mehanske šibkosti odklepajo stopnje tehnologije:
+  - scout mechanical weakness -> stopnja 1;
+  - attacker mechanical weakness -> stopnja 2;
+  - people-killer mechanical weakness -> stopnja 3.
+- Logične šibkosti dajejo takojšen pasivni bonus v boju/obrambi.
+- Legacy `activeMissions` niso več normalen gameplay sistem; stare seje se migrirajo tako, da se ljudje vrnejo v kamp.
+- UI research tekst je preurejen v loop: `Research -> Intel -> AI weak points -> Upgrades -> Survival`.
+- Research level labeli so tematski:
+  - roboti: `Izvidniki`, `Napadalci`, `People-killerji`;
+  - orožje: `Puške`, `EMP strelivo`, `Anti-core orožje`;
+  - obzidje: `Leseni zid`, `EMP obramba`, `Napredni obrambni sistemi`.
+
+Testi dodani/posodobljeni:
+
+- brez raziskovalcev `aiInsight` ne raste več pasivno;
+- robot research povečuje `aiInsight`;
+- `aiInsight` odpira AI tree node;
+- mehanske šibkosti odklepajo weapon/wall progression;
+- logične šibkosti vplivajo na combat/raid odds;
+- legacy missions niso več uporabljene kot normalen gameplay;
+- stare seje z `activeMissions` ne crashajo.
+
+### Popravki map UI kontrol
+
+Commit: `64850ca Fix map draft control icons`.
+
+Spremembe:
+
+- Gumbi na zadnjem hexu med risanjem poti ne uporabljajo več emoji teksta kot glavnega renderja.
+- Ikone za `scout`, `attack`, `+`, `-` in potrditev so zamenjane z inline SVG ikonami.
+- Popravljeno je centriranje in konsistenten prikaz ikon znotraj krožnih SVG gumbov.
+- Gameplay logika pošiljanja odprave ni bila spremenjena.
+
+Commit: `bb4719b Fix map progress arc alignment`.
+
+Spremembe:
+
+- Progress lok za artefakt in raziskovalne gumbe ne uporablja več `circle + strokeDashoffset`.
+- Lok se riše kot eksplicitni SVG `path`, zato začetek ne plava in vedno začne na vrhu obroča.
+- Pri 100% se še vedno prikaže poln krog.
+
+### Zaklenjene raziskave
+
+Commit: `3be2d22 Prevent selecting locked research`.
+
+Spremembe:
+
+- Zaklenjenih raziskav ni več mogoče izbrati v research selectorju.
+- Zaklenjenih raziskav ni več mogoče izbrati na map gumbih raziskovalne cone.
+- Če trenutni research target po zaključku runde postane zaklenjen za nadaljevanje, se fokus sam prestavi na `robots`.
+- Preview in `playRound` uporabljata normaliziran research target, da engine ne prejme zaklenjene izbire iz starega/migriranega UI stanja.
+- V človeškem research drevesu so imena zaklenjenih stopenj skrita in prikazana kot `Zaklenjeno`.
+
+### Robots research completion bugfix
+
+Commit: `b22b6c3 Reset robot research progress on unlock`.
+
+Spremembe:
+
+- Popravljen bug, kjer se `robotsResearchProgress` po odklepu prve robots/mechanical stopnje ni porabil/resetiral.
+- Ko AI drevo razkrije mehansko šibkost in se `robotsResearchLevel` dvigne, engine zdaj odšteje `RESEARCH_LEVEL_WORKER_MONTHS` za vsako novo odklenjeno stopnjo.
+- Dodan test, ki preveri: `Roboti 120` -> `robotsResearchLevel = 1` in `robotsResearchProgress = 0`.
+
+### Kako se AI načrtovalno drevo trenutno odpira
+
+AI tree se odpira prek `aiInsight`, ne več prek pasivnega časovnika.
+
+1. Igralec dodeli ljudi v `Research`.
+2. Če je research target `robots`, raziskovalci ustvarijo največ `aiInsight`.
+3. Če je target `weapon` ali `wall`, se `aiInsight` še vedno rahlo poveča, vendar samo z 15% faktorjem.
+4. `revealTreeByInsight()` primerja `aiInsight` z `insightThreshold` vsakega nodea.
+5. Node postane:
+   - `partial`, ko je insight blizu praga;
+   - `revealed`, ko insight doseže prag.
+6. Faza omeji največji možen insight:
+   - `find`: največ `0.30`;
+   - `understand`: največ `0.60`;
+   - `eliminate`: največ `0.90`.
+
+Pragovi nodeov:
+
+- `0.10`: izvidniške enote;
+- `0.20`: scout mechanical weakness;
+- `0.30`: scout logical weakness;
+- `0.40`: napadalne enote;
+- `0.50`: attacker mechanical weakness;
+- `0.60`: attacker logical weakness;
+- `0.70`: people-killer enote;
+- `0.80`: people-killer mechanical weakness;
+- `0.90`: people-killer logical weakness.
 
 ## Struktura projekta
 
@@ -40,7 +148,8 @@ Največji preostali problem ni več samo arhitektura, ampak skladnost razlag in 
 ├── package.json
 ├── tsconfig.json
 ├── docs/
-│   └── audit.md
+│   ├── audit.md
+│   └── research-ai-logic.md
 ├── src/
 │   ├── db/
 │   │   ├── connection.ts
@@ -75,11 +184,12 @@ Največji preostali problem ni več samo arhitektura, ampak skladnost razlag in 
 
 Velikosti glavnih datotek:
 
-- `src/engine/game.ts`: 1143 vrstic.
-- `client/src/App.tsx`: 3630 vrstic.
-- `src/engine/constants.ts`: 258 vrstic.
-- `src/engine/game.test.ts`: 232 vrstic.
-- skupaj TypeScript/TSX v `src` in `client/src`: 6720 vrstic.
+- `src/engine/game.ts`: 1092 vrstic.
+- `client/src/App.tsx`: 3727 vrstic.
+- `src/engine/constants.ts`: 264 vrstic.
+- `src/engine/game.test.ts`: 279 vrstic.
+- `docs/audit.md`: 1081+ vrstic po tej posodobitvi.
+- `docs/research-ai-logic.md`: 44 vrstic.
 
 ## Strani in zasloni
 
@@ -217,7 +327,7 @@ Engine je determinističen za isti seed in isti sequence akcij. RNG stanje je:
 
 1. vrne state, če status ni `active`;
 2. sestavi RNG iz `rngSeed/rngCallCount`;
-3. izračuna celoten klan pred rundo: kamp + stare misije + odprave;
+3. izračuna celoten klan pred rundo: kamp + odprave + morebitne legacy misije za migracijo;
 4. normalizira oborožene ljudi glede na orožje;
 5. naloži obroke;
 6. kamp porabi hrano;
@@ -231,7 +341,7 @@ Engine je determinističen za isti seed in isti sequence akcij. RNG stanje je:
 14. artefakt lahko uniči šibko točko;
 15. nove odprave se sprejmejo pred tikanjem;
 16. aktivne odprave se premaknejo, napadejo ali se vračajo;
-17. stare `activeMissions` se tickajo;
+17. legacy `activeMissions`, če obstajajo v stari seji, se odstranijo in ljudje se vrnejo v kamp;
 18. drugi klani se odkrijejo in zavezniki pošljejo pomoč;
 19. `clanActivity` se spremeni;
 20. AI pridobi `aiKnowledge`;
@@ -769,7 +879,8 @@ Raid lahko dodatno poveča `aiKnowledge`:
 
 - `population`: ljudje v kampu;
 - `maxPopulation`;
-- ljudje na misijah/odpravah so ločeno v `activeMissions` in `expeditions`.
+- ljudje na aktivnih odpravah so ločeno v `expeditions`;
+- `activeMissions` je samo legacy/migracijsko stanje, ne normalen gameplay.
 
 ### Resursi
 
@@ -879,25 +990,21 @@ Verjetno neuporabljene komponente:
 Stanje/flow:
 
 - `combatants` obstaja, vendar path attack uporablja `draftPeople`; direct combat UI ni več glavni flow.
-- `missionAssignments` in `activeMissions` sta še priključena prek `Missions`, čeprav novi napadi uporabljajo `newExpeditions`.
+- `missionAssignments` in `activeMissions` ostajata v tipih zaradi kompatibilnosti starih sej, vendar normalni UI in engine gameplay uporabljata `newExpeditions`.
 
 ## Potencialni bugi in neskladja
 
-### 1. Rules modal je zastarel
+### 1. Pravila in razlage so še razpršene
 
-`RulesModal` še vedno pravi:
+`RulesModal` je bil posodobljen na research-driven sistem, vendar razlage še vedno živijo na več mestih:
 
-- faza 1: skrivanje je najmočnejše;
-- faza 2: špijonaža;
-- faza 3: obramba.
+- `HELP`;
+- `RulesModal`;
+- panel tekst;
+- tooltipi;
+- engine komentarji.
 
-Engine in UI zdaj uporabljata osi:
-
-- `obzidje`;
-- `orozje`;
-- `roboti`.
-
-To je največje trenutno UX neskladje. Igralec dobi razlago za staro igro.
+Tveganje ni več staro besedilo o `skrivanje / špijonaža / obramba`, ampak ponovno razhajanje formul in opisov ob naslednjih gameplay spremembah.
 
 ### 2. UI pravi, da nizka populacija znižuje napad, vendar raid uporablja kamp populacijo
 
@@ -944,13 +1051,13 @@ Komentarji in UI razlage uporabljajo intervale kot "−5 do −3" in "+1 do +3",
 
 Frontend omejuje klik na sosednje hekse, API pa sprejme poljubno pot. Ker je produkcijski API javen, lahko client pošlje teleport poti.
 
-### 7. Dva sistema misij na šibke točke
+### 7. Legacy misije ostajajo v tipih in migraciji
 
-Path-based napadi in legacy `activeMissions` oba lahko uničita šibke točke. To povečuje možnost dvojnih ali nasprotujočih se stanj.
+Path-based odprave/napadi so zdaj normalni sistem. `activeMissions` se ne uporablja več za normalen gameplay, vendar ostaja v tipih in migraciji starih sej. To je še vedno tehnični dolg, ker tip še namiguje na star sistem.
 
-### 8. `aiInsight` ni odvisen od raziskovalcev
+### 8. `aiInsight` je research-driven, a razlaga mora ostati centralizirana
 
-AI drevo se odpira samodejno +3 % na rundo do faznega stropa. Raziskovalci na `robots` vplivajo na research levele in intel, ne neposredno na `aiInsight`. UI delno pravi "AI drevo se odpira samodejno", vendar ponekod še govori "Več izvidništva" za weak point razkritje.
+AI drevo se zdaj odpira prek raziskovalcev. `robots` research daje poln insight gain, `weapon`/`wall` samo 15% stranski gain. Preostalo tveganje je, da UI tooltipi ali dokumentacija ob prihodnjem balansiranju ne bodo več sledili konstantam.
 
 ### 9. `axisHistory` beleži fokus, vendar osi nimajo neposrednega mehanskega učinka
 
@@ -994,7 +1101,7 @@ V engineu pomeni kamp populacijo, v nekaterih UI labelih še vedno izgleda kot c
 
 ### Monolitni `App.tsx`
 
-`App.tsx` je 3630 vrstic. Smiselna delitev:
+`App.tsx` je približno 3727 vrstic. Smiselna delitev:
 
 - `screens/StartScreen.tsx`;
 - `screens/GameScreen.tsx`;
@@ -1012,7 +1119,7 @@ V engineu pomeni kamp populacijo, v nekaterih UI labelih še vedno izgleda kot c
 
 ### Monolitni `processRound`
 
-`game.ts` je 1143 vrstic. Smiselni čisti moduli:
+`game.ts` je približno 1092 vrstic. Smiselni čisti moduli:
 
 - `round/food.ts`;
 - `round/research.ts`;
@@ -1026,12 +1133,11 @@ V engineu pomeni kamp populacijo, v nekaterih UI labelih še vedno izgleda kot c
 
 ### Legacy odstranitev
 
-Odločitev:
+Normalni gameplay uporablja path-based `expeditions`. Preostali dolg:
 
-1. odstraniti stare `activeMissions` in `missionAssignments`;
-2. ali jih preimenovati v "special operations" in jasno ločiti od path napadov.
-
-Trenutno je to največji gameplay dolg.
+1. odstraniti `activeMissions` in `missionAssignments` iz tipov, ko migracija starih sej ne bo več potrebna;
+2. odstraniti stare helperje in UI placeholderje, ki so ostali kot zgodovinski ostanki;
+3. dodati server-side migracijski test za stare shranjene seje.
 
 ### Pravila in formula razlage
 
@@ -1043,7 +1149,7 @@ Treba je centralizirati pravila v dokument ali data strukturo, iz katere se poln
 - title atributi;
 - engine komentarji.
 
-Zaradi tega se je `RulesModal` že razšel z engineom.
+Zaradi tega obstaja tveganje, da se `RulesModal` ali panel tooltipi ponovno razidejo z engineom.
 
 ### API validacija poti
 
@@ -1069,13 +1175,11 @@ Dodati teste za najbolj tvegane stvari:
 
 ## Priporočena prioriteta
 
-1. Popraviti `RulesModal`, da opisuje trenutno igro: `obzidje/orozje/roboti`, AI enote, raziskave, `aiInsight`, path odprave.
-2. Uskladiti UI attack preview s pravo engine formulo za splošni napad in weak point napad.
-3. Popraviti pending expedition prikaz hrane/časa na `roundTripMonths`.
-4. Odstraniti ali jasno ločiti legacy `activeMissions`.
-5. Dodati server validacijo poti.
-6. Uvesti derived prikaz `totalClanPopulation = population + expeditions + activeMissions`.
-7. Popraviti max-exclusive razlage ali spremeniti `rngInt`/klice v inclusive helper.
-8. Razbiti `processRound` in `App.tsx` v module.
-9. Persistirati round history ali vsaj zadnjih N logov v `GameState`.
-10. Dodati teste za odprave, raid damage in UI/engine formula skladnost.
+1. Centralizirati formule in razlage za research, attack preview, raid odds in weak point bonuse.
+2. Dodati server validacijo poti.
+3. Odstraniti legacy `activeMissions`/`missionAssignments` iz tipov, ko migracija ni več potrebna.
+4. Uvesti derived prikaz `totalClanPopulation = population + expeditions`.
+5. Popraviti max-exclusive razlage ali spremeniti `rngInt`/klice v inclusive helper.
+6. Razbiti `processRound` in `App.tsx` v module.
+7. Persistirati round history ali vsaj zadnjih N logov v `GameState`.
+8. Dodati teste za odprave, raid damage in UI/engine formula skladnost.
