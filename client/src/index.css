@@ -456,9 +456,10 @@ b      { color: var(--text); font-weight: 600; }
   .center-col { order: 1; flex: 1 1 auto; min-height: 0; overflow: hidden; }   /* karta velika */
   .center-col .map-panel { padding: 4px; }
   .center-col .map-legend { display: none; }
-  .right-col { order: 2; display: flex; flex: 0 0 auto; max-height: 24vh; overflow: hidden; }  /* drsljiv log */
+  .right-col { order: 2; display: flex !important; flex: 0 0 23vh; height: 23vh; min-height: 110px; overflow: hidden; }  /* drsljiv log — fiksna višina */
   .right-col .rc-active { display: none; }       /* V teku skrit na telefonu (prostor) */
-  .right-col .rc-log { flex: 1 1 auto; min-height: 0; }
+  .right-col .rc-log { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .right-col .rc-log .rc-log-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; }
   .left-col {
     order: 3; flex: 0 0 auto; min-height: 0;
     display: flex !important; grid-template-columns: none;
