@@ -3135,119 +3135,146 @@ export default function App() {
           })()}
 
           {/* ─── PREHRANA ─── */}
-          {tab === 'food' && (
-          <div className="panel command-panel">
-            <div className="panel-head"><h3>🌾 PREHRANA</h3><span className="dim small">{foragers} nabiralcev</span></div>
-            <div className="field-stats">
-              <div className="ps-row">
-                <span className="dim small">🌾 Nabiralci</span>
-                <span className="pa-pm">
-                  <button className="pa-btn" disabled={foragers <= 0} onClick={() => bumpRole('f', -1)}>−</button>
-                  <b className="pa-count">{foragers}</b>
-                  <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('f', 1)}>+</button>
-                </span>
+          {tab === 'food' && (() => {
+            const safety = odds?.forageSafetyProbability ?? 0;
+            const dots = Math.min(24, foragers);
+            return (
+            <div className="panel def-panel">
+              <div className="def-head"><span className="def-head-icon">🌾</span><div><h3>PREHRANA</h3><div className="def-sub">OSKRBA S HRANO</div></div></div>
+              <div className="def-card">
+                <div className="def-card-title">NABIRALCI</div>
+                <div className="def-defenders">
+                  <div className="def-big-num" style={{ color: '#9ed18a' }}>{foragers}</div>
+                  <div className="def-slider-row">
+                    <button className="pa-btn" disabled={foragers <= 0} onClick={() => bumpRole('f', -1)}>−</button>
+                    <input type="range" min={0} max={availablePop} value={foragers} onChange={e => setRole('f', +e.target.value)} className="def-slider" />
+                    <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('f', 1)}>+</button>
+                  </div>
+                </div>
+                <div className="def-free">Prosti ljudje: <b style={{ color: freePeople > 0 ? '#66cc88' : '#888' }}>{freePeople}</b></div>
+                <div className="def-people-row">{Array.from({ length: dots }).map((_, i) => <span key={i} className="def-person">👤</span>)}{foragers > dots && <span className="def-person-more dim small">+{foragers - dots}</span>}</div>
               </div>
-              <div className="ps-row"><span className="dim small">Obroki:</span><RationsMini value={rations} onChange={setRations} /></div>
-              <div className="ps-row"><span className="dim small">Pridelek:</span><b style={{ color: '#22cc88' }}>+{foragerYield}</b></div>
-              <div className="ps-row"><span className="dim small">Poraba kampa (×{rTier.foodMult}):</span><b style={{ color: '#cc4444' }}>−{campFoodCost}</b></div>
-              <div className="ps-row"><span className="dim small">Zaloga zdaj:</span><b>{game.resources.survival}</b></div>
-              <div className="ps-row"><span className="dim small">Naslednji mesec:</span>
-                <b style={{ color: foodNextMonth <= 0 ? '#cc2222' : '#d8d8d8' }}>{foodNextMonth}{foodNextMonth <= 0 && ' ⚠'}</b></div>
-              <div className="ps-row"><span className="dim small">Brez izgub pri nabiranju:</span>
-                <b style={{ color: probColor(odds?.forageSafetyProbability ?? 0) }}>{odds ? Math.round((odds.forageSafetyProbability ?? 0) * 100) + '%' : '–'}</b></div>
+              <div className="def-card">
+                <div className="def-card-title">OBROKI</div>
+                <RationsMini value={rations} onChange={setRations} />
+              </div>
+              <div className="def-stat-grid">
+                <div className="def-stat"><div className="def-stat-label">PRIDELEK / MESEC</div><div className="def-stat-big" style={{ color: '#22cc88' }}>+{foragerYield}</div><div className="def-stat-note">hrane</div></div>
+                <div className="def-stat"><div className="def-stat-label">PORABA KAMPA</div><div className="def-stat-big" style={{ color: '#cc4444' }}>−{campFoodCost}</div><div className="def-stat-note">×{rTier.foodMult}</div></div>
+                <div className="def-stat"><div className="def-stat-label">VARNO NABIRANJE</div><Gauge pct={Math.round(safety * 100)} color={probColor(safety)} /></div>
+              </div>
+              <div className="def-card">
+                <div className="def-card-title">ZALOGA HRANE</div>
+                <div className="def-big-num" style={{ color: '#cc8800' }}>🍞 {game.resources.survival}</div>
+                <div className="def-stat-note">Naslednji mesec: <b style={{ color: foodNextMonth <= 0 ? '#cc2222' : '#9ed18a' }}>{foodNextMonth}{foodNextMonth <= 0 ? ' ⚠' : ''}</b></div>
+              </div>
+              <div className="def-how">
+                <div className="def-how-title">KAKO DELUJE</div>
+                <div className="def-how-row"><span className="def-how-ic">🌾</span><span>Nabiralci zbirajo hrano vsak mesec.</span></div>
+                <div className="def-how-row"><span className="def-how-ic">🍽</span><span>Višji obroki dajo več moči, a porabijo več hrane.</span></div>
+                <div className="def-how-row"><span className="def-how-ic">⚠</span><span>Če zaloga pade na 0, klan strada in izgublja ljudi.</span></div>
+              </div>
             </div>
-            <p className="field-note dim small">Nabiralci zbirajo hrano. Višji obroki dajo več moči, a porabijo več hrane.</p>
-          </div>
-          )}
+            );
+          })()}
 
           {/* ─── DELAVNICE ─── */}
-          {tab === 'workshop' && (
-          <div className="panel command-panel">
-            <div className="panel-head"><h3>🔨 DELAVNICE</h3><span className="dim small">{workers} delavcev</span></div>
-            <div className="field-stats">
-              <div className="ps-row">
-                <span className="dim small">🔨 Delavci</span>
-                <span className="pa-pm">
-                  <button className="pa-btn" disabled={workers <= 0} onClick={() => bumpRole('w', -1)}>−</button>
-                  <b className="pa-count">{workers}</b>
-                  <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('w', 1)}>+</button>
-                </span>
+          {tab === 'workshop' && (() => {
+            const cfg = workshopObj === 'weapon'
+              ? { label: 'orožje', total: 6, prog: game.weaponWorkshopProgress ?? 0, color: '#cc7733', icon: '⚔', made: game.resources.combat }
+              : workshopObj === 'wall'
+                ? { label: 'obzidje', total: 12, prog: game.wallProgress ?? 0, color: '#aabb88', icon: '🏰', made: game.wallsBuilt ?? 0 }
+                : { label: 'artefakt', total: 360, prog: game.artifactWorkshopProgress ?? 0, color: '#ffd84a', icon: '💎', made: game.resources.artifacts ?? 0 };
+            const need = Math.max(0, cfg.total - cfg.prog);
+            const months = workers > 0 ? Math.ceil(need / workers) : Infinity;
+            const pctv = Math.round((cfg.prog / cfg.total) * 100);
+            const dots = Math.min(24, workers);
+            return (
+            <div className="panel def-panel">
+              <div className="def-head"><span className="def-head-icon">🔨</span><div><h3>DELAVNICE</h3><div className="def-sub">IZDELAVA</div></div></div>
+              <div className="def-card">
+                <div className="def-card-title">DELAVCI</div>
+                <div className="def-defenders">
+                  <div className="def-big-num" style={{ color: '#cc9a6a' }}>{workers}</div>
+                  <div className="def-slider-row">
+                    <button className="pa-btn" disabled={workers <= 0} onClick={() => bumpRole('w', -1)}>−</button>
+                    <input type="range" min={0} max={availablePop} value={workers} onChange={e => setRole('w', +e.target.value)} className="def-slider" />
+                    <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('w', 1)}>+</button>
+                  </div>
+                </div>
+                <div className="def-free">Prosti ljudje: <b style={{ color: freePeople > 0 ? '#66cc88' : '#888' }}>{freePeople}</b></div>
+                <div className="def-people-row">{Array.from({ length: dots }).map((_, i) => <span key={i} className="def-person">👤</span>)}{workers > dots && <span className="def-person-more dim small">+{workers - dots}</span>}</div>
               </div>
-              <div className="ps-row"><span className="dim small">Cilj:</span><WorkshopSelector value={workshopObj} onChange={setWorkshopObj} weaponLevel={game.weaponResearchLevel ?? 0} wallLevel={game.wallResearchLevel ?? 0} /></div>
-              <div className="ps-row"><span className="dim small">⚙ Material:</span><b>{game.resources.material ?? 0}</b></div>
-              <div className="ps-row"><span className="dim small">⚔ Orožje:</span><b>{game.resources.combat}</b></div>
-              <div className="ps-row"><span className="dim small">🧱 Obzidje:</span><b>{game.wallsBuilt ?? 0}</b></div>
-              {(() => {
-                const cfg = workshopObj === 'weapon'
-                  ? { label: 'orožja', total: 6, prog: game.weaponWorkshopProgress ?? 0, color: '#cc7733' }
-                  : workshopObj === 'wall'
-                    ? { label: 'obzidja', total: 12, prog: game.wallProgress ?? 0, color: '#aabb88' }
-                    : { label: 'artefakta', total: 360, prog: game.artifactWorkshopProgress ?? 0, color: '#ffd84a' };
-                const need = Math.max(0, cfg.total - cfg.prog);
-                const months = workers > 0 ? Math.ceil(need / workers) : Infinity;
-                return (
-                  <>
-                    <div className="ps-row"><span className="dim small">Napredek {cfg.label}:</span>
-                      <b>{cfg.prog} / {cfg.total} delavec-mesecev</b></div>
-                    <div className="ps-row"><span className="dim small">Do izdelka (pri {workers} delavcih):</span>
-                      <b style={{ color: cfg.color }}>{workers > 0 ? `${months} mesec(ev)` : '∞'}</b></div>
-                  </>
-                );
-              })()}
+              <div className="def-card">
+                <div className="def-card-title">CILJ IZDELAVE</div>
+                <WorkshopSelector value={workshopObj} onChange={setWorkshopObj} weaponLevel={game.weaponResearchLevel ?? 0} wallLevel={game.wallResearchLevel ?? 0} />
+                <div className="def-build-prog">
+                  <div className="def-stat-note">{cfg.icon} {cfg.label}: imaš <b>{cfg.made}</b> · napredek {cfg.prog}/{cfg.total} dm</div>
+                  <div className="def-progbar"><span className="def-progbar-fill" style={{ width: `${pctv}%`, background: cfg.color }} /></div>
+                  <div className="def-stat-note">Do izdelka (pri {workers}): <b style={{ color: cfg.color }}>{workers > 0 ? `${months} mesec(ev)` : '∞'}</b></div>
+                </div>
+              </div>
+              <div className="def-stat-grid">
+                <div className="def-stat"><div className="def-stat-label">MATERIAL</div><div className="def-stat-big" style={{ color: '#88aabb' }}>{game.resources.material ?? 0}</div></div>
+                <div className="def-stat"><div className="def-stat-label">OROŽJE</div><div className="def-stat-big" style={{ color: '#cc7755' }}>{game.resources.combat}</div></div>
+                <div className="def-stat"><div className="def-stat-label">OBZIDJE</div><div className="def-stat-big" style={{ color: '#aabb88' }}>{game.wallsBuilt ?? 0}</div></div>
+              </div>
+              <div className="def-how">
+                <div className="def-how-title">KAKO DELUJE</div>
+                <div className="def-how-row"><span className="def-how-ic">⚔</span><span>Orožje: 6 delavec-mes. + 1 material.</span></div>
+                <div className="def-how-row"><span className="def-how-ic">🏰</span><span>Obzidje: 12 delavec-mes. + 4 materiala (+20 % obrambe).</span></div>
+                <div className="def-how-row"><span className="def-how-ic">💎</span><span>Artefakt: 360 delavec-mes. + 20 materiala. Napredek se ohrani ob preklopu.</span></div>
+              </div>
             </div>
-            <p className="field-note dim small">
-              Stroški: <b>orožje</b> 6 delavec-mes. + <b>1 material</b>; <b>obzidje</b> 12 delavec-mes. + <b>4 materiala</b>; <b>artefakt</b> 360 delavec-mes. (30 let z 1 delavcem) + <b>20 materiala</b>.
-              Napredek <b>se ohrani</b> ob preklopu med stvarmi — lahko preklopiš na drugo in se kasneje vrneš tu, kjer si končal.
-            </p>
-          </div>
-          )}
+            );
+          })()}
 
           {/* ─── RAZISKAVE ─── */}
           {tab === 'research' && (
           <>
-          <div className="panel command-panel">
-            <div className="panel-head"><h3>🔬 RAZISKAVE</h3><span className="dim small">{researchers} raziskovalcev</span></div>
-            <div className="field-stats">
-              <div className="ps-row">
-                <span className="dim small">🔬 Raziskovalci</span>
-                <span className="pa-pm">
-                  <button className="pa-btn" disabled={researchers <= 0} onClick={() => bumpRole('r', -1)}>−</button>
-                  <b className="pa-count">{researchers}</b>
-                  <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('r', 1)}>+</button>
-                </span>
+          {(() => {
+            const cfg = researchObj === 'robots'
+              ? { label: 'Roboti', lvl: game.robotsResearchLevel ?? 0, prog: game.robotsResearchProgress ?? 0, color: '#cc8800', icon: '🤖', eff: 'odklene Orožje/Obzidje' }
+              : researchObj === 'weapon'
+                ? { label: 'Orožje', lvl: game.weaponResearchLevel ?? 0, prog: game.weaponResearchProgress ?? 0, color: '#cc4433', icon: '⚔', eff: `napad ×${Math.pow(2, game.weaponResearchLevel ?? 0)}` }
+                : { label: 'Obzidje', lvl: game.wallResearchLevel ?? 0, prog: game.wallResearchProgress ?? 0, color: '#aabb88', icon: '🏰', eff: `obramba ×${Math.pow(2, game.wallResearchLevel ?? 0)}` };
+            const months = researchers > 0 ? Math.ceil((120 - cfg.prog) / researchers) : Infinity;
+            const pctv = Math.round((cfg.prog / 120) * 100);
+            const dots = Math.min(24, researchers);
+            return (
+            <div className="panel def-panel">
+              <div className="def-head"><span className="def-head-icon">🔬</span><div><h3>RAZISKAVE</h3><div className="def-sub">RAZVOJ</div></div></div>
+              <div className="def-card">
+                <div className="def-card-title">RAZISKOVALCI</div>
+                <div className="def-defenders">
+                  <div className="def-big-num" style={{ color: '#6aa0cc' }}>{researchers}</div>
+                  <div className="def-slider-row">
+                    <button className="pa-btn" disabled={researchers <= 0} onClick={() => bumpRole('r', -1)}>−</button>
+                    <input type="range" min={0} max={availablePop} value={researchers} onChange={e => setRole('r', +e.target.value)} className="def-slider" />
+                    <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('r', 1)}>+</button>
+                  </div>
+                </div>
+                <div className="def-free">Prosti ljudje: <b style={{ color: freePeople > 0 ? '#66cc88' : '#888' }}>{freePeople}</b></div>
+                <div className="def-people-row">{Array.from({ length: dots }).map((_, i) => <span key={i} className="def-person">👤</span>)}{researchers > dots && <span className="def-person-more dim small">+{researchers - dots}</span>}</div>
               </div>
-              <div className="ps-row"><span className="dim small">Cilj:</span><ResearchSelector value={researchObj} onChange={setResearchObj} robotsLevel={game.robotsResearchLevel ?? 0} weaponLevel={game.weaponResearchLevel ?? 0} wallLevel={game.wallResearchLevel ?? 0} /></div>
-              {researchObj === 'robots' && (() => {
-                const lvl = game.robotsResearchLevel ?? 0; const prog = game.robotsResearchProgress ?? 0;
-                const months = researchers > 0 ? Math.ceil((120 - prog) / researchers) : Infinity;
-                return <>
-                  <div className="ps-row"><span className="dim small">🤖 Roboti — stopnja:</span><b style={{ color: '#cc8800' }}>Lv{lvl} (odklene Orožje/Obzidje {lvl})</b></div>
-                  <div className="ps-row"><span className="dim small">Napredek do Lv{lvl + 1}:</span><b>{prog} / 120 razisk.-mes.</b></div>
-                  <div className="ps-row"><span className="dim small">Do stopnje (pri {researchers}):</span><b style={{ color: '#cc8800' }}>{researchers > 0 ? `${months} mesec(ev)` : '∞'}</b></div>
-                  <div className="ps-row"><span className="dim small">+ Intel / mesec:</span><b style={{ color: '#3388cc' }}>+{researchIntel}</b></div>
-                </>;
-              })()}
-              {researchObj === 'weapon' && (() => {
-                const lvl = game.weaponResearchLevel ?? 0; const prog = game.weaponResearchProgress ?? 0;
-                const months = researchers > 0 ? Math.ceil((120 - prog) / researchers) : Infinity;
-                return <>
-                  <div className="ps-row"><span className="dim small">⚔ Orožje — stopnja:</span><b style={{ color: '#cc4433' }}>Lv{lvl} (napad ×{Math.pow(2, lvl)})</b></div>
-                  <div className="ps-row"><span className="dim small">Napredek do Lv{lvl + 1}:</span><b>{prog} / 120 razisk.-mes.</b></div>
-                  <div className="ps-row"><span className="dim small">Do stopnje (pri {researchers}):</span><b style={{ color: '#cc4433' }}>{researchers > 0 ? `${months} mesec(ev)` : '∞'}</b></div>
-                </>;
-              })()}
-              {researchObj === 'wall' && (() => {
-                const lvl = game.wallResearchLevel ?? 0; const prog = game.wallResearchProgress ?? 0;
-                const months = researchers > 0 ? Math.ceil((120 - prog) / researchers) : Infinity;
-                return <>
-                  <div className="ps-row"><span className="dim small">🧱 Obzidje — stopnja:</span><b style={{ color: '#aabb88' }}>Lv{lvl} (obramba ×{Math.pow(2, lvl)})</b></div>
-                  <div className="ps-row"><span className="dim small">Napredek do Lv{lvl + 1}:</span><b>{prog} / 120 razisk.-mes.</b></div>
-                  <div className="ps-row"><span className="dim small">Do stopnje (pri {researchers}):</span><b style={{ color: '#aabb88' }}>{researchers > 0 ? `${months} mesec(ev)` : '∞'}</b></div>
-                </>;
-              })()}
+              <div className="def-card">
+                <div className="def-card-title">CILJ RAZISKAVE</div>
+                <ResearchSelector value={researchObj} onChange={setResearchObj} robotsLevel={game.robotsResearchLevel ?? 0} weaponLevel={game.weaponResearchLevel ?? 0} wallLevel={game.wallResearchLevel ?? 0} />
+                <div className="def-build-prog">
+                  <div className="def-stat-note">{cfg.icon} {cfg.label}: <b style={{ color: cfg.color }}>Lv{cfg.lvl}</b> · {cfg.eff}</div>
+                  <div className="def-progbar"><span className="def-progbar-fill" style={{ width: `${pctv}%`, background: cfg.color }} /></div>
+                  <div className="def-stat-note">Do Lv{cfg.lvl + 1} (pri {researchers}): <b style={{ color: cfg.color }}>{researchers > 0 ? `${months} mesec(ev)` : '∞'}</b>{researchObj === 'robots' ? ` · +${researchIntel} intel/m` : ''}</div>
+                </div>
+              </div>
+              <div className="def-how">
+                <div className="def-how-title">KAKO DELUJE</div>
+                <div className="def-how-row"><span className="def-how-ic">🤖</span><span>Roboti: odkrivanje šibkih točk; vsaka stopnja odklene Orožje/Obzidje.</span></div>
+                <div className="def-how-row"><span className="def-how-ic">⚔</span><span>Orožje/Obzidje: vsaka stopnja podvoji napad/obrambo (120 razisk.-mes.).</span></div>
+                <div className="def-how-row"><span className="def-how-ic">🔭</span><span>AI drevo se odpira samodejno z znanjem o AI.</span></div>
+              </div>
             </div>
-            <p className="field-note dim small">Raziskovalci: „AI roboti" dajo intel (boljši boji); „Orožje" in „Obzidje" vsaka stopnja podvoji napad/obrambo (120 razisk.-mes. na stopnjo). AI drevo se odpira samodejno z znanjem o AI.</p>
-          </div>
+            );
+          })()}
           <div className="band band-trees">
             <HumanTree robotsLevel={game.robotsResearchLevel ?? 0} weaponLevel={game.weaponResearchLevel ?? 0} wallLevel={game.wallResearchLevel ?? 0}
               focus={researchObj} onFocus={setResearchObj} />

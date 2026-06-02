@@ -2065,3 +2065,5 @@ input[type=range]::-moz-range-thumb {
 .def-upgrade-btn.artifact:hover { background: #241f0c; border-color: #7a6418; }
 .def-progbar { height: 7px; background: #1e2730; border-radius: 3px; overflow: hidden; margin: .45rem 0; }
 .def-progbar-fill { display: block; height: 100%; border-radius: 3px; }
+
+.def-build-prog { margin-top: .5rem; display: flex; flex-direction: column; gap: .35rem; }
