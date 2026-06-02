@@ -454,9 +454,10 @@ b      { color: var(--text); font-weight: 600; }
     display: flex; flex-direction: column; gap: .25rem;
   }
   .center-col { order: 1; flex: 1 1 auto; min-height: 0; overflow: hidden; }   /* karta velika */
-  .center-col .map-panel { padding: 4px; }
+  .center-col .map-panel { padding: 2px; }
   .center-col .map-legend { display: none; }
-  .right-col { order: 2; display: flex !important; flex: 0 0 23vh; height: 23vh; min-height: 110px; overflow: hidden; }  /* drsljiv log — fiksna višina */
+  .center-col .hex-svg { width: 100%; height: 100%; }   /* karta zapolni ves prostor */
+  .right-col { order: 2; display: flex !important; flex: 0 0 16vh; height: 16vh; min-height: 90px; overflow: hidden; }  /* drsljiv log — manjši pas */
   .right-col .rc-active { display: none; }       /* V teku skrit na telefonu (prostor) */
   .right-col .rc-log { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
   .right-col .rc-log .rc-log-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; }

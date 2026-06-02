@@ -1730,12 +1730,13 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
     { q: 1, r: 3, icon: '🛡️', label: 'OBRAMBA',   count: camp.defenders,   color: '#66aabb', adj: 'd' as const },
   ];
   const campZoneIds = new Set(CAMP_ZONES.map(z => `${z.q},${z.r}`));
-  const CAMP_EXTENT = SIZE * 2.1;  // prostor za zunanje kontrolne gumbe okoli kampa
+  const CAMP_EXTENT = SIZE * 1.35;  // prostor za kontrole okoli kampa (tesneje = večji heksi)
   const pts = tiles.map(t => hexToPixel(t.q, t.r, SIZE));
-  let minX = Math.min(...pts.map(p => p.x)) - SIZE;
-  let maxX = Math.max(...pts.map(p => p.x)) + SIZE;
-  let minY = Math.min(...pts.map(p => p.y)) - SIZE;
-  let maxY = Math.max(...pts.map(p => p.y)) + SIZE;
+  const PAD = SIZE * 0.55;          // tesnejša obroba okoli heksov = večja karta
+  let minX = Math.min(...pts.map(p => p.x)) - PAD;
+  let maxX = Math.max(...pts.map(p => p.x)) + PAD;
+  let minY = Math.min(...pts.map(p => p.y)) - SIZE * 0.9;  // zgoraj malo več (kontrole nad zadnjim heksom)
+  let maxY = Math.max(...pts.map(p => p.y)) + PAD;
   // Razširi okvir, da je veliki kamp v celoti viden (ne odreže ga rob)
   const clanForBounds = tiles.find(t => t.isClanCamp);
   if (clanForBounds) {
