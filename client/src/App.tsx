@@ -93,6 +93,23 @@ function BigStat({ icon, label, value, color, unit, note, noteColor, title }: { 
   );
 }
 
+/** Krožni merilnik (odstotek) — SVG obroč. */
+function Gauge({ pct, color }: { pct: number; color: string }) {
+  const r = 28, c = 2 * Math.PI * r;
+  const p = Math.max(0, Math.min(100, pct));
+  const off = c * (1 - p / 100);
+  return (
+    <div className="gauge">
+      <svg width="72" height="72" viewBox="0 0 72 72">
+        <circle cx="36" cy="36" r={r} fill="none" stroke="#1e2730" strokeWidth="6" />
+        <circle cx="36" cy="36" r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={off} transform="rotate(-90 36 36)" />
+      </svg>
+      <div className="gauge-val" style={{ color }}>{pct}%</div>
+    </div>
+  );
+}
+
 /** Stari ResStat ostal samo za morebitne legacy klice — preusmerjen na BigStat brez bar-a. */
 function ResStat({ icon, label, value, color }: { icon: string; label: string; value: number; max?: number; color?: string }) {
   return <BigStat icon={icon} label={label} value={value} color={color ?? '#88aacc'} />;
@@ -2969,46 +2986,97 @@ export default function App() {
             </div>
           )}
 
-          {/* ─── OBRAMBA ─── */}
-          {tab === 'defense' && (
-          <div className="panel command-panel">
-            <div className="panel-head"><h3>🛡 OBRAMBA</h3><span className="dim small">{defenders} branilcev</span></div>
-            <div className="field-stats">
-              <div className="ps-row">
-                <span className="dim small">🛡 Branilci</span>
-                <span className="pa-pm">
-                  <button className="pa-btn" disabled={defenders <= 0} onClick={() => bumpRole('d', -1)}>−</button>
-                  <b className="pa-count">{defenders}</b>
-                  <button className="pa-btn" disabled={freePeople <= 0 || weaponsLeft <= 0} onClick={() => bumpRole('d', 1)}>+</button>
-                </span>
+          {/* ─── OBRAMBA (grafični panel) ─── */}
+          {tab === 'defense' && (() => {
+            const raidP = odds?.raidProbability ?? 0;
+            const raid6 = odds ? 1 - Math.pow(1 - raidP, 6) : 0;
+            const repel = defenders > 0 && odds ? odds.raidRepelProbability : 0;
+            const repelPct = Math.round(repel * 100), raidPct = Math.round(raidP * 100), raid6Pct = Math.round(raid6 * 100);
+            const wallLvl = game.wallsBuilt ?? 0;
+            const wallProg = game.wallProgress ?? 0;  // gradnja /12
+            const risk = (p: number) => p < 0.15 ? 'Nizko tveganje' : p < 0.40 ? 'Srednje tveganje' : 'Visoko tveganje';
+            const safety = repel >= 0.66 ? 'Visoka' : repel >= 0.33 ? 'Srednja' : 'Nizka';
+            const dots = Math.min(24, defenders);
+            const bullets = Math.min(24, weaponCap);
+            return (
+            <div className="panel def-panel">
+              <div className="def-head">
+                <span className="def-head-icon">🛡</span>
+                <div><h3>OBRAMBA</h3><div className="def-sub">ZAŠČITA TABORA</div></div>
               </div>
-              <div className="ps-row"><span className="dim small">⚠ Napad AI (ta mesec):</span>
-                <b style={{ color: probColor(1 - (odds?.raidProbability ?? 0)) }}>{odds ? Math.round(odds.raidProbability * 100) + '%' : '–'}</b></div>
-              <div className="ps-row"><span className="dim small">⚠ Vsaj en napad v 6 mesecih:</span>
-                <b style={{ color: probColor(1 - (odds ? 1 - Math.pow(1 - odds.raidProbability, 6) : 0)) }}>
-                  {odds ? Math.round((1 - Math.pow(1 - odds.raidProbability, 6)) * 100) + '%' : '–'}</b></div>
-              <div className="ps-row"><span className="dim small">✓ Obramba odbije napad:</span>
-                <b style={{ color: probColor(odds?.raidRepelProbability ?? 0) }}>{defenders > 0 && odds ? Math.round(odds.raidRepelProbability * 100) + '%' : '–'}</b></div>
-              <div className="ps-row"><span className="dim small">🧱 Obzidje:</span>
-                <b style={{ color: (game.wallsBuilt ?? 0) > 0 ? '#aabb88' : '#888' }}>{game.wallsBuilt ?? 0}</b></div>
-              <div className="ps-row"><span className="dim small">🧱 Bonus obrambe (obzidje):</span>
-                <b style={{ color: (game.wallsBuilt ?? 0) > 0 ? '#66cc88' : '#888' }}>
-                  +{((game.wallsBuilt ?? 0) * 20)}%{(game.wallsBuilt ?? 0) > 0 ? ` (×${(1 + 0.20 * (game.wallsBuilt ?? 0)).toFixed(1)})` : ''}</b></div>
-              <div className="ps-row"><span className="dim small">⚔ Orožje (skupna kapaciteta):</span><b>{weaponCap}</b></div>
-              <div className="ps-row"><span className="dim small">⚔ Oboroženih (branilci+odprave+misije):</span>
-                <b style={{ color: overArmed ? '#cc4444' : '#9ec0ad' }}>{armedTotal} / {weaponCap}</b></div>
+
+              {/* BRANILCI */}
+              <div className="def-card">
+                <div className="def-card-title">BRANILCI</div>
+                <div className="def-defenders">
+                  <div className="def-big-num">{defenders}<span className="def-cap"> / {weaponCap}</span></div>
+                  <div className="def-slider-row">
+                    <button className="pa-btn" disabled={defenders <= 0} onClick={() => bumpRole('d', -1)}>−</button>
+                    <input type="range" min={0} max={availablePop} value={defenders}
+                      onChange={e => setRole('d', +e.target.value)} className="def-slider" />
+                    <button className="pa-btn" disabled={freePeople <= 0 || weaponsLeft <= 0} onClick={() => bumpRole('d', 1)}>+</button>
+                  </div>
+                </div>
+                <div className="def-free">Prosti ljudje: <b style={{ color: freePeople > 0 ? '#66cc88' : '#888' }}>{freePeople}</b></div>
+                <div className="def-people-row">
+                  {Array.from({ length: dots }).map((_, i) => <span key={i} className="def-person">👤</span>)}
+                  {defenders > dots && <span className="def-person-more dim small">+{defenders - dots}</span>}
+                </div>
+              </div>
+
+              {/* TVEGANJA */}
+              <div className="def-stat-grid">
+                <div className="def-stat">
+                  <div className="def-stat-label">VARNOST TABORA</div>
+                  <Gauge pct={repelPct} color={probColor(repel)} />
+                  <div className="def-stat-sub" style={{ color: probColor(repel) }}>{safety}</div>
+                  <div className="def-stat-note">Verjetnost odbitja napada</div>
+                </div>
+                <div className="def-stat">
+                  <div className="def-stat-label">AI NAPAD TA MESEC</div>
+                  <div className="def-stat-big" style={{ color: probColor(1 - raidP) }}>🗼 {raidPct}%</div>
+                  <div className="def-stat-note">{risk(raidP)}</div>
+                </div>
+                <div className="def-stat">
+                  <div className="def-stat-label">VSAJ EN NAPAD V 6 MESECIH</div>
+                  <div className="def-stat-big" style={{ color: probColor(1 - raid6) }}>{raid6Pct}%</div>
+                  <div className="def-stat-note">{risk(raid6)}</div>
+                </div>
+              </div>
+
+              {/* OROŽJE + OBZIDJE */}
+              <div className="def-bottom-grid">
+                <div className="def-card">
+                  <div className="def-card-title">OROŽJE</div>
+                  <div className="def-big-num" style={{ color: overArmed ? '#cc4444' : '#d8d8d8' }}>🔫 {armedTotal}<span className="def-cap"> / {weaponCap}</span></div>
+                  <div className="def-stat-note">{overArmed ? 'Premalo orožja!' : 'Popolnoma opremljeno'}</div>
+                  <div className="def-bullets">
+                    {Array.from({ length: bullets }).map((_, i) => <span key={i} className={`def-bullet ${i < armedTotal ? 'used' : ''}`}>▮</span>)}
+                  </div>
+                </div>
+                <div className="def-card">
+                  <div className="def-card-title">🏰 OBZIDJE</div>
+                  <div className="def-wall-lvl">STOPNJA {wallLvl}</div>
+                  <div className="def-stat-note">+{wallLvl * 20}% k obrambi</div>
+                  <div className="def-seg">{Array.from({ length: 12 }).map((_, i) => <span key={i} className={`def-seg-cell ${i < wallProg ? 'fill' : ''}`} />)}</div>
+                  <button className="def-upgrade-btn" onClick={() => { setWorkshopObj('wall'); setTab('workshop'); }}>🧱 GRADI OBZIDJE</button>
+                </div>
+              </div>
+
+              {overArmed && (
+                <div className="weapon-warning">⚠ Premalo orožja: oboroženih {armedTotal}/{weaponCap}. Vsak branilec, napadalec in član odprave rabi orožje.</div>
+              )}
+
+              {/* KAKO DELUJE */}
+              <div className="def-how">
+                <div className="def-how-title">KAKO DELUJE</div>
+                <div className="def-how-row"><span className="def-how-ic">👥</span><span>Več branilcev poveča verjetnost, da odbijemo napad AI.</span></div>
+                <div className="def-how-row"><span className="def-how-ic">🏰</span><span>Obzidje daje bonus k obrambi celotnega tabora (+20 % na stopnjo).</span></div>
+                <div className="def-how-row"><span className="def-how-ic">👁</span><span>Več ljudi v taboru poveča možnost, da nas AI odkrije.</span></div>
+              </div>
             </div>
-            {overArmed && (
-              <div className="weapon-warning">⚠ Premalo orožja: imaš {weaponCap}, oboroženih {armedTotal}. Vsak branilec, napadalec in član odprave/misije rabi orožje.</div>
-            )}
-            <p className="field-note dim small">
-              „Napad AI" je verjetnost <b>na mesec</b> — neodvisna vsak mesec, zato se v več mesecih sešteje.
-              Branilci/obzidja ne znižajo verjetnosti napada, ampak povečajo možnost <b>odbitja</b>.
-              Vsako <b>obzidje</b> doda <b>+20 %</b> k moči obrambe (gradi se v Delavnicah), zato z več obzidji obramba postaja vse lažja.
-              Verjetnost napada znižata <b>skrivanje</b> (os) in nižja populacija; viša jo to, kar AI ve o tebi.
-            </p>
-          </div>
-          )}
+            );
+          })()}
 
           {/* ─── PREHRANA ─── */}
           {tab === 'food' && (

@@ -2011,3 +2011,49 @@ input[type=range]::-moz-range-thumb {
   background: #0a0a0a; border-left: 2px solid #6aa630;
 }
 .eta-row { display: flex; align-items: baseline; gap: 8px; font-size: .78rem; flex-wrap: wrap; }
+
+/* ─── Grafični panel OBRAMBA ─────────────────────────────────────────────── */
+.def-panel { display: flex; flex-direction: column; gap: .6rem; }
+.def-head { display: flex; align-items: center; gap: .6rem; padding-bottom: .4rem; border-bottom: 1px solid #232c36; }
+.def-head-icon { font-size: 1.7rem; }
+.def-head h3 { margin: 0; font-size: 1.1rem; letter-spacing: .04em; }
+.def-sub { font-size: .6rem; letter-spacing: .14em; color: #5a7a99; text-transform: uppercase; }
+
+.def-card { background: #10161e; border: 1px solid #1e2730; border-radius: 10px; padding: .6rem .7rem; }
+.def-card-title { font-size: .6rem; letter-spacing: .12em; color: #6a8299; text-transform: uppercase; margin-bottom: .4rem; }
+
+.def-defenders { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }
+.def-big-num { font-size: 1.9rem; font-weight: 800; line-height: 1; color: #cfe3ff; }
+.def-cap { font-size: .9rem; font-weight: 600; color: #5a7a99; }
+.def-slider-row { display: flex; align-items: center; gap: .5rem; flex: 1; }
+.def-slider { flex: 1; accent-color: #3aa0ff; }
+.def-free { font-size: .72rem; color: #8a99a3; margin-top: .35rem; }
+.def-people-row { display: flex; flex-wrap: wrap; gap: 1px; margin-top: .35rem; align-items: center; }
+.def-person { font-size: .82rem; filter: saturate(.5) brightness(1.1); }
+.def-person-more { margin-left: 4px; }
+
+.def-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+.def-stat { background: #10161e; border: 1px solid #1e2730; border-radius: 10px; padding: .55rem .4rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: .2rem; }
+.def-stat-label { font-size: .52rem; letter-spacing: .06em; color: #6a8299; text-transform: uppercase; line-height: 1.25; min-height: 2.2em; display: flex; align-items: center; }
+.def-stat-big { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+.def-stat-sub { font-size: .8rem; font-weight: 700; }
+.def-stat-note { font-size: .56rem; color: #6a7a86; line-height: 1.2; }
+
+.gauge { position: relative; width: 72px; height: 72px; }
+.gauge-val { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; font-weight: 800; }
+
+.def-bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.def-bullets { display: flex; flex-wrap: wrap; gap: 1px; margin-top: .4rem; }
+.def-bullet { color: #2a3a2a; font-size: .7rem; }
+.def-bullet.used { color: #cc7733; }
+.def-wall-lvl { font-size: 1.2rem; font-weight: 800; color: #aabb88; line-height: 1; margin-top: .1rem; }
+.def-seg { display: flex; gap: 2px; margin: .45rem 0; }
+.def-seg-cell { flex: 1; height: 7px; border-radius: 2px; background: #1e2730; }
+.def-seg-cell.fill { background: #aabb88; }
+.def-upgrade-btn { width: 100%; padding: .4rem; border: 1px solid #3a4a30; background: #141c14; color: #aabb88; border-radius: 8px; font-size: .72rem; cursor: pointer; letter-spacing: .04em; }
+.def-upgrade-btn:hover { background: #1a241a; border-color: #5a7a40; }
+
+.def-how { background: #0d1219; border: 1px solid #1a222b; border-radius: 10px; padding: .55rem .7rem; }
+.def-how-title { font-size: .58rem; letter-spacing: .12em; color: #6a8299; text-transform: uppercase; margin-bottom: .4rem; }
+.def-how-row { display: flex; gap: .5rem; align-items: flex-start; font-size: .72rem; color: #9fb0bb; line-height: 1.35; margin-bottom: .3rem; }
+.def-how-ic { font-size: .95rem; flex-shrink: 0; }
