@@ -1683,7 +1683,7 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, research, pop, draftPeople, onDraftKind, onDraftPeople, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
+function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, research, pop, draftPeople, draftRations, draftStealth, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   draftKind: 'scout' | 'attack';
@@ -1707,8 +1707,12 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
   research: { robotsLevel: number; robotsProgress: number; weaponLevel: number; weaponProgress: number; wallLevel: number; wallProgress: number; researchers: number };
   pop: { total: number; inCamp: number; away: number; free: number };
   draftPeople: number;
+  draftRations: number;
+  draftStealth: boolean;
   onDraftKind: (k: 'scout' | 'attack') => void;
   onDraftPeople: (delta: number) => void;
+  onDraftRations: (n: number) => void;
+  onDraftStealth: (v: boolean) => void;
   onConfirmDraft: () => void;
   canConfirmDraft: boolean;
   draftAddDisabled: boolean;
@@ -2289,6 +2293,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             ? lp.y + SIZE * 1.15 + 55   // premalo prostora zgoraj → pod heks
             : aboveCy;
           const cx = lp.x;
+          const RATIONS_EMOJI: Record<number, string> = { 1: '💀', 2: '🥄', 3: '🍞', 4: '🥗', 5: '🥩' };
           type DraftControlIcon = 'scout' | 'attack' | 'minus' | 'plus' | 'confirm';
           const DraftIcon = ({ icon, color }: { icon: DraftControlIcon; color: string }) => {
             if (icon === 'scout') {
@@ -2323,20 +2328,31 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           );
           return (
             <g className="draft-controls">
+              {/* število ljudi na sredini hexa */}
+              <circle cx={lp.x} cy={lp.y} r={13} fill="#11171f99" stroke={draftKind === 'attack' ? '#cc3333' : '#ffd84a'} strokeWidth="1.5" style={{ pointerEvents: 'none' }} />
+              <text x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="central" fontSize="13" fontWeight="bold" fill="#fff" style={{ pointerEvents: 'none' }}>{draftPeople}</text>
               {/* vrsta 1: izbira tipa odprave */}
               <Btn x={cx - 13} y={cy - 16} fill={draftKind === 'scout' ? '#3a2a00' : '#0a0a0a'} stroke={draftKind === 'scout' ? '#ffd84a' : '#555'}
                 icon="scout" iconColor={draftKind === 'scout' ? '#ffd84a' : '#b8b8b8'} onClick={() => onDraftKind('scout')} title="Izvidniki (raziskovanje)" />
               <Btn x={cx + 13} y={cy - 16} fill={draftKind === 'attack' ? '#3a1010' : '#0a0a0a'} stroke={draftKind === 'attack' ? '#cc3333' : '#555'}
                 icon="attack" iconColor={draftKind === 'attack' ? '#ff7777' : '#b8b8b8'} onClick={() => onDraftKind('attack')} title="Napad" />
-              {/* vrsta 2: število ljudi −/+ in potrdi */}
+              {/* vrsta 2: − skrivanje + */}
               <Btn x={cx - 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="minus" disabled={draftPeople <= 1}
                 onClick={() => onDraftPeople(-1)} title="Manj ljudi" />
-              <circle cx={cx} cy={cy + 7} r={11} fill="#11171f" stroke={draftKind === 'attack' ? '#cc3333' : '#ffd84a'} strokeWidth="1.5" />
-              <text x={cx} y={cy + 7} textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold" fill="#fff" style={{ pointerEvents: 'none' }}>{draftPeople}</text>
+              <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftStealth(!draftStealth); }}>
+                <title>{draftStealth ? 'Skrivanje vklopljeno' : 'Skrivanje izklopljeno'}</title>
+                <circle cx={cx} cy={cy + 7} r={11} fill={draftStealth ? '#1a1a2e' : '#0a0a0a'} stroke={draftStealth ? '#8888ff' : '#555'} strokeWidth="1.5" />
+                <text x={cx} y={cy + 7} textAnchor="middle" dominantBaseline="central" fontSize="11" style={{ userSelect: 'none', pointerEvents: 'none', opacity: draftStealth ? 1 : 0.35 }}>🌙</text>
+              </g>
               <Btn x={cx + 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="plus" disabled={draftAddDisabled}
                 onClick={() => onDraftPeople(1)} title="Več ljudi" />
-              {/* potrdi */}
-              <Btn x={cx} y={cy + 30} r={9} fill={canConfirmDraft ? '#0f2a14' : '#0a0a0a'} stroke={canConfirmDraft ? '#66cc88' : '#555'}
+              {/* vrsta 3: obroki (cycle) + potrdi */}
+              <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftRations(draftRations % 5 + 1); }}>
+                <title>{`Obroki: ${draftRations} — klikni za spremembo`}</title>
+                <circle cx={cx - 16} cy={cy + 30} r={9} fill="#0a1a0a" stroke="#668866" strokeWidth="1.5" />
+                <text x={cx - 16} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>{RATIONS_EMOJI[draftRations] ?? '🍞'}</text>
+              </g>
+              <Btn x={cx + 16} y={cy + 30} r={9} fill={canConfirmDraft ? '#0f2a14' : '#0a0a0a'} stroke={canConfirmDraft ? '#66cc88' : '#555'}
                 icon="confirm" iconColor={canConfirmDraft ? '#8df0a5' : '#b8b8b8'} disabled={!canConfirmDraft} onClick={onConfirmDraft} title="Pošlji odpravo" />
             </g>
           );
@@ -3628,11 +3644,15 @@ export default function App() {
             research={{ robotsLevel: game.robotsResearchLevel ?? 0, robotsProgress: game.robotsResearchProgress ?? 0, weaponLevel: game.weaponResearchLevel ?? 0, weaponProgress: game.weaponResearchProgress ?? 0, wallLevel: game.wallResearchLevel ?? 0, wallProgress: game.wallResearchProgress ?? 0, researchers }}
             pop={{ total: game.population, inCamp: Math.max(0, game.population - inMissions), away: inMissions, free: freePeople }}
             draftPeople={draftPeople}
+            draftRations={draftRations}
+            draftStealth={draftStealth}
             onDraftKind={(k) => setDraftKind(k)}
             onDraftPeople={(d) => {
               if (d > 0) { if (!(assignedHome + plannedTotal + draftPeople >= availablePop || weaponsLeft <= 0)) setDraftPeople(draftPeople + 1); }
               else setDraftPeople(Math.max(1, draftPeople - 1));
             }}
+            onDraftRations={setDraftRations}
+            onDraftStealth={setDraftStealth}
             onConfirmDraft={() => confirmDraft(draftKind)}
             canConfirmDraft={canConfirmDraft}
             draftAddDisabled={assignedHome + plannedTotal + draftPeople >= availablePop || weaponsLeft <= 0} />
