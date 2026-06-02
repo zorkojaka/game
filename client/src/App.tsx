@@ -1640,6 +1640,18 @@ function hexPath(cx: number, cy: number, size: number): string {
   return `M ${pts[0]} L ${pts.slice(1).join(' L ')} Z`;
 }
 
+function arcPath(cx: number, cy: number, r: number, fraction: number): string {
+  const f = Math.max(0, Math.min(0.9999, fraction));
+  const startA = -Math.PI / 2;
+  const endA = startA + f * Math.PI * 2;
+  const sx = cx + r * Math.cos(startA);
+  const sy = cy + r * Math.sin(startA);
+  const ex = cx + r * Math.cos(endA);
+  const ey = cy + r * Math.sin(endA);
+  const large = f > 0.5 ? 1 : 0;
+  return `M${sx} ${sy} A${r} ${r} 0 ${large} 1 ${ex} ${ey}`;
+}
+
 /** Heks barvanje glede na researchProgress. */
 function hexColorByProgress(p: number): { fill: string; stroke: string; labelColor: string } {
   if (p < 0.25)      return { fill: 'url(#hatch-red)',     stroke: '#3a1818', labelColor: '#5a2020' };
@@ -2167,26 +2179,24 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                         const R = 9.5;
                         // Pri velikih total (npr. artefakt 360) prikažemo zvezna loka, ne 360 segmentov.
                         if (total > 24) {
-                          const C = 2 * Math.PI * R;
                           const doneFrac = Math.max(0, Math.min(1, done / total));
                           const nextFrac = Math.max(0, Math.min(1, next / total));
+                          const Arc = ({ fraction, opacity = 1 }: { fraction: number; opacity?: number }) => (
+                            fraction >= 0.999
+                              ? <circle cx={bxp} cy={byp} r={R} fill="none" stroke={z.color} strokeWidth="3" opacity={opacity} />
+                              : <path d={arcPath(bxp, byp, R, fraction)} fill="none" stroke={z.color} strokeWidth="3" strokeLinecap="butt" opacity={opacity} />
+                          );
                           return (
                             <g pointerEvents="none">
                               {/* podlaga (temno) */}
                               <circle cx={bxp} cy={byp} r={R} fill="none" stroke="#2a2a2a" strokeWidth="3" />
                               {/* napoved (svetlo) */}
                               {nextFrac > doneFrac && (
-                                <circle cx={bxp} cy={byp} r={R} fill="none" stroke={z.color} strokeWidth="3"
-                                  strokeDasharray={`${C * nextFrac} ${C}`}
-                                  strokeDashoffset={C / 4}
-                                  transform={`rotate(-90 ${bxp} ${byp})`} opacity="0.4" />
+                                <Arc fraction={nextFrac} opacity={0.4} />
                               )}
                               {/* dosežen napredek (polno) */}
                               {doneFrac > 0 && (
-                                <circle cx={bxp} cy={byp} r={R} fill="none" stroke={z.color} strokeWidth="3"
-                                  strokeDasharray={`${C * doneFrac} ${C}`}
-                                  strokeDashoffset={C / 4}
-                                  transform={`rotate(-90 ${bxp} ${byp})`} />
+                                <Arc fraction={doneFrac} />
                               )}
                             </g>
                           );
