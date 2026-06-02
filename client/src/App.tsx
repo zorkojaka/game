@@ -2284,7 +2284,11 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
         {/* ─── Kontrole odprave na ZADNJEM heksu poti ─── */}
         {drawingMode && draftPath.length >= 2 && lastStep && (() => {
           const lp = shift(hexToPixel(lastStep.q, lastStep.r, SIZE));
-          const cx = lp.x, cy = lp.y - SIZE * 1.15;  // nad zadnjim heksom
+          const aboveCy = lp.y - SIZE * 1.15;
+          const cy = aboveCy - 25 < 0
+            ? lp.y + SIZE * 1.15 + 55   // premalo prostora zgoraj → pod heks
+            : aboveCy;
+          const cx = lp.x;
           type DraftControlIcon = 'scout' | 'attack' | 'minus' | 'plus' | 'confirm';
           const DraftIcon = ({ icon, color }: { icon: DraftControlIcon; color: string }) => {
             if (icon === 'scout') {
