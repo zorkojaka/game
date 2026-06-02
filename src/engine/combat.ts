@@ -12,7 +12,7 @@ import {
   AI_WEAK_POINT_EXPLOIT_BONUS,
   aiDefensePower,
   researchMult,
-  LOGICAL_WEAKNESS_BONUS,
+  LOGICAL_WEAKNESS_COMBAT_BONUS,
   RATIONS_LEVELS,
   DEFAULT_RATIONS,
   INTEL_COMBAT_BONUS_PER_100,
@@ -39,10 +39,25 @@ export function intelCombatMultiplier(intelligence: number): number {
   return 1 + Math.min(INTEL_COMBAT_BONUS_MAX, INTEL_COMBAT_BONUS_PER_100 * (intelligence / 100));
 }
 
-/** Bonus bojne moči iz razkritih LOGIČNIH šibkih točk robotov (brez nadgradenj). */
+/** Razkriti logični bonusi po tipu AI enote. */
+export function logicalWeaknessByRobot(state: GameState): Partial<Record<'scouts' | 'attackers' | 'peopleKillers', number>> {
+  const out: Partial<Record<'scouts' | 'attackers' | 'peopleKillers', number>> = {};
+  for (const n of state.aiTree ?? []) {
+    if (n.role !== 'logical' || n.visibility !== 'revealed') continue;
+    out[n.robot] = (out[n.robot] ?? 0) + LOGICAL_WEAKNESS_COMBAT_BONUS;
+  }
+  return out;
+}
+
+/** Bonus bojne moči iz razkritih LOGIČNIH šibkih točk prisotnih robotov. */
 export function logicalWeaknessBonus(state: GameState): number {
-  const revealed = (state.aiTree ?? []).filter(n => n.role === 'logical' && n.visibility === 'revealed').length;
-  return revealed * LOGICAL_WEAKNESS_BONUS;
+  const units = state.aiUnits ?? { scouts: state.aiRobots, attackers: 0, peopleKillers: 0 };
+  const byRobot = logicalWeaknessByRobot(state);
+  let bonus = 0;
+  if ((units.scouts ?? 0) > 0) bonus += byRobot.scouts ?? 0;
+  if ((units.attackers ?? 0) > 0) bonus += byRobot.attackers ?? 0;
+  if ((units.peopleKillers ?? 0) > 0) bonus += byRobot.peopleKillers ?? 0;
+  return bonus;
 }
 
 export function calcAIStrength(

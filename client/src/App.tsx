@@ -3,7 +3,9 @@ import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundL
 import { tileId } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
-import { RATIONS_LEVELS, aiDefensePower } from '../../src/engine/constants';
+import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, researchMult } from '../../src/engine/constants';
+import { missionSuccessProbability } from '../../src/engine/game';
+import { logicalWeaknessBonus } from '../../src/engine/combat';
 
 // ─── Konstante ───────────────────────────────────────────────────────────────
 
@@ -114,8 +116,8 @@ function Gauge({ pct, color }: { pct: number; color: string }) {
 const HELP: Record<string, { title: string; rows: [string, string][] }> = {
   defense: { title: 'Kako deluje — Obramba', rows: [
     ['👥', 'Več branilcev poveča verjetnost, da odbijemo napad AI.'],
-    ['🏰', 'Obzidje daje bonus k obrambi celotnega tabora (+20 % na stopnjo).'],
-    ['👁', 'Več ljudi v taboru poveča možnost, da nas AI odkrije.'],
+    ['🏰', 'Obzidje daje +20 % k obrambi na zgrajeno stopnjo, raziskava obzidja ta učinek podvoji po levelih.'],
+    ['◆', 'Razkrite logične šibkosti zmanjšajo moč ustreznih AI napadov.'],
   ] },
   food: { title: 'Kako deluje — Prehrana', rows: [
     ['🌾', 'Nabiralci zbirajo hrano vsak mesec.'],
@@ -128,9 +130,9 @@ const HELP: Record<string, { title: string; rows: [string, string][] }> = {
     ['💎', 'Artefakt: 360 delavec-mes. + 20 materiala. Napredek se ohrani ob preklopu.'],
   ] },
   research: { title: 'Kako deluje — Raziskave', rows: [
-    ['🤖', 'Roboti: odkrivanje šibkih točk; vsaka stopnja odklene Orožje/Obzidje.'],
-    ['⚔', 'Orožje/Obzidje: vsaka stopnja podvoji napad/obrambo (120 razisk.-mes.).'],
-    ['🔭', 'AI drevo se odpira samodejno z znanjem o AI.'],
+    ['🤖', 'Roboti: raziskovalci ustvarjajo intel in odpirajo AI drevo.'],
+    ['⚙', 'Mehanske šibkosti odklenejo nove stopnje orožja in obrambe.'],
+    ['◆', 'Logične šibkosti takoj dodajo pasivne bonuse v boju/obrambi.'],
   ] },
   scout: { title: 'Kako deluje — Izvidniki', rows: [
     ['🔭', 'Izvidniki raziskujejo hekse in odkrivajo šibke točke ter klane.'],
@@ -369,6 +371,8 @@ function NodeCard({ node, flash }: { node: AITreeNode; flash?: boolean }) {
           <Bar ratio={node.strength / 100} color={node.executed ? '#cc2222' : PHASE[node.phase].color} height={3} />
           <span className="nc-str-num">{node.strength}</span>
         </div>
+        {node.description && <div className="dim small">{node.description}</div>}
+        {node.effect && <div className="small" style={{ color: PHASE[node.phase].color }}>{node.effect}</div>}
         {node.executed && <span className="nc-exec-tag">IZVEDEN</span>}
       </div>
     </div>
@@ -400,6 +404,12 @@ const HUMAN_AXIS_META: Record<HumanAxis, { icon: string; label: string; color: s
 };
 
 const EMPTY_HISTORY: Record<HumanAxis, number> = { obzidje: 0, orozje: 0, roboti: 0 };
+
+const RESEARCH_LEVEL_NAMES: Record<ResearchObjective, string[]> = {
+  robots: ['Izvidniki', 'Napadalci', 'People-killerji'],
+  weapon: ['Puške', 'EMP strelivo', 'Anti-core orožje'],
+  wall: ['Leseni zid', 'EMP obramba', 'Napredni obrambni sistemi'],
+};
 
 /** Izbira osi (fokusa) meseca — viden gumb skrivanje / špijonaža / obramba. */
 function AxisFocusBar({ value, onChange }: { value: HumanAxis; onChange: (a: HumanAxis) => void }) {
@@ -472,13 +482,13 @@ function HumanTree({ robotsLevel, weaponLevel, wallLevel, focus, onFocus }: {
                           {unlocked ? '◆' : lockedByRobots ? '🔒' : '◇'}
                         </span>
                         <span className="ht-node-label" style={{ color: unlocked ? '#c8e0d0' : '#3a3a3a' }}>
-                          {meta.label.charAt(0) + meta.label.slice(1).toLowerCase()} {lvl}
+                          {RESEARCH_LEVEL_NAMES[b.obj][lvl - 1]}
                         </span>
                       </div>
                       <div className="ht-node-eff dim small" style={{ color: unlocked ? meta.color : '#2a2a2a' }}>
                         {unlocked
-                          ? (b.obj === 'robots' ? 'šibke točke odkrite' : `učinek ×${Math.pow(2, lvl)}`)
-                          : lockedByRobots ? `rabi Robote ${lvl}` : 'razišči'}
+                          ? (b.obj === 'robots' ? 'AI znanje odklenjeno' : `učinek ×${Math.pow(2, lvl)}`)
+                          : lockedByRobots ? `rabi mehansko šibkost ${lvl}` : 'razišči'}
                       </div>
                     </div>
                   );
@@ -530,7 +540,12 @@ function AITree({ nodes, justRevealed }: { nodes: AITreeNode[]; justRevealed: Se
                           {unlocked ? n.label : partial ? `${n.label.split(' ')[0]}…` : '[ZAKRITO]'}
                         </span>
                       </div>
-                      {unlocked && <div className="ht-node-eff" style={{ color: meta.color }}>moč {n.strength}</div>}
+                      {unlocked && (
+                        <>
+                          <div className="ht-node-eff" style={{ color: meta.color }}>{n.effect || `moč ${n.strength}`}</div>
+                          {n.description && <div className="dim small">{n.description}</div>}
+                        </>
+                      )}
                     </div>
                   );
                 })}
@@ -1439,9 +1454,9 @@ function RulesModal({ onClose }: { onClose: () => void }) {
     ) },
     { id: 'faze', icon: '🌑', title: 'Faze AI', body: (
       <ul>
-        <li><b>1 — AI išče:</b> droni in senzorji te iščejo. Skrivanje je najmočnejše.</li>
-        <li><b>2 — AI razume:</b> analizira vzorce. Špijonaža razkriva njegov načrt.</li>
-        <li><b>3 — AI iztreblja:</b> udari na preživetje. Obramba je ključna.</li>
+        <li><b>1 — AI išče:</b> AI ima predvsem izvidniške enote. Človeška tehnologija je osnovna.</li>
+        <li><b>2 — AI razume:</b> pridejo napadalne enote. Potrebna sta boljše orožje in EMP obramba.</li>
+        <li><b>3 — AI iztreblja:</b> pridejo people-killer enote. Potrebni so napredni obrambni sistemi in močnejše orožje.</li>
       </ul>
     ) },
     { id: 'viri', icon: '📦', title: 'Viri', body: (
@@ -1449,7 +1464,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
         <li>🍞 <b>Hrana</b> — porablja jo populacija; nabiralci jo pridelajo.</li>
         <li>⚔ <b>Orožje</b> — omejuje, koliko ljudi se lahko bori; izdela se iz materiala.</li>
         <li>⚙ <b>Material</b> — surovina za orožje in obzidje; najdeš ga z odpravami in iz uničenih robotov.</li>
-        <li>👁 <b>Intel</b> — raziskovalci ga zbirajo; izboljša boje in razkriva AI.</li>
+        <li>👁 <b>Intel</b> — raziskovalci ga zbirajo; izboljša boje in poganja odkrivanje AI drevesa.</li>
         <li>💎 <b>Artefakt</b> — redek; takoj uniči eno odkrito šibko točko.</li>
       </ul>
     ) },
@@ -1458,7 +1473,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
         <li>🛡 <b>Obramba</b> — branilci odbijajo napade AI na kamp.</li>
         <li>🌾 <b>Prehrana</b> — nabiralci zbirajo hrano; jakost obrokov (1–5) vpliva na porabo in moč.</li>
         <li>🔨 <b>Delavnice</b> — delavci izdelujejo orožje ali gradijo obzidje.</li>
-        <li>🔬 <b>Raziskave</b> — raziskovalci zbirajo intel (roboti = boljši boj, ranljivosti = razkrivanje AI).</li>
+        <li>🔬 <b>Raziskave</b> — raziskovalci ustvarjajo intel, razkrivajo AI šibkosti in odklepajo nadgradnje.</li>
         <li>Pod ikonami so + / − za premik prostih ljudi v vsako območje.</li>
       </ul>
     ) },
@@ -1467,6 +1482,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
         <li>Karta je v megli; razkrivaš jo z odpravami (raziskanost polja raste z obiski).</li>
         <li>V zavihku <b>Izvidniki</b> narišeš pot (klikaš sosednje hekse) in pošlješ izvidnike.</li>
         <li>Odprave vzamejo hrano s seboj; na poti so možna srečanja in najdbe (material, orožje, artefakt).</li>
+        <li>Odprave in napadi so edini sistem misij; stare timer misije niso več del normalnega igranja.</li>
         <li>Pot odprave je <b>rumena</b>.</li>
       </ul>
     ) },
@@ -1479,9 +1495,17 @@ function RulesModal({ onClose }: { onClose: () => void }) {
     ) },
     { id: 'obramba', icon: '🧱', title: 'Obramba & obzidje', body: (
       <ul>
-        <li>Verjetnost napada AT je <b>na mesec</b> in se v več mesecih sešteje; znižata jo skrivanje in nizka populacija.</li>
+        <li>Verjetnost napada AI je <b>na mesec</b> in raste z AI močjo, znanjem o nas in številom ljudi v kampu.</li>
         <li>Branilci in <b>obzidje</b> ne znižajo verjetnosti napada, ampak povečajo <b>odbitje</b>.</li>
-        <li>Vsako <b>obzidje</b> doda <b>+20 %</b> moči obrambe; gradi se v Delavnicah (12 delavec-mesecev + 4 materiala na obzidje).</li>
+        <li>Vsako <b>obzidje</b> doda <b>+20 %</b> moči obrambe; raziskava obzidja učinek podvoji po stopnjah.</li>
+      </ul>
+    ) },
+    { id: 'raziskave', icon: '🔬', title: 'Research loop', body: (
+      <ul>
+        <li><b>Research → Intel → AI weak points → Upgrades → Survival</b>.</li>
+        <li><b>Roboti</b> raziskava najhitreje dviguje AI znanje in odpira AI drevo.</li>
+        <li><b>Mehanske šibkosti</b> odklenejo stopnje orožja in obzidja: izvidniki 1, napadalci 2, people-killerji 3.</li>
+        <li><b>Logične šibkosti</b> takoj dajo pasivne bonuse proti ustreznim AI enotam.</li>
       </ul>
     ) },
     { id: 'zavezniki', icon: '⛺', title: 'Drugi klani (zavezniki)', body: (
@@ -2341,9 +2365,9 @@ function WorkshopSelector({ value, onChange, weaponLevel, wallLevel }: { value: 
 /** Izbira cilja raziskave (raziskovalci) */
 function ResearchSelector({ value, onChange, robotsLevel, weaponLevel, wallLevel }: { value: ResearchObjective; onChange: (o: ResearchObjective) => void; robotsLevel: number; weaponLevel: number; wallLevel: number }) {
   const opts: Array<{ id: ResearchObjective; icon: string; label: string; color: string; desc: string; lvl: number; locked: boolean }> = [
-    { id: 'robots', icon: '🤖', label: 'Roboti', color: '#cc8800', desc: 'Odkrivaj šibke točke robotov. Vsaka stopnja odklene Orožje in Obzidje iste stopnje.', lvl: robotsLevel, locked: false },
-    { id: 'weapon', icon: '⚔️', label: 'Orožje', color: '#cc4433', desc: 'Vsaka stopnja podvoji napad orožja (120 razisk.-mes.). Zaklenjeno za stopnjo Robotov.', lvl: weaponLevel, locked: weaponLevel >= robotsLevel },
-    { id: 'wall',   icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: 'Vsaka stopnja podvoji obrambo obzidja (120 razisk.-mes.). Zaklenjeno za stopnjo Robotov.', lvl: wallLevel, locked: wallLevel >= robotsLevel },
+    { id: 'robots', icon: '🤖', label: RESEARCH_LEVEL_NAMES.robots[Math.min(robotsLevel, 2)] ?? 'Roboti', color: '#cc8800', desc: 'Raziskave ustvarjajo intel in odpirajo AI drevo. Mehanske šibkosti odklenejo tehnologijo.', lvl: robotsLevel, locked: false },
+    { id: 'weapon', icon: '⚔️', label: RESEARCH_LEVEL_NAMES.weapon[Math.min(weaponLevel, 2)] ?? 'Orožje', color: '#cc4433', desc: 'Vsaka stopnja podvoji prispevek orožja. Zaklenjeno z mehanskimi šibkostmi AI.', lvl: weaponLevel, locked: weaponLevel >= robotsLevel },
+    { id: 'wall',   icon: '🧱', label: RESEARCH_LEVEL_NAMES.wall[Math.min(wallLevel, 2)] ?? 'Obzidje', color: '#aabb88', desc: 'Vsaka stopnja podvoji učinek obzidja. Zaklenjeno z mehanskimi šibkostmi AI.', lvl: wallLevel, locked: wallLevel >= robotsLevel },
   ];
   const sel = opts.find(o => o.id === value);
   return (
@@ -2679,12 +2703,10 @@ export default function App() {
     if (!game || game.status !== 'active') return;
     const t = setTimeout(() => {
       previewOdds(game.runId, { axis, combatants, defenders, foragers, workers, researchers,
-        workshopObjective: workshopObj, researchObjective: researchObj, rations,
-        missionAssignments: missions, missionRations: missionR }).then(setOdds).catch(() => setOdds(null));
+        workshopObjective: workshopObj, researchObjective: researchObj, rations }).then(setOdds).catch(() => setOdds(null));
     }, 250);
     return () => clearTimeout(t);
-  }, [game?.runId, game?.totalRounds, axis, combatants, defenders, foragers, workers, researchers, workshopObj, researchObj, rations,
-      JSON.stringify(missions), JSON.stringify(missionR), scoutTargets.size]);
+  }, [game?.runId, game?.totalRounds, axis, combatants, defenders, foragers, workers, researchers, workshopObj, researchObj, rations]);
 
   const handleNew = async () => {
     setLoading(true);
@@ -2708,7 +2730,6 @@ export default function App() {
       const { state } = await playRound(game.runId, {
         assignment: { axis, combatants: 0, defenders, foragers, workers, researchers,
           workshopObjective: workshopObj, researchObjective: researchObj, rations,
-          missionAssignments: missions, missionRations: missionR,
           newExpeditions: newExps.length > 0 ? newExps : undefined,
           useArtifactOnWpId: artifactTargetWp || undefined },
         targetWeakPoint: targetWP || undefined,
@@ -2726,11 +2747,10 @@ export default function App() {
 
   // game.population = ljudje V KAMPU (ljudje na misijah/odpravah so že odšteti ob odhodu).
   const campPop = game?.population ?? 0;
-  const inMissions = (game?.activeMissions ?? []).reduce((s, m) => s + m.assigned, 0)
-                   + (game?.expeditions ?? []).reduce((s, e) => s + e.assigned, 0);
+  const inMissions = (game?.expeditions ?? []).reduce((s, e) => s + e.assigned, 0);
   const totalClan = campPop + inMissions;  // cel klan = kamp + ljudje zunaj
   const pop = campPop;  // ostane za kompatibilnost spodaj
-  const newMissionPeople = Object.values(missions).reduce((s, v) => s + v, 0);
+  const newMissionPeople = 0;
   const pendingExpPpl = pendingExpeditions.reduce((s, e) => s + e.assigned, 0);
   const plannedTotal = newMissionPeople + pendingExpPpl + combatants;  // rezervirani za odprave/misije/napad
   const assignedHome = defenders + foragers + workers + researchers;
@@ -2817,7 +2837,8 @@ export default function App() {
     const SCOUT_CAPTURE_PER_SCOUT_FE = 0.004;
     const AI_KNOW_BONUS_FE = 0.20;
     // Faktor glede na AI izvidniške enote (manj robotov → manj srečanj). Mora se ujemati z enginom.
-    const aiScouts = game.aiUnits?.scouts ?? game.aiRobots ?? 100;
+    const scoutLogicKnown = (game.aiTree ?? []).some(n => n.robot === 'scouts' && n.role === 'logical' && n.visibility === 'revealed');
+    const aiScouts = (game.aiUnits?.scouts ?? game.aiRobots ?? 100) * (scoutLogicKnown ? 0.8 : 1);
     const scoutFactor = Math.max(0, Math.min(1, 0.25 + 0.75 * Math.min(1, Math.max(0, aiScouts) / 100)));
     let pNo = 1;
     for (const step of draftPath.slice(1)) {
@@ -3287,16 +3308,20 @@ export default function App() {
           <>
           {(() => {
             const cfg = researchObj === 'robots'
-              ? { label: 'Roboti', lvl: game.robotsResearchLevel ?? 0, prog: game.robotsResearchProgress ?? 0, color: '#cc8800', icon: '🤖', eff: 'odklene Orožje/Obzidje' }
+              ? { label: RESEARCH_LEVEL_NAMES.robots[Math.min(game.robotsResearchLevel ?? 0, 2)], lvl: game.robotsResearchLevel ?? 0, prog: game.robotsResearchProgress ?? 0, color: '#cc8800', icon: '🤖', eff: 'razkriva AI drevo' }
               : researchObj === 'weapon'
-                ? { label: 'Orožje', lvl: game.weaponResearchLevel ?? 0, prog: game.weaponResearchProgress ?? 0, color: '#cc4433', icon: '⚔', eff: `napad ×${Math.pow(2, game.weaponResearchLevel ?? 0)}` }
-                : { label: 'Obzidje', lvl: game.wallResearchLevel ?? 0, prog: game.wallResearchProgress ?? 0, color: '#aabb88', icon: '🏰', eff: `obramba ×${Math.pow(2, game.wallResearchLevel ?? 0)}` };
+                ? { label: RESEARCH_LEVEL_NAMES.weapon[Math.min(game.weaponResearchLevel ?? 0, 2)], lvl: game.weaponResearchLevel ?? 0, prog: game.weaponResearchProgress ?? 0, color: '#cc4433', icon: '⚔', eff: `napad ×${Math.pow(2, game.weaponResearchLevel ?? 0)}` }
+                : { label: RESEARCH_LEVEL_NAMES.wall[Math.min(game.wallResearchLevel ?? 0, 2)], lvl: game.wallResearchLevel ?? 0, prog: game.wallResearchProgress ?? 0, color: '#aabb88', icon: '🏰', eff: `obramba ×${Math.pow(2, game.wallResearchLevel ?? 0)}` };
             const months = researchers > 0 ? Math.ceil((120 - cfg.prog) / researchers) : Infinity;
             const pctv = Math.round((cfg.prog / 120) * 100);
             const dots = Math.min(24, researchers);
             return (
             <div className="panel def-panel">
               <div className="def-head"><span className="def-head-icon">🔬</span><div><h3>RAZISKAVE</h3><div className="def-sub">RAZVOJ</div></div><InfoButton kind="research" /></div>
+              <div className="def-card">
+                <div className="def-card-title">RAZISKOVALNA VERIGA</div>
+                <div className="dim small">🔬 Research → 👁 Intel → ◆ AI šibkosti → ⚔/🧱 Nadgradnje → 👥 Preživetje</div>
+              </div>
               <div className="def-card">
                 <div className="def-card-title">RAZISKOVALCI</div>
                 <div className="def-defenders">
@@ -3371,12 +3396,16 @@ export default function App() {
               <div className="pending-exps">
                 <div className="dim small" style={{ marginBottom: 4 }}>Potrjene odprave (sproži ob izvedbi meseca):</div>
                 {pendingExpeditions.map((e, i) => e.kind === 'scout' && (() => {
-                  const months = e.path.length - 1;
+                  const oneWay = e.path.length - 1;
+                  const last = e.path[e.path.length - 1];
+                  const clan = game.mapTiles?.find(t => t.isClanCamp);
+                  const ret = clan && last ? Math.min(oneWay, hexDistFE(last, { q: clan.q, r: clan.r })) : oneWay;
+                  const months = oneWay + ret;
                   const t = RATIONS[e.rations] ?? RATIONS[3];
                   const food = Math.round(e.assigned * months * t.foodMult);
                   return (
                     <div key={i} className="pending-exp-row">
-                      <span>🔭 {e.assigned} · {months}m · {t.emoji} 🍞{food}{e.stealth ? ' · 🌙' : ''}</span>
+                      <span>🔭 {e.assigned} · {months}m tja+nazaj · {t.emoji} 🍞{food}{e.stealth ? ' · 🌙' : ''}</span>
                       <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
                     </div>
                   );
@@ -3406,10 +3435,16 @@ export default function App() {
               const wp = tile?.hidesWeakPointId ? game.aiWeakPoints.find(w => w.id === tile.hidesWeakPointId) : undefined;
               const wpDisc = !!wp?.discovered;
               const targetLabel = wpDisc ? `◆ ${wp!.label}` : tile?.isAICore ? '☣ AI jedro' : `(${last.q},${last.r}) — splošni napad`;
-              const hStr = draftPeople * 1.2 * draftRTier.strengthMult * (draftStealth ? 1.2 : 1);
               const aiUnits = game.aiUnits ?? { scouts: game.aiRobots ?? 0, attackers: 0, peopleKillers: 0 };
-              const aStr = Math.max(1, aiDefensePower(aiUnits) * 0.05);
-              const winP = hStr / (hStr + aStr);
+              const stealthBonus = draftStealth ? 1.2 : 1;
+              const winP = wpDisc
+                ? Math.min(0.98, missionSuccessProbability(game, wp!.id, draftPeople, draftRations) * stealthBonus)
+                : (() => {
+                    const hStr = draftPeople * COMBAT_BASE_HUMAN_MULTIPLIER * draftRTier.strengthMult
+                      * stealthBonus * researchMult(game.weaponResearchLevel ?? 0) * (1 + logicalWeaknessBonus(game));
+                    const aStr = Math.max(1, aiDefensePower(aiUnits) * 0.05);
+                    return hStr / (hStr + aStr);
+                  })();
               return (
                 <>
                   <div className="def-card">
@@ -3445,22 +3480,21 @@ export default function App() {
             {pendingExpeditions.filter(e => e.kind === 'mission').length > 0 && (
               <div className="pending-exps">
                 <div className="dim small" style={{ marginBottom: 4 }}>Potrjeni napadi (sproži ob izvedbi meseca):</div>
-                {pendingExpeditions.map((e, i) => e.kind === 'mission' && (
-                  <div key={i} className="pending-exp-row">
-                    <span>⚔ {e.assigned} · {e.path.length - 1}m{e.weakPointId ? ' · ◆ šibka točka' : ''}{e.stealth ? ' · 🌙' : ''}</span>
-                    <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
-                  </div>
-                ))}
+                {pendingExpeditions.map((e, i) => e.kind === 'mission' && (() => {
+                  const oneWay = e.path.length - 1;
+                  const last = e.path[e.path.length - 1];
+                  const clan = game.mapTiles?.find(t => t.isClanCamp);
+                  const ret = clan && last ? Math.min(oneWay, hexDistFE(last, { q: clan.q, r: clan.r })) : oneWay;
+                  return (
+                    <div key={i} className="pending-exp-row">
+                      <span>⚔ {e.assigned} · {oneWay + ret}m tja+nazaj{e.weakPointId ? ' · ◆ šibka točka' : ''}{e.stealth ? ' · 🌙' : ''}</span>
+                      <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
+                    </div>
+                  );
+                })())}
               </div>
             )}
           </div>
-          <Missions wps={game.aiWeakPoints} aiTree={game.aiTree}
-            active={game.activeMissions ?? []} plan={missions} planR={missionR}
-            onPlanChange={setMissionAssignment} onRationsChange={setMissionRations}
-            odds={odds} availablePop={availablePop} selectedWpId={targetWP}
-            artifacts={game.resources.artifacts ?? 0}
-            onUseArtifact={setArtifactTargetWp}
-            artifactTargetWpId={artifactTargetWp} />
           </>
           )}
 
@@ -3541,7 +3575,7 @@ export default function App() {
             <h3>⏳ V TEKU</h3>
             <span className="dim small">{(game.expeditions ?? []).length} aktivnih · {inMissions} ljudi zunaj</span>
           </div>
-          {(game.expeditions ?? []).length === 0 && (game.activeMissions ?? []).length === 0 ? (
+          {(game.expeditions ?? []).length === 0 ? (
             <p className="field-note dim small">Trenutno ni aktivnih odprav ali napadov. Pošlji jih iz zavihkov Izvidniki ali Napad.</p>
           ) : (
             <div className="active-expeditions">
@@ -3574,28 +3608,6 @@ export default function App() {
                         ? `↩ vrača se v kamp — še ${e.returnRemaining ?? 0} mesec(ev)`
                         : remaining === 0 ? 'prihod ta mesec' : `še ${remaining} mesec(ev) do cilja`}
                       {!returning && e.encountersLog.length > 0 && ` · ${e.encountersLog.slice(-1)[0]}`}
-                    </div>
-                  </div>
-                );
-              })}
-              {(game.activeMissions ?? []).map(m => {
-                const total = Math.max(1, m.monthsTotal);
-                const done = total - m.monthsRemaining;
-                const wp = game.aiWeakPoints.find(w => w.id === m.weakPointId);
-                return (
-                  <div key={m.weakPointId} className="exp-card">
-                    <div className="exp-head">
-                      <span className="exp-kind" style={{ color: '#cc8800' }}>🎯 Misija na ◆ {wp?.label ?? m.weakPointId} · {m.assigned} ljudi</span>
-                      <span className="dim small">{Math.round(m.successProbability * 100)}% uspeh</span>
-                    </div>
-                    <div className="exp-progress">
-                      <div className="ep-track">
-                        <div className="ep-fill" style={{ width: `${(done / total) * 100}%`, background: '#cc8800' }} />
-                      </div>
-                      <span className="dim small">mesec {done} / {total}</span>
-                    </div>
-                    <div className="exp-events dim small">
-                      {m.monthsRemaining === 0 ? 'razrešitev ta mesec' : `še ${m.monthsRemaining} mesec(ev)`}
                     </div>
                   </div>
                 );

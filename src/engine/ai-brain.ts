@@ -60,17 +60,17 @@ export function adaptGenome(genome: AIGenome, history: AxisHistory): AIGenome {
 export function generateAITree(): AITreeNode[] {
   return [
     // Faza 1 — Najti · IZVIDNIKI (scouts)
-    { id: 'scout_unit',  phase: 'find',      robot: 'scouts',        role: 'unit',       label: 'Izvidniške enote',            visibility: 'unknown', strength: 30, executed: false, insightThreshold: 0.10 },
-    { id: 'scout_mech',  phase: 'find',      robot: 'scouts',        role: 'mechanical', label: 'Mehanska šibka točka izvidnikov', visibility: 'unknown', strength: 30, executed: false, insightThreshold: 0.20 },
-    { id: 'scout_logic', phase: 'find',      robot: 'scouts',        role: 'logical',    label: 'Logična šibka točka izvidnikov',  visibility: 'unknown', strength: 30, executed: false, insightThreshold: 0.30 },
+    { id: 'scout_unit',  phase: 'find',      robot: 'scouts',        role: 'unit',       label: 'Izvidniške enote', description: 'AI mapira območje in išče človeške kampe.', effect: 'Razkrit je prvi tip AI enot.', visibility: 'unknown', strength: 30, executed: false, insightThreshold: 0.10 },
+    { id: 'scout_mech',  phase: 'find',      robot: 'scouts',        role: 'mechanical', label: 'Senzorji in optika', description: 'Izvidniki so odvisni od optičnih senzorjev in kratkega dosega zaznave.', effect: 'Odklenjena stopnja 1 za orožje in obzidje.', visibility: 'unknown', strength: 30, executed: false, insightThreshold: 0.20 },
+    { id: 'scout_logic', phase: 'find',      robot: 'scouts',        role: 'logical',    label: 'Vzorec patruljiranja', description: 'Izvidniki ponavljajo predvidljive poti iskanja.', effect: 'Takojšen bonus proti izvidniškim napadom in srečanjem.', visibility: 'unknown', strength: 30, executed: false, insightThreshold: 0.30 },
     // Faza 2 — Razumeti · NAPADALCI (attackers)
-    { id: 'atk_unit',    phase: 'understand', robot: 'attackers',    role: 'unit',       label: 'Napadalne enote',             visibility: 'unknown', strength: 60, executed: false, insightThreshold: 0.40 },
-    { id: 'atk_mech',    phase: 'understand', robot: 'attackers',    role: 'mechanical', label: 'Mehanska šibka točka napadalcev', visibility: 'unknown', strength: 60, executed: false, insightThreshold: 0.50 },
-    { id: 'atk_logic',   phase: 'understand', robot: 'attackers',    role: 'logical',    label: 'Logična šibka točka napadalcev',  visibility: 'unknown', strength: 60, executed: false, insightThreshold: 0.60 },
+    { id: 'atk_unit',    phase: 'understand', robot: 'attackers',    role: 'unit',       label: 'Napadalne enote', description: 'AI začne izvajati organizirane napade na kamp.', effect: 'Razkrit je drugi tip AI enot.', visibility: 'unknown', strength: 60, executed: false, insightThreshold: 0.40 },
+    { id: 'atk_mech',    phase: 'understand', robot: 'attackers',    role: 'mechanical', label: 'Napajalni členki', description: 'Napadalci imajo ranljive energetske sklepe in napajalne povezave.', effect: 'Odklenjena stopnja 2 za orožje in obzidje.', visibility: 'unknown', strength: 60, executed: false, insightThreshold: 0.50 },
+    { id: 'atk_logic',   phase: 'understand', robot: 'attackers',    role: 'logical',    label: 'Taktika frontalnega pritiska', description: 'Napadalci pritiskajo frontalno in slabo reagirajo na razpršeno obrambo.', effect: 'Takojšen bonus pri obrambi pred napadalci.', visibility: 'unknown', strength: 60, executed: false, insightThreshold: 0.60 },
     // Faza 3 — Iztrebiti · PEOPLE-KILLERJI (peopleKillers)
-    { id: 'pk_unit',     phase: 'eliminate',  robot: 'peopleKillers', role: 'unit',       label: 'People-killer enote',         visibility: 'unknown', strength: 90, executed: false, insightThreshold: 0.70 },
-    { id: 'pk_mech',     phase: 'eliminate',  robot: 'peopleKillers', role: 'mechanical', label: 'Mehanska šibka točka people-killerjev', visibility: 'unknown', strength: 90, executed: false, insightThreshold: 0.80 },
-    { id: 'pk_logic',    phase: 'eliminate',  robot: 'peopleKillers', role: 'logical',    label: 'Logična šibka točka people-killerjev',  visibility: 'unknown', strength: 90, executed: false, insightThreshold: 0.90 },
+    { id: 'pk_unit',     phase: 'eliminate',  robot: 'peopleKillers', role: 'unit',       label: 'People-killer enote', description: 'AI začne ciljno iztrebljati ljudi.', effect: 'Razkrit je tretji tip AI enot.', visibility: 'unknown', strength: 90, executed: false, insightThreshold: 0.70 },
+    { id: 'pk_mech',     phase: 'eliminate',  robot: 'peopleKillers', role: 'mechanical', label: 'Termalno jedro', description: 'People-killer enote imajo termalno jedro, ki ga je mogoče preobremeniti.', effect: 'Odklenjena stopnja 3 za orožje in obzidje.', visibility: 'unknown', strength: 90, executed: false, insightThreshold: 0.80 },
+    { id: 'pk_logic',    phase: 'eliminate',  robot: 'peopleKillers', role: 'logical',    label: 'Prioritetni algoritem tarč', description: 'AI izbira tarče po predvidljivem vrstnem redu prioritet.', effect: 'Takojšen bonus pri preživetju in zmanjšanju izgub.', visibility: 'unknown', strength: 90, executed: false, insightThreshold: 0.90 },
   ];
 }
 

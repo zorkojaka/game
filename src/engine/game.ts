@@ -3,34 +3,32 @@
 
 import type { GameState, PlayerAction, RoundLog, Assignment, AIPhase, RaidResult, ScoutResult, HumanAxis, Mission, AIUnits, ResearchObjective, CampArea } from './types.js';
 import type { RNGState } from './rng.js';
-import { createRNG, rngBool, rngInt, rngNext, seedFromString } from './rng.js';
+import { rngInt, rngNext, seedFromString } from './rng.js';
 import { resolveCombat } from './combat.js';
 import { revealTreeByInsight, revealNodeRetroactive } from './fog.js';
-import { generateMap, generateOtherClans, spendScoutsOnMap, visibilityFromProgress } from './map.js';
+import { generateMap, generateOtherClans } from './map.js';
 import { tickExpedition, returnMonths, roundTripMonths } from './expedition.js';
-import { tileId } from './types.js';
 import type { Expedition } from './types.js';
-import { calcAISurveillanceGain, adaptGenome, generateAITree, generateAIWeakPoints, DEFAULT_GENOME } from './ai-brain.js';
+import { calcAISurveillanceGain, generateAITree, generateAIWeakPoints, DEFAULT_GENOME } from './ai-brain.js';
 import {
   INITIAL_POPULATION, INITIAL_SURVIVAL, INITIAL_COMBAT, INITIAL_INTELLIGENCE, INITIAL_MATERIAL,
   INITIAL_AI_KNOWLEDGE, INITIAL_CLAN_ACTIVITY,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
   AI_UNIT_DEFS, aiAttackPower, aiDefensePower, AI_FULL_ATTACK_POWER,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
-  SCOUT_INTEL_YIELD, SCOUT_FOG_YIELD, CLAN_ACTIVITY_BY_PHASE, CLAN_ACTIVITY_EXPOSURE_MODIFIER,
-  CLAN_ACTIVITY_HIDDEN_MODIFIER, PHASE_EVENT_BASE_DAMAGE, PREPARED_DAMAGE_REDUCTION,
+  SCOUT_INTEL_YIELD, CLAN_ACTIVITY_EXPOSURE_MODIFIER,
   RATIONS_LEVELS, DEFAULT_RATIONS,
   WEAPON_WORKER_MONTHS, WALL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS,
   WEAPON_MATERIAL_COST, WALL_MATERIAL_COST, ARTIFACT_MATERIAL_COST,
   RESEARCH_LEVEL_WORKER_MONTHS, researchMult,
-  INITIAL_AI_INSIGHT, INSIGHT_PER_ROUND, INSIGHT_PHASE_CAP,
+  INITIAL_AI_INSIGHT, AI_INSIGHT_PER_RESEARCHER, NON_ROBOT_RESEARCH_INSIGHT_FACTOR, INSIGHT_PHASE_CAP,
+  LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION, LOGICAL_WEAKNESS_LETHALITY_REDUCTION,
   RAID_BASE_CHANCE, RAID_POP_SCALING_MAX, RAID_POP_REFERENCE, RAID_AI_KNOWLEDGE_BONUS,
-  RAID_HIDING_REDUCTION, RAID_CLAN_ABSORPTION, RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT,
+  RAID_CLAN_ABSORPTION, RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT,
   RAID_BREACH_AREAS, RAID_AREA_PEOPLE_LOSS,
   RAID_DESTROY_FOOD_PCT, RAID_DESTROY_WEAPONS_PCT, RAID_DESTROY_MATERIAL_PCT, RAID_DESTROY_WALL_LEVELS,
   SCOUT_BASE_SUCCESS, SCOUT_INTEL_BONUS_PER_100, SCOUT_ESPIONAGE_BONUS,
-  SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_HIDING_REDUCTION, SCOUT_AI_KNOWLEDGE_BONUS,
-  SCOUT_PARTIAL_EFFECTIVE, SCOUT_CAPTURED_LOSS_MIN, SCOUT_CAPTURED_LOSS_MAX,
+  SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_AI_KNOWLEDGE_BONUS,
   COMBAT_BASE_HUMAN_MULTIPLIER,
   STARVATION_LOSS_PCT_1ST, STARVATION_LOSS_PCT_2ND, STARVATION_LOSS_PCT_NTH,
   INTEL_COMBAT_BONUS_PER_100, INTEL_COMBAT_BONUS_MAX,
@@ -38,7 +36,7 @@ import {
   MISSION_DURATION_MONTHS, MISSION_ENCOUNTER_BASE, MISSION_ENCOUNTER_PER_PERSON,
   MISSION_ENCOUNTER_AI_KNOW, MISSION_WP_DIFFICULTY, MISSION_MIN_TEAM,
 } from './constants.js';
-import { calcHumanStrength, calcAIStrength, calcSuccessProbability, rollOutcome, logicalWeaknessBonus } from './combat.js';
+import { calcHumanStrength, calcAIStrength, calcSuccessProbability, rollOutcome, logicalWeaknessBonus, logicalWeaknessByRobot } from './combat.js';
 
 // ─── Pomožne funkcije za nove mehanike ───────────────────────────────────────
 
@@ -75,6 +73,32 @@ export function readAIUnits(state: GameState): AIUnits {
     peopleKillers: state.aiUnits.peopleKillers ?? 0,
   };
   return { scouts: state.aiRobots ?? 0, attackers: 0, peopleKillers: 0 };
+}
+
+const ROBOT_TECH_LEVEL: Record<keyof AIUnits, number> = {
+  scouts: 1,
+  attackers: 2,
+  peopleKillers: 3,
+};
+
+/** Najvišja odklenjena tech stopnja iz razkritih MEHANSKIH šibkosti AI drevesa. */
+export function mechanicalTechUnlockLevel(state: Pick<GameState, 'aiTree'>): number {
+  let level = 0;
+  for (const n of state.aiTree ?? []) {
+    if (n.role !== 'mechanical' || n.visibility !== 'revealed') continue;
+    level = Math.max(level, ROBOT_TECH_LEVEL[n.robot] ?? 0);
+  }
+  return level;
+}
+
+/** AI raid moč po pasivnih logičnih bonusih igralca. */
+function effectiveRaidAttackPower(state: GameState): number {
+  const units = readAIUnits(state);
+  const logical = logicalWeaknessByRobot(state);
+  const reduce = (robot: keyof AIUnits) => Math.max(0, 1 - (logical[robot] ? LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS : 0));
+  return units.scouts * AI_UNIT_DEFS.scouts.attack * reduce('scouts')
+    + units.attackers * AI_UNIT_DEFS.attackers.attack * reduce('attackers')
+    + units.peopleKillers * AI_UNIT_DEFS.peopleKillers.attack * reduce('peopleKillers');
 }
 
 /**
@@ -132,7 +156,7 @@ export function raidRepelProbability(state: GameState, assignment: Assignment): 
   const equip = Math.min(state.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT * weaponMult;
   const defStr = (base + equip) * (1 + intelB) * wallBonus;
   // Raid izvaja vsa AI sila (vsi tipi enot napadajo) — moč po njihovem napadu
-  const aiStr = aiAttackPower(readAIUnits(state)) * (1 - state.clanActivity) * RAID_AI_FORCE_PCT;
+  const aiStr = effectiveRaidAttackPower(state) * (1 - state.clanActivity) * RAID_AI_FORCE_PCT;
   return defStr / (defStr + Math.max(1, aiStr));
 }
 
@@ -196,7 +220,9 @@ function resolveRaid(
   // Število robotov, ki sodelujejo v raidu (za štetje uničenih) — vsi tipi
   const aiForce = Math.floor(totalAIRobots(aiUnits) * (1 - state.clanActivity) * RAID_AI_FORCE_PCT);
   // People-killer enote (faza 3) povečajo smrtnost med ljudmi
-  const lethality = 1 + PEOPLEKILLER_LETHALITY_PER_UNIT * aiUnits.peopleKillers;
+  const logical = logicalWeaknessByRobot(state);
+  const pkReduction = logical.peopleKillers ? LOGICAL_WEAKNESS_LETHALITY_REDUCTION : 0;
+  const lethality = (1 + PEOPLEKILLER_LETHALITY_PER_UNIT * aiUnits.peopleKillers) * (1 - pkReduction);
 
   // Front-line žrtve branilcev + uničenje AI po izidu
   const frontFrac:   Record<typeof outcome, number> = { victory: 0.05, partial: 0.25, defeat: 0.60, annihilation: 1.00 };
@@ -312,6 +338,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   const totalClanBefore = state.population
     + (state.activeMissions ?? []).reduce((s, m) => s + m.assigned, 0)
     + (state.expeditions ?? []).reduce((s, e) => s + e.assigned, 0);
+  const legacyMissionReturn = (state.activeMissions ?? []).reduce((s, m) => s + m.assigned, 0);
 
   // Normaliziraj — backward compat (dayGuard+nightGuard → defenders) + clamp na orožje
   const cap = Math.floor(state.resources.combat);
@@ -372,35 +399,34 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   let wallResearchLevel      = state.wallResearchLevel ?? 0;
   let wallResearchProgress   = state.wallResearchProgress ?? 0;
 
+  let aiInsightGain = 0;
   if (researchers > 0) {
+    const insightFactor = researchObj === 'robots' ? 1 : NON_ROBOT_RESEARCH_INSIGHT_FACTOR;
+    aiInsightGain = researchers * AI_INSIGHT_PER_RESEARCHER * rations.strengthMult * insightFactor;
     if (researchObj === 'robots') {
-      // Roboti: odkrivamo šibke točke; vsak nivo odklene orožje/obzidje iste stopnje
+      // Roboti: ustvarjajo intel in insight, ki razkrije AI enote/šibkosti.
       const intelBonus = Math.floor(researchers * SCOUT_INTEL_YIELD * rations.strengthMult);
       intelligence += intelBonus;
       robotsResearchProgress += researchers;
-      while (robotsResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS) {
-        robotsResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
-        robotsResearchLevel += 1;
-        workshopEvents.push(`🔬 Roboti raziskani — stopnja ${robotsResearchLevel}! Odklenjeno Orožje ${robotsResearchLevel} in Obzidje ${robotsResearchLevel}.`);
-      }
     } else if (researchObj === 'weapon') {
-      // Orožje je zaklenjeno za raziskavo robotov: ne more preseči robotsResearchLevel
-      if (weaponResearchLevel >= robotsResearchLevel) {
-        workshopEvents.push(`🔒 Orožje ${weaponResearchLevel + 1} zaklenjeno — najprej razišči Robote ${weaponResearchLevel + 1}.`);
+      const unlocked = Math.max(state.robotsResearchLevel ?? 0, mechanicalTechUnlockLevel(state));
+      if (weaponResearchLevel >= unlocked) {
+        workshopEvents.push(`🔒 Orožje ${weaponResearchLevel + 1} zaklenjeno — najprej razkrij mehansko šibkost AI stopnje ${weaponResearchLevel + 1}.`);
       } else {
         weaponResearchProgress += researchers;
-        while (weaponResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && weaponResearchLevel < robotsResearchLevel) {
+        while (weaponResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && weaponResearchLevel < unlocked) {
           weaponResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
           weaponResearchLevel += 1;
           workshopEvents.push(`🔬 Raziskava orožja dokončana — stopnja ${weaponResearchLevel}! Napad orožja ×${researchMult(weaponResearchLevel)}.`);
         }
       }
     } else if (researchObj === 'wall') {
-      if (wallResearchLevel >= robotsResearchLevel) {
-        workshopEvents.push(`🔒 Obzidje ${wallResearchLevel + 1} zaklenjeno — najprej razišči Robote ${wallResearchLevel + 1}.`);
+      const unlocked = Math.max(state.robotsResearchLevel ?? 0, mechanicalTechUnlockLevel(state));
+      if (wallResearchLevel >= unlocked) {
+        workshopEvents.push(`🔒 Obzidje ${wallResearchLevel + 1} zaklenjeno — najprej razkrij mehansko šibkost AI stopnje ${wallResearchLevel + 1}.`);
       } else {
         wallResearchProgress += researchers;
-        while (wallResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && wallResearchLevel < robotsResearchLevel) {
+        while (wallResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && wallResearchLevel < unlocked) {
           wallResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
           wallResearchLevel += 1;
           workshopEvents.push(`🔬 Raziskava obzidja dokončana — stopnja ${wallResearchLevel}! Obramba obzidja ×${researchMult(wallResearchLevel)}.`);
@@ -409,14 +435,19 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     }
   }
 
-  // Naše znanje o AI (insight) → postopno odpiranje AI drevesa do faznega stropa
+  // Naše znanje o AI (insight) → odpiranje AI drevesa do faznega stropa; poganja ga raziskovanje.
   const aiInsight = Math.min(
     INSIGHT_PHASE_CAP[state.phase],
-    (state.aiInsight ?? INITIAL_AI_INSIGHT) + INSIGHT_PER_ROUND,
+    (state.aiInsight ?? INITIAL_AI_INSIGHT) + aiInsightGain,
   );
   let aiTree = revealTreeByInsight(state.aiTree, aiInsight);
   const prevRevealed = new Set(state.aiTree.filter(n => n.visibility === 'revealed').map(n => n.id));
   const revealed: string[] = aiTree.filter(n => n.visibility === 'revealed' && !prevRevealed.has(n.id)).map(n => n.id);
+  const unlockedTechLevel = Math.max(robotsResearchLevel, mechanicalTechUnlockLevel({ aiTree }));
+  if (unlockedTechLevel > robotsResearchLevel) {
+    robotsResearchLevel = unlockedTechLevel;
+    workshopEvents.push(`🔓 Mehanska šibkost razkrita — odklenjena stopnja ${unlockedTechLevel} za orožje in obzidje.`);
+  }
 
   // 4. DELAVCI — delavnica (delavec-meseci; napredek se ohrani ob preklopu)
   const workers = assignment.workers ?? 0;
@@ -490,7 +521,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   });
 
   // 6a. NAPAD (offensive combat — combatants gredo udariti AI)
-  let population = state.population;
+  let population = state.population + legacyMissionReturn;
   let aiUnits = readAIUnits(state);
   let aiRobots = totalAIRobots(aiUnits);
   const applyDestroy = (n: number) => { aiUnits = destroyAIUnits(aiUnits, n); aiRobots = totalAIRobots(aiUnits); };
@@ -657,7 +688,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       continue;
     }
 
-    const r = tickExpedition(e, mapTiles, aiKnowledge, rng, aiUnits.scouts);
+    const scoutEncounterUnits = Math.round(aiUnits.scouts * (1 - (logicalWeaknessByRobot({ ...state, aiTree } as GameState).scouts ? LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION : 0)));
+    const r = tickExpedition(e, mapTiles, aiKnowledge, rng, scoutEncounterUnits);
     rng = r.rng;
     mapTiles = r.tiles;
 
@@ -775,83 +807,14 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     }
   }
 
-  // 6d. MISIJE — tikni aktivne misije + obravnavaj nove razporeditve
-  const oldMissions = state.activeMissions ?? [];
+  // 6d. LEGACY MISIJE — timer sistem je odstranjen iz aktivnega gameplaya.
+  // Stare shranjene seje varno migriramo: ljudi vrnemo v kamp, novih missionAssignments ne sprejemamo.
+  const oldMissions: Mission[] = [];
   const oldCompleted = state.completedMissions ?? [];
   const tickedMissions: Mission[] = [];
   const newlyCompleted: Mission[] = [];
-  const missionRationsMap = assignment.missionRations ?? {};
-
-  for (const m of oldMissions) {
-    // Posodobi obroke misije iz trenutne izbire (default na prejšnje)
-    const mRationsLvl = missionRationsMap[m.weakPointId] ?? m.rations ?? DEFAULT_RATIONS;
-    // Misija ima svojo hrano za celotno trajanje (vzeto upfront ob startu) — brez dodatnih odbitkov tukaj
-
-    // Encounter roll vsak mesec — člani misije so že odšteti iz pop., zato izgube ne tičejo pop.
-    const encP = missionEncounterProbability(state, m.assigned);
-    const [encRoll, rngM] = rngNext(rng); rng = rngM;
-    let assignedNow = m.assigned;
-    if (encRoll < encP) {
-      const [lossPct, rngMl] = rngInt(rng, 20, 60); rng = rngMl;
-      const lost = Math.floor(m.assigned * lossPct / 100);
-      combat = Math.max(0, combat - lost);
-      assignedNow = Math.max(0, m.assigned - lost);
-      if (assignedNow < MISSION_MIN_TEAM) {
-        population += assignedNow;  // preživeli se vrnejo v kamp
-        newlyCompleted.push({ ...m, assigned: assignedNow, monthsRemaining: 0, rations: mRationsLvl, status: 'aborted',
-          resultNarrative: `Odprava prekinjena — AI je razkril ekipo, ${lost} mrtvih.` });
-        continue;
-      }
-    }
-    const remaining = m.monthsRemaining - 1;
-    if (remaining <= 0) {
-      const finalP = missionSuccessProbability({ ...state, resources: { ...state.resources, intelligence } }, m.weakPointId, assignedNow, mRationsLvl);
-      const [fRoll, rngF] = rngNext(rng); rng = rngF;
-      if (fRoll < finalP) {
-        population += assignedNow;  // preživeli se vrnejo
-        newlyCompleted.push({ ...m, assigned: assignedNow, monthsRemaining: 0, rations: mRationsLvl, status: 'success',
-          resultNarrative: `Odprava na ${m.weakPointId} uspela.` });
-        const idx = aiWeakPoints.findIndex(wp => wp.id === m.weakPointId);
-        if (idx >= 0) {
-          const wpLabel = aiWeakPoints[idx].label;
-          aiWeakPoints[idx] = { ...aiWeakPoints[idx], exploited: true, discovered: true };
-          expeditionEvents.push(`💥 ŠIBKA TOČKA UNIČENA: ${wpLabel} — odprava se vrača.`);
-        }
-      } else {
-        const [lossPct, rngL] = rngInt(rng, 30, 70); rng = rngL;
-        const lost = Math.floor(assignedNow * lossPct / 100);
-        combat = Math.max(0, combat - lost);
-        const survivors = Math.max(0, assignedNow - lost);
-        population += survivors;  // preživeli se vrnejo
-        newlyCompleted.push({ ...m, assigned: survivors, monthsRemaining: 0, rations: mRationsLvl, status: 'failed',
-          resultNarrative: `Odprava na ${m.weakPointId} ni uspela — ${lost} padlih.` });
-      }
-      continue;
-    }
-    // Posodobi successProbability glede na trenutne pogoje
-    const updatedSP = missionSuccessProbability({ ...state, resources: { ...state.resources, intelligence } }, m.weakPointId, assignedNow, mRationsLvl);
-    tickedMissions.push({ ...m, assigned: assignedNow, monthsRemaining: remaining, rations: mRationsLvl, successProbability: updatedSP });
-  }
-
-  // Nove misije iz assignment.missionAssignments
-  const newMissionAssigns = assignment.missionAssignments ?? {};
-  for (const [wpId, ppl] of Object.entries(newMissionAssigns)) {
-    if (ppl < MISSION_MIN_TEAM) continue;
-    if (tickedMissions.some(m => m.weakPointId === wpId)) continue;
-    if (oldCompleted.some(m => m.weakPointId === wpId && m.status === 'success')) continue;
-    const wp = aiWeakPoints.find(w => w.id === wpId);
-    if (!wp || !wp.discovered || wp.exploited) continue;
-    const dur = MISSION_DURATION_MONTHS[wpId] ?? 4;
-    const mRationsLvl = missionRationsMap[wpId] ?? DEFAULT_RATIONS;
-    const mTier = RATIONS_LEVELS[mRationsLvl] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
-    // Hrana za celotno trajanje misije vzeta upfront
-    const mFoodCost = Math.round(ppl * dur * mTier.foodMult);
-    survival = Math.max(0, survival - mFoodCost);
-    population -= ppl;  // ekipa zapusti kamp (kot pri odpravah)
-    expeditionEvents.push(`🎒 Misija (${ppl} ljudi, ${dur}m) vzela ${mFoodCost} hrane s seboj.`);
-    const sp = missionSuccessProbability({ ...state, resources: { ...state.resources, intelligence } }, wpId, ppl, mRationsLvl);
-    tickedMissions.push({ weakPointId: wpId, assigned: ppl, monthsTotal: dur, monthsRemaining: dur,
-      successProbability: sp, rations: mRationsLvl, status: 'in_progress' });
+  if (legacyMissionReturn > 0) {
+    expeditionEvents.push(`↩ Legacy misije odstranjene — ${legacyMissionReturn} ljudi se je vrnilo v kamp. Uporabi odprave po mapi za nove napade.`);
   }
 
   // 6e. DRUGI KLANI — odkritje (raziskan heks) + mesečno sodelovanje (če zavezniki)
@@ -1109,22 +1072,6 @@ export function previewOdds(state: GameState, assignment: Assignment) {
   const p = calcSuccessProbability(humanStr, aiStr);
 
   const missionPreviews: Record<string, { successProbability: number; encounterPerMonth: number; monthsTotal: number }> = {};
-  const want = assignment.missionAssignments ?? {};
-  const wantR = assignment.missionRations ?? {};
-  // Za aktivne misije uporabimo dejansko stanje
-  const activeById: Record<string, Mission> = {};
-  for (const m of state.activeMissions ?? []) activeById[m.weakPointId] = m;
-  for (const wp of state.aiWeakPoints) {
-    const active = activeById[wp.id];
-    const ppl = active ? active.assigned : (want[wp.id] ?? 0);
-    const r = wantR[wp.id] ?? active?.rations ?? DEFAULT_RATIONS;
-    const dur = MISSION_DURATION_MONTHS[wp.id] ?? 4;
-    missionPreviews[wp.id] = {
-      successProbability: missionSuccessProbability(state, wp.id, ppl, r),
-      encounterPerMonth:  missionEncounterProbability(state, ppl),
-      monthsTotal: dur,
-    };
-  }
 
   return {
     successProbability: p,

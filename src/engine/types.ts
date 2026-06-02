@@ -4,7 +4,7 @@ export type AIPhase = 'find' | 'understand' | 'eliminate';
 // Faza 1: Najti | Faza 2: Razumeti | Faza 3: Iztrebiti
 
 export type HumanAxis = 'obzidje' | 'orozje' | 'roboti';
-// Skrivanje | Špijonaža | Obramba
+// Obzidje | Orožje | Roboti
 
 export type Visibility = 'unknown' | 'partial' | 'revealed';
 // Megla: neznano | delno | odkrito
@@ -17,6 +17,8 @@ export interface AITreeNode {
   id: string;
   phase: AIPhase;
   label: string;
+  description: string;
+  effect: string;
   visibility: Visibility;
   strength: number; // 0–100, how strong this node is
   executed: boolean;

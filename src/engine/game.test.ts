@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
-import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability } from './game.js';
-import { rollOutcome, DECISIVE_MARGIN } from './combat.js';
+import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability } from './game.js';
+import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus } from './combat.js';
 import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths } from './expedition.js';
 import { createRNG } from './rng.js';
 import type { PlayerAction, GameState } from './types.js';
@@ -154,7 +154,7 @@ describe('raziskave: roboti odklepajo orožje/obzidje', () => {
   const research = (g: GameState, obj: 'robots' | 'weapon' | 'wall', n: number) =>
     processRound(g, { assignment: { axis: 'roboti', combatants: 0, defenders: 0, foragers: 0, workers: 0, researchers: n, rations: 3, researchObjective: obj } });
 
-  it('Roboti 120 razisk. → stopnja 1', () => {
+  it('Roboti 120 razisk. → razkrije mehansko šibkost in odklene stopnjo 1', () => {
     expect(research(newGame(8), 'robots', 120).robotsResearchLevel).toBe(1);
   });
 
@@ -175,18 +175,42 @@ describe('aiInsight — odpira AI drevo, fazni stropi', () => {
   it('start 1 %', () => {
     expect(newGame(1).aiInsight).toBeCloseTo(0.01, 5);
   });
-  it('raste po rundi in je omejen na fazni strop (find ≤ 0.30)', () => {
+  it('brez raziskovalcev ne raste več pasivno', () => {
+    const s = newGame(1);
+    const r = processRound(s, action({ foragers: 10, researchers: 0 }));
+    expect(r.aiInsight).toBeCloseTo(s.aiInsight, 5);
+  });
+  it('robot research poveča insight in je omejen na fazni strop (find ≤ 0.30)', () => {
     let s = newGame(1);
     for (let i = 0; i < 20 && s.status === 'active' && s.phase === 'find'; i++) {
-      s = processRound(s, action({ foragers: 40 }));
+      s = processRound(s, action({ foragers: 40, researchers: 10, researchObjective: 'robots' }));
       expect(s.aiInsight).toBeLessThanOrEqual(0.30 + 1e-9);
     }
+    expect(s.aiInsight).toBeGreaterThan(0.01);
   });
   it('z dovolj insighta se razkrije vsaj eno vozlišče drevesa', () => {
     const base = newGame(1);
     const g: GameState = { ...base, aiInsight: 0.55, phase: 'understand' };
     const r = processRound(g, action({ foragers: 5 }));
     expect(r.aiTree.some(n => n.visibility === 'revealed')).toBe(true);
+  });
+  it('mehanska šibkost določi odklenjeno tech stopnjo', () => {
+    const base = newGame(1);
+    const g: GameState = {
+      ...base,
+      aiTree: base.aiTree.map(n => n.id === 'atk_mech' ? { ...n, visibility: 'revealed' } : n),
+    };
+    expect(mechanicalTechUnlockLevel(g)).toBe(2);
+  });
+  it('logična šibkost spremeni combat bonus in raid obrambo', () => {
+    const base = newGame(1);
+    const withLogic: GameState = {
+      ...base,
+      aiTree: base.aiTree.map(n => n.id === 'scout_logic' ? { ...n, visibility: 'revealed' } : n),
+    };
+    expect(logicalWeaknessBonus(withLogic)).toBeGreaterThan(logicalWeaknessBonus(base));
+    const a = action({ defenders: 10, rations: 3 }).assignment;
+    expect(raidRepelProbability(withLogic, a)).toBeGreaterThan(raidRepelProbability(base, a));
   });
 });
 
@@ -228,5 +252,26 @@ describe('axisHistory (#6 — vir za CompletedRun)', () => {
     const g = newGame(3);
     const r = processRound(g, action({ axis: 'roboti', foragers: 5 }));
     expect(r.axisHistory.roboti).toBe((g.axisHistory.roboti ?? 0) + 1);
+  });
+});
+
+describe('legacy missions disabled', () => {
+  it('missionAssignments ne ustvarijo več activeMissions', () => {
+    const base = newGame(1);
+    const known: GameState = { ...base, aiWeakPoints: base.aiWeakPoints.map(w => ({ ...w, discovered: true })) };
+    const r = processRound(known, action({ missionAssignments: { wp_power: 10 }, missionRations: { wp_power: 3 } }));
+    expect(r.activeMissions).toEqual([]);
+  });
+
+  it('stara seja z activeMissions ne crasha in migrira ljudi nazaj v kamp', () => {
+    const base = newGame(1);
+    const old: GameState = {
+      ...base,
+      population: 70,
+      activeMissions: [{ weakPointId: 'wp_power', assigned: 10, monthsTotal: 4, monthsRemaining: 3, successProbability: 0.5, rations: 3, status: 'in_progress' }],
+    };
+    const r = processRound(old, action({ foragers: 20 }));
+    expect(r.activeMissions).toEqual([]);
+    expect(r.population).toBeGreaterThan(70);
   });
 });

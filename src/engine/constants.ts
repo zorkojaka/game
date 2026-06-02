@@ -202,18 +202,24 @@ export const RESEARCH_EFFECT_MULT = 2;           // ×2 na level
 export function researchMult(level: number): number {
   return Math.pow(RESEARCH_EFFECT_MULT, Math.max(0, level | 0));
 }
-// Vsaka razkrita LOGIČNA šibka točka robota → +bonus naši bojni moči proti AI (brez nadgradenj).
-// Z orožjem lvl 1 je napadalec izenačen z robotom; z logično šibkostjo postane močnejši.
-export const LOGICAL_WEAKNESS_BONUS = 0.5; // +50 % bojne moči na razkrito logično šibko točko
-
 // ─── Naše znanje o AI (odpira AI drevo) ────────────────────────────────────────
 export const INITIAL_AI_INSIGHT = 0.01;  // na začetku vemo 1 %
-export const INSIGHT_PER_ROUND   = 0.03; // postopno odpiranje na rundo (clamp na fazni strop)
+// Insight ni več pasiven timer: raziskovalci ga ustvarjajo. Robot research je primarna pot,
+// ostale raziskave dajo le manjši stranski napredek, ker ekipa še vedno dela z AI podatki.
+export const AI_INSIGHT_PER_RESEARCHER = 0.003;
+export const NON_ROBOT_RESEARCH_INSIGHT_FACTOR = 0.15;
 export const INSIGHT_PHASE_CAP: Record<AIPhase, number> = {
   find:       0.30, // faza 1 odpre do 30 %
   understand: 0.60, // faza 2 do 60 %
   eliminate:  0.90, // faza 3 do 90 %
 };
+
+// Razkrita logična šibkost da takojšen pasiven bonus. Uporabljamo enoten vir,
+// da UI lahko jasno pokaže aktivne bonuse in engine uporabi iste vrednosti.
+export const LOGICAL_WEAKNESS_COMBAT_BONUS = 0.20;    // splošni napad proti temu tipu robota
+export const LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS = 0.15; // obramba pred raid močjo tega tipa
+export const LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION = 0.20; // manj srečanj z izvidniki
+export const LOGICAL_WEAKNESS_LETHALITY_REDUCTION = 0.15; // manj žrtev pri people-killerjih
 
 // ─── AI napad na kamp (raid) ─────────────────────────────────────────────────
 // P(raid) = base + popScaling * popFactor + aiKnowBonus * aiKnow

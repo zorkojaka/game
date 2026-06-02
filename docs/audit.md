@@ -1,17 +1,32 @@
 # Audit projekta: AI vs Humanity
 
-Datum pregleda: 2026-06-01
+Datum pregleda: 2026-06-02
+
+Sprint update: veja `dev/research-ai-logic` je po tem auditu implementirala novi research-driven AI loop. Za aktualne spremembe glej [research-ai-logic.md](research-ai-logic.md). Preostale ugotovitve v tem auditu so uporabne kot zgodovinski pregled in tehnični dolg, ne kot popolnoma aktualen opis po sprintu.
 
 ## Povzetek
 
-Projekt je majhna TypeScript/React igra z jasnim namenom: potezna enoigralska strategija, kjer igralec vodi človeški klan proti AI. Arhitekturno je razdeljen na engine (`src/engine`), REST strežnik (`src/server`, `src/db`) in Vite/React frontend (`client/src`).
+Projekt je po prejšnjem auditu opazno posodobljen. Glavne izboljšave:
 
-Največja tehnična značilnost projekta je, da je veliko gameplay logike že skoncentrirane v čistem engine modulu, vendar sta tako engine kot UI zrasla v velike monolite:
+- dodani so engine testi (`src/engine/game.test.ts`);
+- frontend tipi so zdaj re-export iz `src/engine/types.ts`;
+- obroki v UI uporabljajo engine konstante;
+- AI ima razčlembo enot (`scouts`, `attackers`, `peopleKillers`);
+- boji in raidi uporabljajo dejanski seedan RNG roll;
+- dodani so raziskovalni leveli za robote, orožje in obzidje;
+- dodan je `aiInsight`, ki odpira AI drevo;
+- odprave imajo povratek, nošen plen in round-trip hrano;
+- admin API poti so zaščitene z `ADMIN_TOKEN`;
+- `CompletedRun` zdaj shrani dejanski `axisHistory`;
+- `GameSession.updateOne` uporablja `$set`;
+- dodana je osnovna validacija `assignment`.
 
-- `src/engine/game.ts` ima 943 vrstic in vsebuje skoraj celotno mesečno simulacijo.
-- `client/src/App.tsx` ima 3374 vrstic in vsebuje praktično vse zaslone, komponente, state in UI izračune.
-- Testnih datotek trenutno ni.
-- Obstaja precej legacy kode za star sistem scoutov/misij, ki ni več aktivno povezana z novim sistemom odprav po heks mapi.
+Največji preostali problem ni več samo arhitektura, ampak skladnost razlag in pravil:
+
+- `RulesModal` še vedno razlaga staro zasnovo `skrivanje / špijonaža / obramba`, čeprav so osi zdaj `obzidje / orozje / roboti`.
+- UI ocena napada po poti ne vključuje vseh engine bonusov in ne uporablja iste formule kot realni spopad.
+- Še vedno obstajata dva sistema za napade na šibke točke: novi path-based `expeditions` in stari `activeMissions`.
+- `processRound` in `App.tsx` sta še večja monolita kot prej.
 
 ## Struktura projekta
 
@@ -21,6 +36,7 @@ Največja tehnična značilnost projekta je, da je veliko gameplay logike že sk
 ├── CLAUDE.md
 ├── deploy.sh
 ├── ecosystem.config.cjs
+├── jest.config.cjs
 ├── package.json
 ├── tsconfig.json
 ├── docs/
@@ -38,6 +54,7 @@ Največja tehnična značilnost projekta je, da je veliko gameplay logike že sk
 │   │   ├── constants.ts
 │   │   ├── expedition.ts
 │   │   ├── fog.ts
+│   │   ├── game.test.ts
 │   │   ├── game.ts
 │   │   ├── map.ts
 │   │   ├── rng.ts
@@ -56,245 +73,795 @@ Največja tehnična značilnost projekta je, da je veliko gameplay logike že sk
         └── types.ts
 ```
 
-### Backend in DB
+Velikosti glavnih datotek:
 
-- `src/server/index.ts` je Express aplikacija. Servira `/api/*` in produkcijski frontend build iz `client/dist`.
-- `src/db/connection.ts` vzpostavi MongoDB Atlas povezavo z `MONGO_URI` in bazo `ai-vs-humanity`.
-- `GameSession` hrani celoten `GameState` z `strict: false`, zato lahko preživi evolucijo stanja brez migracij.
-- `CompletedRun` hrani končane run-e za statistiko in bodočo evolucijo AI.
-- `Feedback` hrani povratne informacije igralcev.
+- `src/engine/game.ts`: 1143 vrstic.
+- `client/src/App.tsx`: 3630 vrstic.
+- `src/engine/constants.ts`: 258 vrstic.
+- `src/engine/game.test.ts`: 232 vrstic.
+- skupaj TypeScript/TSX v `src` in `client/src`: 6720 vrstic.
 
-### Engine
+## Strani in zasloni
 
-- `types.ts`: vsi glavni tipi.
-- `constants.ts`: balancing konstante.
-- `game.ts`: `newGame`, `processRound`, `previewOdds` in večina pravil.
-- `combat.ts`: izračun moči, odds in izidov bojnih napadov.
-- `expedition.ts`: premikanje odprav po mapi, tveganja, najdbe.
-- `map.ts`: generiranje heks mape, drugi klani, vidnost heksov.
-- `fog.ts`: odkrivanje AI drevesa.
-- `ai-brain.ts`: AI genome, drevo AI in šibke točke.
-- `rng.ts`: deterministični RNG.
+Ni routerja. `App.tsx` upravlja vse zaslone.
 
-### Frontend
+### Start
 
-- `client/src/App.tsx`: en velik React monolit z vsemi zasloni, UI komponentami, lokalnim stateom, logiko poti, preview izračuni in layoutom.
-- `client/src/api.ts`: fetch wrapperji za API.
-- `client/src/types.ts`: kopija engine tipov za frontend.
-- `client/src/index.css`: celoten styling aplikacije.
+`StartScreen` se prikaže, ko ni naloženega `GameState`. Ob zagonu poskusi naložiti `runId` iz `localStorage` (`avh-runId`).
 
-## API poti
+### Glavni ekran
 
-- `POST /api/game/new`: ustvari novo igro, shrani `GameSession`, vrne `runId` in `state`.
-- `GET /api/game/:runId`: vrne stanje igre.
-- `POST /api/game/:runId/round`: izvede eno rundo prek `processRound`, posodobi sejo in po potrebi ustvari `CompletedRun`.
-- `POST /api/game/:runId/preview`: vrne odds za trenutno razporeditev.
-- `POST /api/feedback`: shrani feedback.
-- `GET /api/feedback`: vrne zadnjih 200 feedback zapisov.
-- `GET /api/sessions`: vrne zadnjih 20 sej.
+Sestava:
 
-## Vse strani in zasloni
-
-Projekt nima routerja. Vse je v `App.tsx`, prikaz pa je odvisen od stanja igre in izbranega zavihka.
-
-### Start screen
-
-`StartScreen` se prikaže, ko ni aktivnega `game` stanja. Uporabnik lahko začne novo igro. Ob zagonu frontend poskusi iz `localStorage` prebrati `avh-runId` in naložiti obstoječo igro.
-
-### Glavni game screen
-
-Glavni ekran je `app-shell` z:
-
-- zgornjo vrstico resursov, populacije, AI statusa in menija;
-- levim nav menijem z zavihki;
-- centralno operativno heks mapo;
-- desnim dnevnikom dogodkov;
-- spodnjo vrstico s fazami in gumbom `NASLEDNJI MESEC`.
+- zgornja vrstica z resursi, AI enotami, znanjem in menijem;
+- levi panel z zavihki;
+- osrednja heks mapa;
+- desni dnevnik dogodkov in aktivne odprave;
+- spodnja vrstica s fazami in gumbom `NASLEDNJI MESEC`.
 
 ### Zavihek Obramba
 
 Prikazuje:
 
-- število branilcev;
-- verjetnost AI napada v tekočem mesecu;
-- kumulativno verjetnost vsaj enega napada v 6 mesecih;
+- branilce;
+- mesečno verjetnost AI napada;
+- verjetnost vsaj enega napada v 6 mesecih;
 - verjetnost odbitja napada;
-- število obzidij in bonus;
-- bojno kapaciteto iz orožja.
+- orožje, prosto orožje, obzidje, artefakt.
 
 ### Zavihek Prehrana
 
 Prikazuje:
 
-- število nabiralcev;
+- nabiralce;
 - obroke;
-- pridelek;
-- porabo kampa;
-- projekcijo hrane naslednji mesec;
-- oceno varnosti nabiranja.
+- pridelek, porabo, zalogo;
+- projekcijo hrane;
+- varnost nabiranja.
 
 ### Zavihek Delavnice
 
-Prikazuje delavce in cilj izdelave:
+Prikazuje izdelavo:
 
-- orožje;
-- obzidje;
-- artefakt.
-
-Prikazuje material, obstoječe orožje/obzidje in napredek delavec-mesecev.
+- orožje: 6 delavec-mesecev + 1 material;
+- obzidje: 12 delavec-mesecev + 4 materiala;
+- artefakt: 360 delavec-mesecev + 20 materiala.
 
 ### Zavihek Raziskave
 
-Prikazuje raziskovalce in cilj:
+Prikazuje raziskovalce, cilj raziskave in drevesa:
 
-- `AI roboti`: več intela za bojni bonus;
-- `Ranljivosti`: razkrivanje AI drevesa.
+- `robots`;
+- `weapon`;
+- `wall`.
+
+Roboti odklepajo stopnje orožja/obzidja. AI drevo se odpira prek `aiInsight`.
 
 ### Zavihek Izvidniki
 
-Uporabnik riše pot po heks mapi. Pot se lahko potrdi kot scout odprava. Odprava vzame ljudi in hrano, nato se po izvedbi meseca doda v `newExpeditions`.
+Risanje poti po heks mapi. Izvidniška odprava:
+
+- vzame ljudi iz kampa;
+- vzame hrano za pot tja in nazaj;
+- raziskuje hekse;
+- lahko najde material/orožje/artefakt;
+- plen dostavi šele ob vrnitvi.
 
 ### Zavihek Napad
 
-Uporabnik riše pot do AI jedra ali odkrite šibke točke. Pot se potrdi kot `mission` odprava. Spopad se zgodi ob prihodu na cilj, ne takoj ob kliku.
+Risanje napadalne poti do AI jedra ali odkrite šibke točke. Spopad se zgodi ob prihodu. Preživeli se vračajo v kamp.
 
-### Zavihek V teku
-
-Prikazuje aktivne `expeditions` in stare `activeMissions`, če obstajajo.
-
-### Zavihek Misije
+### Desni panel V teku
 
 Prikazuje:
 
-- `AlliesPanel`: drugi človeški klani, odkrite lokacije, zavezništva in mesečni bonus.
-- `Missions`: stare misije proti šibkim točkam prek `missionAssignments`, ločeno od novega sistema poti.
-
-### Zavihek Drevo
-
-Prikazuje:
-
-- `HumanTree`: napredek po oseh `hiding`, `espionage`, `defense`.
-- `AITree`: AI načrtovalno drevo po fazah.
-
-### Dnevnik dogodkov
-
-`EventLog` je frontend-only časovni trak zadnjih 50 vnosov. Zgradi se iz `lastRoundLog` po vsaki rundi in ni trajno shranjen kot seznam; po refreshu ostane samo zadnji `lastRoundLog`, ne celotna zgodovina.
+- aktivne path-based odprave;
+- odprave v povratku;
+- stare `activeMissions`, če obstajajo.
 
 ### Modali
 
-- `FeedbackModal`: pošiljanje predlogov/napak.
-- `RulesModal`: razlaga pravil.
-- `PhaseTransitionBanner`: prikaz ob prehodu faze.
-- `GameOverScreen`: končni ekran za zmago ali poraz.
+- `FeedbackModal`;
+- `RulesModal`;
+- `PhaseTransitionBanner`;
+- `GameOverScreen`.
+
+## API in strežnik
+
+### API poti
+
+- `POST /api/game/new`: nova igra.
+- `GET /api/game/:runId`: stanje igre.
+- `POST /api/game/:runId/round`: izvede mesec.
+- `POST /api/game/:runId/preview`: preview odds.
+- `POST /api/feedback`: shrani feedback.
+- `GET /api/feedback`: admin, zahteva `x-admin-token`.
+- `GET /api/sessions`: admin, zahteva `x-admin-token`.
+
+### Validacija
+
+`validateAssignment` preveri:
+
+- `axis` mora biti `obzidje`, `orozje` ali `roboti`;
+- glavna numerična polja morajo biti integer >= 0;
+- `rations` mora biti 1-5;
+- `newExpeditions` mora biti seznam s potmi.
+
+To je dobra osnovna validacija, vendar še ne preveri:
+
+- da so koraki poti sosednji;
+- da so koordinate na mapi;
+- da odprava ne preseže populacije;
+- da `missionAssignments` in `missionRations` vsebujejo veljavne vrednosti;
+- da `newExpeditions.kind` velja samo `scout` ali `mission`.
 
 ## Game loop
 
-Glavna zanka je:
+1. Frontend ustvari ali naloži igro.
+2. Igralec razporedi branilce, nabiralce, delavce, raziskovalce, obroke in odprave.
+3. Frontend kliče `/api/game/:runId/preview` za predogled.
+4. Ob `NASLEDNJI MESEC` frontend pošlje `PlayerAction`.
+5. Server naloži `GameSession`, validira assignment, pokliče `processRound`.
+6. Novi `GameState` se shrani z `$set`.
+7. Če je igra zaključena, server ustvari `CompletedRun`.
+8. Frontend iz `lastRoundLog` doda vnos v lokalni event log.
 
-1. Frontend naloži ali ustvari `GameState`.
-2. Igralec razporedi ljudi, obroke, delavnice, raziskave in morebitne odprave.
-3. Frontend kliče `POST /api/game/:runId/preview` za predogled verjetnosti.
-4. Ob kliku `NASLEDNJI MESEC` frontend pošlje `PlayerAction`.
-5. Server naloži `GameSession`, pokliče `processRound(state, action)` in shrani nov state.
-6. Frontend dobi nov `state`, iz `lastRoundLog` sestavi vnos v lokalni event log in nadaljuje.
+Engine je determinističen za isti seed in isti sequence akcij. RNG stanje je:
 
-Engine je zamišljen kot determinističen. V `GameState` sta `rngSeed` in `rngCallCount`; vsak RNG klic poveča števec. To omogoča ponovljivost, če ista začetna igra prejme iste akcije.
+- `rngSeed`;
+- `rngCallCount`.
 
-## Kako delujejo runde
+## Runde: zaporedje v engineu
 
-`processRound` izvede eno mesečno rundo v tem zaporedju:
+`processRound` naredi:
 
-1. Če igra ni `active`, vrne nespremenjeno stanje.
-2. Inicializira RNG iz `rngSeed` in `rngCallCount`.
-3. Izračuna celotno velikost klana pred rundo: kamp + aktivne misije + odprave.
-4. Normalizira razporeditev borcev in branilcev glede na razpoložljivo orožje.
-5. Iz `axisHistory` izračuna nivoje `hiding`, `espionage`, `defense`.
-6. Uporabi obroke za porabo hrane, moč in populacijske učinke.
-7. Kamp porabi hrano, nabiralci proizvedejo hrano.
-8. Raziskovalci dodajo intel in po potrebi razkrivajo AI drevo.
-9. Delavci napredujejo v delavnicah in porabijo material za orožje, obzidje ali artefakt.
-10. Šibke točke se lahko odkrijejo prek AI drevesa ali raziskane mape.
-11. Neposredni `combatants` napad je še podprt v engineu, vendar frontend trenutno v `handleRound` vedno pošlje `combatants: 0`; dejanski napadi so prek poti.
-12. AI lahko izvede raid na kamp. Verjetnost temelji na populaciji, AI znanju, osi in aktivnosti drugih klanov.
-13. Uporabi se artefakt, če je izbran.
-14. Aktivne odprave se premaknejo za en korak, lahko doživijo srečanja, najdbe, odkritja, zavezništva ali boj ob prihodu.
-15. Nove odprave iz `assignment.newExpeditions` se sprejmejo: ljudje odidejo iz kampa, hrana se odšteje upfront.
-16. Stare `activeMissions` se tickajo, nove iz `missionAssignments` se lahko začnejo.
-17. Drugi klani se odkrijejo in zavezniki pošljejo mesečne bonuse.
-18. `clanActivity` se posodobi glede na skrivanje/izpostavljenost in zaveznike.
-19. AI pridobi novo `aiKnowledge` iz nadzora.
-20. Lakota lahko ubije del populacije.
-21. Obroki lahko spremenijo populacijo.
-22. Preveri se poraz zaradi izumrtja ali popolnega AI znanja v fazi `eliminate`.
-23. Napreduje faza/mesec, po 12 rundah pride do prehoda faze.
-24. Če so vsi roboti uničeni ali vse šibke točke exploited, status postane `victory`.
-25. Sestavi se `RoundLog` in vrne nov `GameState`.
+1. vrne state, če status ni `active`;
+2. sestavi RNG iz `rngSeed/rngCallCount`;
+3. izračuna celoten klan pred rundo: kamp + stare misije + odprave;
+4. normalizira oborožene ljudi glede na orožje;
+5. naloži obroke;
+6. kamp porabi hrano;
+7. nabiralci proizvedejo hrano;
+8. raziskovalci dodajo intel in napredek raziskav;
+9. `aiInsight` naraste in odpre AI drevo;
+10. delavci napredujejo v delavnicah;
+11. šibke točke se lahko odkrijejo prek AI drevesa ali mape;
+12. neposredni `combatants` napad se razreši, če je uporabljen;
+13. AI lahko izvede raid na kamp;
+14. artefakt lahko uniči šibko točko;
+15. nove odprave se sprejmejo pred tikanjem;
+16. aktivne odprave se premaknejo, napadejo ali se vračajo;
+17. stare `activeMissions` se tickajo;
+18. drugi klani se odkrijejo in zavezniki pošljejo pomoč;
+19. `clanActivity` se spremeni;
+20. AI pridobi `aiKnowledge`;
+21. lakota lahko ubije del populacije;
+22. obroki lahko spremenijo populacijo;
+23. preveri se poraz;
+24. faza napreduje;
+25. ob prehodu faze AI dobi nove enote;
+26. preveri se zmaga;
+27. sestavi se `RoundLog`.
 
-## Kako deluje AI napredek
+## Popis igralne logike in formul
 
-AI ima tri faze:
+### Začetno stanje
 
-- `find`;
-- `understand`;
-- `eliminate`.
+Začetek:
 
-Vsaka faza traja 12 rund (`ROUNDS_PER_PHASE`). `aiPhaseProgress` se vsak mesec poveča za 1. Ko doseže 12:
+- populacija: 80;
+- hrana/voda: 120;
+- orožje: 60;
+- intel: 10;
+- material: 30;
+- artefakti: 0;
+- AI znanje o nas: 0.1;
+- aktivnost drugih klanov: 0.60;
+- AI insight igralca: 0.01;
+- AI enote: 100 izvidnikov.
 
-- `round` se resetira na 1;
-- `phase` preide na naslednjo fazo;
-- `aiPhaseProgress` se resetira na 0;
-- vozlišča zaključene faze v `aiTree` se retroaktivno razkrijejo in označijo kot `executed`.
+### AI enote
 
-AI napredek ni trenutno vezan na `DEFAULT_GENOME.phaseSpeed`, čeprav genome vsebuje `phaseSpeed`. AI tudi ne izbira aktivnih akcij iz `aiTree`; drevo je predvsem fog-of-war in narativna struktura. Realni pritisk AI prihaja iz:
+AI ima tri tipe:
 
-- števila `aiRobots`;
-- `aiKnowledge`;
-- `raidProbability`;
-- faznih prehodov;
-- raid izidov;
-- interakcije s `clanActivity`.
+| Tip | Faza prihoda | Število | Napad | Obramba | HP |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `scouts` | `find` | 100 | 0.4 | 0.5 | 1 |
+| `attackers` | `understand` | 75 | 1.6 | 1.2 | 2 |
+| `peopleKillers` | `eliminate` | 25 | 3.5 | 2.6 | 4 |
 
-`aiKnowledge` raste glede na izpostavljenost igralca:
+Skupna ofenzivna moč:
 
 ```text
-exposure = (combatants + researchers) / population
-gain = calcAISurveillanceGain(DEFAULT_GENOME, clanActivity, exposure)
+aiAttackPower =
+  scouts * 0.4 +
+  attackers * 1.6 +
+  peopleKillers * 3.5
 ```
 
-Drugi klani z višjim `clanActivity` zmanjšujejo AI surveillance gain. Raid izidi lahko dodatno povečajo `aiKnowledge`.
+Skupna obrambna moč:
 
-## Glavne komponente
+```text
+aiDefensePower =
+  scouts * 0.5 +
+  attackers * 1.2 +
+  peopleKillers * 2.6
+```
 
-### Engine komponente
+Polna AI attack referenca:
 
-- `newGame(seed?)`: ustvari začetni `GameState`.
-- `processRound(state, action)`: glavni mesečni reducer.
-- `previewOdds(state, assignment)`: izračuna preview za UI.
-- `resolveCombat`: razreši neposreden napad.
-- `resolveRaid`: razreši AI napad na kamp.
-- `tickExpedition`: premakne odpravo po mapi in sproži srečanja/najdbe.
-- `spendIntelOnFog`: porabi raziskovalni budget za AI drevo.
-- `generateMap`: ustvari fiksno 6x5 heks mapo.
-- `generateOtherClans`: ustvari fiksne druge klane.
-- `generateAITree`: ustvari fiksno AI drevo.
-- `generateAIWeakPoints`: ustvari tri šibke točke.
+```text
+100*0.4 + 75*1.6 + 25*3.5 = 247.5
+```
 
-### Frontend komponente
+Ob faznih prehodih:
 
-Najpomembnejše aktivne komponente:
+- v `understand` pride +75 attackers;
+- v `eliminate` pride +25 peopleKillers.
 
-- `App`: glavni state, API klici, layout, tab routing.
-- `StartScreen`, `GameOverScreen`.
-- `PhaseHeader`, `PhaseTransitionBanner`.
-- `BigStat`, `RationsMini`, `WorkshopSelector`, `ResearchSelector`.
-- `HexMap`: mapa, kamp zoni, risanje poti, odprave, weak point markerji.
-- `AlliesPanel`, `Missions`.
-- `HumanTree`, `AITree`, `NodeCard`.
-- `EventLog`, `RoundLog`.
-- `FeedbackModal`, `RulesModal`.
-- `FitScale`: pomanjša vsebino levih panelov.
+### Uničevanje AI enot
 
-Komponente, ki obstajajo, a niso več očitno uporabljene:
+`destroyAIUnits(units, count)` razporedi izgube po tipih uteženo z `1 / hp`.
+
+Pomen: šibkejši roboti padajo prej, people-killerji preživijo dlje. Ostanek po zaokroževanju se odstrani v vrstnem redu:
+
+```text
+scouts → attackers → peopleKillers
+```
+
+### Obroki
+
+| Nivo | Hrana | Populacija | Moč |
+| --- | ---: | ---: | ---: |
+| 1 Lakota | x0.50 | -5 do -3 | x0.55 |
+| 2 Skopo | x0.75 | -2 do -1 | x0.80 |
+| 3 Normalno | x1.00 | 0 | x1.00 |
+| 4 Dobro | x2.50 | +1 do +3 | x1.30 |
+| 5 Obilje | x5.00 | +3 do +6 | x1.60 |
+
+Pomembno: `rngInt(min, max)` je max-exclusive, zato trenutna implementacija dejansko ne doseže zgornje meje. Primer: `-5 do -3` v praksi vrne `-5` ali `-4`, ne `-3`.
+
+### Hrana
+
+Poraba kampa:
+
+```text
+survivalCost = round(population * 1 * rations.foodMult)
+```
+
+Nabiranje:
+
+```text
+foraged = floor(foragers * 4 * rations.strengthMult)
+```
+
+Po porabi in nabiranju se `survival` clampa na 0.
+
+Lakota:
+
+```text
+isStarving = survival <= 0
+```
+
+Izgube:
+
+- 1. mesec lakote: 25 % kamp populacije;
+- 2. mesec: 50 %;
+- 3+ mesec: 75 %.
+
+### Raziskave
+
+Raziskovalci vedno dodajo osnovni intel:
+
+```text
+intel += floor(researchers * 8 * rations.strengthMult)
+```
+
+Če je cilj `robots`, dodajo še enak dodaten intel bonus in napredujejo v robots research:
+
+```text
+intel += floor(researchers * 8 * rations.strengthMult)
+robotsResearchProgress += researchers
+```
+
+Vsaka raziskovalna stopnja zahteva:
+
+```text
+120 raziskovalec-mesecev
+```
+
+Zaklep:
+
+- `robotsResearchLevel` odklepa maksimalni level `weaponResearchLevel` in `wallResearchLevel`;
+- `weapon` in `wall` ne moreta preseči `robots`.
+
+Učinek levelov:
+
+```text
+researchMult(level) = 2^level
+```
+
+Orožje:
+
+- level 0: x1;
+- level 1: x2;
+- level 2: x4.
+
+Obzidje:
+
+- level 0: x1;
+- level 1: x2;
+- level 2: x4.
+
+### AI insight in AI drevo
+
+Začetek:
+
+```text
+aiInsight = 0.01
+```
+
+Vsaka runda:
+
+```text
+aiInsight += 0.03
+```
+
+Fazni stropi:
+
+- `find`: 0.30;
+- `understand`: 0.60;
+- `eliminate`: 0.90.
+
+AI drevo ima 9 vozlišč:
+
+- 3 tipi robotov;
+- za vsakega: unit, mechanical weak point, logical weak point.
+
+Thresholdi:
+
+- scouts: 0.10, 0.20, 0.30;
+- attackers: 0.40, 0.50, 0.60;
+- peopleKillers: 0.70, 0.80, 0.90.
+
+`revealTreeByInsight`:
+
+- če `aiInsight >= threshold`, node postane `revealed`;
+- če je v razponu `threshold - 0.08`, lahko postane `partial`;
+- revealed node se nikoli ne degradira.
+
+Razkrite logical weak point točke dajo bojni bonus:
+
+```text
+logicalWeaknessBonus = numberOfRevealedLogicalNodes * 0.5
+humanCombatMultiplier *= (1 + logicalWeaknessBonus)
+```
+
+### Neposredni napad iz kampa
+
+Če `assignment.combatants > 0`, se uporabi `resolveCombat`.
+
+Človeška moč:
+
+```text
+equipUsed = min(combatResources, combatants)
+base =
+  combatants * 1.2 * rations.strengthMult +
+  equipUsed * 0.8 * weaponResearchMult
+
+humanStrength = base * intelCombatMultiplier * logicalWeaknessMultiplier
+```
+
+Intel:
+
+```text
+intelCombatMultiplier = 1 + min(0.25, 0.05 * intelligence / 100)
+```
+
+AI moč:
+
+```text
+aiStrength = aiDefensePower(aiUnits) * (1 - clanActivity) * foreknowledge
+foreknowledge = 1.3 if aiKnowledge > 0.5 else 1.0
+```
+
+Verjetnost uspeha:
+
+```text
+p = humanStrength * (1 + weakPointBonus) /
+    (humanStrength * (1 + weakPointBonus) + aiStrength)
+```
+
+Če napad izkorišča odkrito šibko točko:
+
+```text
+weakPointBonus = 0.25
+```
+
+Izid je RNG:
+
+```text
+roll = rngNext()
+if roll < p:
+  outcome = victory if p - roll >= 0.25 else partial
+else:
+  outcome = annihilation if roll - p >= 0.25 else defeat
+```
+
+Izgube in plen:
+
+| Izid | Ljudje izgubljeni | AI uničen | Plen |
+| --- | ---: | ---: | --- |
+| victory | 5 % combatants | 90 % engaged | 10 % orožja, +15 intel |
+| partial | 20 % | 50 % | 5 % orožja, +8 intel |
+| defeat | 55 % | 20 % | +3 intel |
+| annihilation | 100 % | 5 % | nič |
+
+`aiRobotsEngaged`:
+
+```text
+floor(aiRobots * (1 - clanActivity) * 0.3)
+```
+
+### AI raid na kamp
+
+Verjetnost raida:
+
+```text
+attackPow = aiAttackPower(aiUnits)
+popFactor = min(1, population / 100)
+
+pRaid =
+  (0.05 + 0.20 * popFactor + 0.15 * aiKnowledge)
+  * (1 - clanActivity * 0.50)
+  * min(1, attackPow / 247.5)
+```
+
+Če `attackPow <= 0`, raid probability = 0.
+
+Opomba: `axis` trenutno ne vpliva na raid, čeprav je parameter prisoten.
+
+Verjetnost odbitja raida:
+
+```text
+defenders = assignment.defenders + dayGuard + nightGuard
+weaponMult = 2^weaponResearchLevel
+wallMult = 2^wallResearchLevel
+wallBonus = 1 + 0.20 * wallMult * wallsBuilt
+
+base = defenders * 1.2 * rations.strengthMult
+equip = min(combat, defenders) * 0.40 * weaponMult
+defStr = (base + equip) * (1 + intelCombatBonus) * wallBonus
+
+aiStr = aiAttackPower(aiUnits) * (1 - clanActivity) * 0.50
+
+pRepel = defStr / (defStr + max(1, aiStr))
+```
+
+Raid izid uporablja isti `rollOutcome(pRepel)`.
+
+Raid žrtve:
+
+Front-line branilci:
+
+| Izid | Branilci | AI uničen |
+| --- | ---: | ---: |
+| victory | 5 % | 80 % |
+| partial | 25 % | 35 % |
+| defeat | 60 % | 12 % |
+| annihilation | 100 % | 3 % |
+
+People-killerji povečajo smrtnost:
+
+```text
+lethality = 1 + 0.012 * peopleKillers
+```
+
+Preboj območij:
+
+| Izid | Prebitih območij |
+| --- | ---: |
+| victory | 0 |
+| partial | 1 |
+| defeat | 2 |
+| annihilation | 4 |
+
+Območja so naključno izbrana iz:
+
+- food;
+- workshop;
+- research;
+- defense.
+
+Žrtve v prebitih območjih:
+
+```text
+partial: 20 % * lethality
+defeat: 40 % * lethality
+annihilation: 70 % * lethality
+```
+
+Uničeni viri:
+
+- food: 25 % trenutne hrane;
+- workshop: 20 % trenutnega orožja;
+- research: 30 % trenutnega materiala;
+- defense: -1 stopnja obzidja.
+
+Neuporabljeno orožje se dodatno lahko uniči:
+
+```text
+weaponsIdle = max(0, combat - defenders - combatants)
+weaponsDestroyed = floor(weaponsIdle * random(20..80 %) / 100)
+```
+
+### Odprave
+
+Premik:
+
+```text
+TILES_PER_MONTH = 1
+pathMonths = path.length - 1
+returnMonths = min(pathMonths, hexDistance(lastTile, camp))
+roundTripMonths = pathMonths + returnMonths
+```
+
+Ob ustvarjanju odprava vzame hrano za `roundTripMonths`.
+
+Stealth:
+
+- vsak 3. mesec preskoči premik;
+- srečanja x0.5;
+- napad po poti ima +20 % bojni bonus.
+
+Raziskovanje heksa:
+
+```text
+researchPerVisit = min(0.55, 0.30 + 0.025 * assigned)
+```
+
+Srečanje na heksu:
+
+```text
+base = 0.05 + 0.004 * assigned + 0.20 * aiKnowledge
+pTile = base * tileEncounterMultiplier * encounterScoutFactor(aiScouts)
+pEncounter = stealth ? pTile * 0.5 : pTile
+```
+
+`tileEncounterMultiplier`:
+
+- progress < 0.25: x1.5;
+- progress < 0.50: x1.2;
+- progress < 1.0: x0.7;
+- progress = 1.0: x0.3;
+- distance <= 1: dodatno x0.5;
+- distance <= 2: dodatno x0.8.
+
+`encounterScoutFactor`:
+
+```text
+0.25 + 0.75 * min(1, aiScouts / 100)
+```
+
+Izgube ob srečanju:
+
+```text
+lost = max(1, floor(assignedNow * random(20..50 %) / 100))
+```
+
+Najdbe na nepopolnoma raziskanem polju:
+
+- artefakt: 0.5 %;
+- orožje: dodatnih 2.5 %;
+- material: dodatnih 12 %.
+
+Najdbe se nosijo in pridejo v kamp šele ob vrnitvi.
+
+### Napad po poti
+
+Če je cilj odkrito weak point polje, uporablja `missionSuccessProbability`:
+
+```text
+teamPower =
+  (sqrt(assigned) * 1.2 * 8 + min(combat, assigned) * 1.2)
+  * rations.strengthMult
+
+p = teamPower * (1 + intelBonus) /
+    (teamPower * (1 + intelBonus) + wpDifficulty)
+```
+
+Težavnosti:
+
+- `wp_power`: 70;
+- `wp_comm`: 90;
+- `wp_core`: 120.
+
+Stealth:
+
+```text
+p = min(0.98, pBase * 1.2)
+```
+
+Če je cilj splošni napad na AI:
+
+```text
+humanStr =
+  survivors * 1.2 * rations.strengthMult *
+  stealthBonus *
+  weaponResearchMult *
+  (1 + logicalWeaknessBonus)
+
+aiStr = max(1, aiDefensePower(aiUnits) * 0.05)
+p = humanStr / (humanStr + aiStr)
+```
+
+Ob uspehu:
+
+```text
+destroyed = min(aiRobots, round(survivors * (1 + p)))
+lost = round(survivors * (1 - p) * 0.3)
+```
+
+Ob neuspehu:
+
+```text
+destroyed = min(aiRobots, round(survivors * 0.5))
+lost = round(survivors * 0.6)
+```
+
+### Drugi klani
+
+Drugi klani so fiksni:
+
+- Severni klan: people, `(1,0)`;
+- Vzhodni klan: material, `(4,3)`;
+- Dolinski klan: food, `(2,1)`.
+
+Odkrijejo se pri `researchProgress >= 0.50`.
+
+Če odprava pride na njihov heks, postanejo allied. Vsak allied klan:
+
+```text
+clanActivity += 0.04
+```
+
+Mesečni bonus:
+
+- food: +8 hrane;
+- material: +4 materiala;
+- weapons: +2 orožja;
+- people: +1 populacija.
+
+### Clan activity in AI knowledge
+
+Osnovni padec:
+
+```text
+clanActivity += -0.004 + allyBoost
+```
+
+AI surveillance:
+
+```text
+exposure = (combatants + researchers) / max(1, state.population)
+base = 0.4 * exposure
+clansBlock = clanActivity * 0.5
+aiKnowledgeGain = max(0, base - clansBlock) * 0.1
+```
+
+Raid lahko dodatno poveča `aiKnowledge`:
+
+- victory: +0.03;
+- partial: +0.07;
+- defeat/annihilation: +0.15.
+
+## Glavne state spremenljivke
+
+### Čas
+
+- `round`;
+- `phase`;
+- `totalRounds`;
+- `aiPhaseProgress`;
+- `status`.
+
+### Populacija
+
+- `population`: ljudje v kampu;
+- `maxPopulation`;
+- ljudje na misijah/odpravah so ločeno v `activeMissions` in `expeditions`.
+
+### Resursi
+
+- `survival`;
+- `combat`;
+- `intelligence`;
+- `material`;
+- `artifacts`.
+
+### AI
+
+- `aiRobots`;
+- `aiUnits`;
+- `aiKnowledge`;
+- `aiInsight`;
+- `aiTree`;
+- `aiWeakPoints`.
+
+### Raziskave in delavnice
+
+- `robotsResearchLevel`, `robotsResearchProgress`;
+- `weaponResearchLevel`, `weaponResearchProgress`;
+- `wallResearchLevel`, `wallResearchProgress`;
+- `weaponWorkshopProgress`;
+- `wallProgress`, `wallsBuilt`;
+- `artifactWorkshopProgress`.
+
+### Mapa in odprave
+
+- `mapTiles`;
+- `otherClans`;
+- `expeditions`;
+- `completedExpeditions`;
+- `activeMissions`;
+- `completedMissions`.
+
+## Testi
+
+Dodani so engine testi za:
+
+- determinizem;
+- RNG outcome;
+- fazni prehod;
+- lakoto;
+- AI enote po fazah;
+- zmago ob uničenju vseh robotov;
+- `destroyAIUnits`;
+- encounter faktor glede na AI scout enote;
+- research gating;
+- `aiInsight`;
+- povratni čas odprav;
+- raid breached areas;
+- `axisHistory`.
+
+To je dober začetek. Manjkajo še testi za:
+
+- frontend/build skladnost;
+- validacijo poti v API;
+- path-based weak point napad;
+- dostavo nošenega plena ob vrnitvi;
+- uničenje virov po raid območjih;
+- `CompletedRun` brez duplikata, če round endpoint nekako ponovno obdela končano igro;
+- edge case z migracijo starih `HumanAxis` vrednosti.
+
+## Neuporabljena ali legacy koda
+
+### Engine
+
+Neuporabljeni importi ali legacy:
+
+- `createRNG` v `game.ts`;
+- `rngBool` v `game.ts`;
+- `spendScoutsOnMap` v `game.ts`;
+- `visibilityFromProgress` v `game.ts`;
+- `tileId` v `game.ts`;
+- `adaptGenome` v `game.ts`;
+- `SCOUT_FOG_YIELD`;
+- `CLAN_ACTIVITY_BY_PHASE`;
+- `CLAN_ACTIVITY_HIDDEN_MODIFIER`;
+- `PHASE_EVENT_BASE_DAMAGE`;
+- `PREPARED_DAMAGE_REDUCTION`;
+- `SCOUT_HIDING_REDUCTION`;
+- `SCOUT_PARTIAL_EFFECTIVE`;
+- `SCOUT_CAPTURED_LOSS_MAX` v `game.ts`;
+- `currentAxis`;
+- legacy `scoutSuccessProbability` / `scoutCaptureProbability`;
+- legacy `scouts`, `scoutPlan`, `dayGuard`, `nightGuard`;
+- legacy `activeMissions` timer sistem.
+
+### Frontend
+
+Verjetno neuporabljene komponente:
 
 - `ResStat`;
 - `ResourceRow`;
@@ -303,282 +870,212 @@ Komponente, ki obstajajo, a niso več očitno uporabljene:
 - `PeopleAllocator`;
 - `PeopleBar`;
 - `SliderRow`;
-- `AxisSelector`;
 - `RationsSelector`;
 - `OddsDisplay`;
 - `OddsArc`;
 - `BalanceTrend`;
-- `HumanMissionsPlaceholder`;
-- verjetno tudi `RoundLog` kot samostojen prikaz zadnjega meseca.
+- `HumanMissionsPlaceholder`.
 
-## Glavne game state spremenljivke
+Stanje/flow:
 
-### Čas in status
+- `combatants` obstaja, vendar path attack uporablja `draftPeople`; direct combat UI ni več glavni flow.
+- `missionAssignments` in `activeMissions` sta še priključena prek `Missions`, čeprav novi napadi uporabljajo `newExpeditions`.
 
-- `round`: mesec znotraj faze, 1-12.
-- `phase`: `find`, `understand`, `eliminate`.
-- `totalRounds`: globalni števec mesecev.
-- `status`: `active`, `victory`, `defeat_extinction`, `defeat_overwhelmed`.
-- `runId`: ID seje.
+## Potencialni bugi in neskladja
 
-### Populacija
+### 1. Rules modal je zastarel
 
-- `population`: ljudje v kampu. Pomembno: ljudje na aktivnih misijah/odpravah niso vključeni.
-- `maxPopulation`: največja dosežena populacija.
-- `consecutiveStarvationMonths`: zaporedni meseci lakote.
+`RulesModal` še vedno pravi:
 
-### Resursi
+- faza 1: skrivanje je najmočnejše;
+- faza 2: špijonaža;
+- faza 3: obramba.
 
-- `resources.survival`: hrana/voda.
-- `resources.combat`: orožje.
-- `resources.intelligence`: intel.
-- `resources.material`: material.
-- `resources.artifacts`: artefakti za instant uničenje šibke točke.
+Engine in UI zdaj uporabljata osi:
 
-### AI
+- `obzidje`;
+- `orozje`;
+- `roboti`.
 
-- `aiRobots`: število AI robotov.
-- `aiKnowledge`: koliko AI ve o klanu, 0-1.
-- `aiPhaseProgress`: napredek v fazi, 0-12.
-- `aiTree`: vozlišča AI načrta.
-- `aiWeakPoints`: šibke točke.
+To je največje trenutno UX neskladje. Igralec dobi razlago za staro igro.
 
-### Klani
+### 2. UI pravi, da nizka populacija znižuje napad, vendar raid uporablja kamp populacijo
 
-- `clanActivity`: koliko so drugi klani aktivni in s tem zaposlujejo AI.
-- `otherClans`: fiksni drugi klani z `discovered`, `allied`, `specialty`.
+To je delno res, vendar `population` v engineu pomeni kamp populacijo. Ljudje na odpravah niso v `population`, zato lahko množično pošiljanje ven zniža raid chance na kamp. Če je to namerno, naj UI to razloži kot "manj ljudi v kampu", ne "nižja populacija".
 
-### Napredek igralca
+### 3. Attack preview po poti ne uporablja iste formule kot engine
 
-- `axisHistory`: število rund po oseh `hiding`, `espionage`, `defense`.
-- `weaponWorkshopProgress`.
-- `weaponWorkshopScouts`: legacy ime/stanje.
-- `wallProgress`.
-- `wallsBuilt`.
-- `artifactWorkshopProgress`.
+UI v zavihku Napad računa:
 
-### Misije in odprave
+```text
+hStr = draftPeople * 1.2 * rations * stealth
+aiStr = aiDefensePower(aiUnits) * 0.05
+```
 
-- `expeditions`: aktivne odprave po heks poti.
-- `completedExpeditions`: zaključene/izgubljene odprave.
-- `activeMissions`: stari timer sistem misij proti šibkim točkam.
-- `completedMissions`: zaključene stare misije.
+Engine za splošni path attack vključuje še:
 
-### Mapa
+- `weaponResearchLevel`;
+- `logicalWeaknessBonus`.
 
-- `mapTiles`: 6x5 heks mapa.
-- `HexTile.researchProgress`: 0-1 kontinuirana raziskanost.
-- `HexTile.visibility`: izpeljana vidnost `unknown`, `partial`, `revealed`.
-- `HexTile.hidesWeakPointId`.
-- `HexTile.otherClanId`.
+Engine za weak point path attack uporablja čisto drugo formulo `missionSuccessProbability`. Zato UI `OCENA ZMAGE` ni zanesljiva za vse napade.
 
-### RNG in log
+### 4. Pending expedition prikazuje samo pot tja, engine hrano računa tja+nazaj
 
-- `rngSeed`.
-- `rngCallCount`.
-- `lastRoundLog`.
+V map tab pending row:
 
-## Neuporabljena ali legacy koda
+```text
+months = e.path.length - 1
+food = assigned * months * foodMult
+```
 
-### Engine
+Engine ob ustvarjanju uporablja:
 
-- `createRNG` je importan v `game.ts`, vendar ni uporabljen.
-- `rngBool` je importan v `game.ts` in `combat.ts`, vendar ni uporabljen.
-- `rngInt` je importan v `combat.ts`, vendar ni uporabljen.
-- `spendScoutsOnMap` in `visibilityFromProgress` sta importana v `game.ts`, vendar nista uporabljena.
-- `adaptGenome` je importan v `game.ts`, vendar ni uporabljen.
-- `currentAxis` je exportan, vendar ga ni videti v rabi.
-- `PhaseEvent` tip obstaja, vendar dejanski fazni damage iz `PHASE_EVENT_BASE_DAMAGE` ni uporabljen.
-- `ScoutPlan`, `scouts`, `scoutPlan`, `dayGuard`, `nightGuard` so legacy polja.
-- `scoutSuccessProbability` in `scoutCaptureProbability` računata legacy `assignment.scouts`, medtem ko novi UI uporablja `newExpeditions`.
-- `weaponWorkshopScouts` je legacy polje, ki se nastavlja na `workers`.
-- `spendScoutsOnMap` v `map.ts` je označen kot star backward compatibility sistem, vendar v trenutnem flowu ni priključen.
+```text
+roundTripMonths(path)
+```
 
-### Frontend
+Glavni draft panel že kaže `tja + nazaj`, pending seznam pa lahko kaže premalo hrane/časa.
 
-- Več komponent v `App.tsx` ni priključenih v trenutni render flow: `ResStat`, `ResourceRow`, `ClanStatus`, `WeakPoints`, `PeopleAllocator`, `PeopleBar`, `SliderRow`, `AxisSelector`, `RationsSelector`, `OddsDisplay`, `OddsArc`, `BalanceTrend`, `HumanMissionsPlaceholder`.
-- `scoutTargets` state je ostanek starega sistema; setter in preview dependency obstajata, vendar ni več aktivne UI rabe za targetiranje scoutov.
-- `combatants` state obstaja, vendar `handleRound` pošlje `combatants: 0`; dejanski napad gre prek `pendingExpeditions`.
-- `tab` tip vključuje `'log'`, vendar side menu nima log zavihka. Mobilni log blok je zato težko dosegljiv iz trenutnega UI.
+### 5. `rngInt` zgornja meja je max-exclusive
 
-## Potencialni bugi
+Komentarji in UI razlage uporabljajo intervale kot "−5 do −3" in "+1 do +3", vendar `rngInt(min,max)` zgornje meje ne vključuje. To vpliva na obroke in loss roll opise.
 
-### 1. Neposredni combat preview in dejanski napad sta razvezana
+### 6. Server validacija ne preverja sosednosti poti
 
-Frontend ima `combatants` in star `previewOdds`, vendar `handleRound` vedno pošlje `combatants: 0`. Uporabnik napada prek poti, medtem ko del engine kode za neposredni napad ostaja aktiven samo teoretično. To lahko vodi do napačnih pričakovanj, če katerikoli UI element še vedno kaže neposredni combat odds.
+Frontend omejuje klik na sosednje hekse, API pa sprejme poljubno pot. Ker je produkcijski API javen, lahko client pošlje teleport poti.
 
-### 2. `population` pomeni kamp, UI ga pogosto obravnava kot celotno populacijo
+### 7. Dva sistema misij na šibke točke
 
-Engine pri odhodu odprave zmanjša `population`, ob vrnitvi jo poveča. Zato `population` dejansko pomeni ljudi v kampu, ne celoten klan. UI na več mestih prikazuje `game.population` kot `Populacija`, nato dodatno računa `inMissions`; to lahko vodi do dvojno zmedenih prikazov. V `ClanStatus` je celo `inCamp = game.population - inMissions`, kar bi bilo napačno, če bi se komponenta uporabljala.
+Path-based napadi in legacy `activeMissions` oba lahko uničita šibke točke. To povečuje možnost dvojnih ali nasprotujočih se stanj.
 
-### 3. `canConfirmDraft` ne upošteva že tekočega drafta v `plannedTotal`
+### 8. `aiInsight` ni odvisen od raziskovalcev
 
-`plannedTotal` vključuje `pendingExpeditions`, `missions` in `combatants`, ne vključuje pa trenutnega `draftPeople`. `canConfirmDraft` ga doda posebej, kar je v redu. Toda plus gumbi za `draftPeople` preverjajo `assignedHome + plannedTotal + draftPeople >= availablePop`, zato so robni pogoji občutljivi na staro vrednost in lahko UI ob nekaterih kombinacijah dovoli/pokaže malo nekonsistentno stanje.
+AI drevo se odpira samodejno +3 % na rundo do faznega stropa. Raziskovalci na `robots` vplivajo na research levele in intel, ne neposredno na `aiInsight`. UI delno pravi "AI drevo se odpira samodejno", vendar ponekod še govori "Več izvidništva" za weak point razkritje.
 
-### 4. Potrjena in nepotrjena draft pot se lahko podvojeno pošljeta
+### 9. `axisHistory` beleži fokus, vendar osi nimajo neposrednega mehanskega učinka
 
-`handleRound` doda vse `pendingExpeditions`, nato pa, če `draftPath.length >= 2`, doda še trenutni draft. Če uporabnik potrdi pot, se draft resetira na kamp. Če reset iz kakršnega koli razloga ne uspe ali je uporabnik po potrditvi začel novo pot, bo ob izvedbi meseca poslan tudi novi nepotrjeni draft. To je morda namerno, vendar UI tekst ločuje "potrdi" in "sproži ob izvedbi", zato je implicitna oddaja nepotrjene poti lahko presenetljiva.
+`axisHistory` je zdaj predvsem UI/progress/future hook. V `processRound` komentar pravi, da je brez mehanskih učinkov. Če UI daje občutek, da izbira osi ta mesec neposredno spremeni izid, je to napačno.
 
-### 5. Aktivne stare misije in nove odprave so dva paralelna sistema za isti cilj
+### 10. `clanActivity` uporablja samo fiksni padec
 
-`Missions` uporablja `missionAssignments` in `activeMissions`, medtem ko zavihek `Napad` uporablja `newExpeditions` z `kind: mission`. Oba lahko uničujeta šibke točke. To poveča možnost edge caseov, npr. dve vzporedni poti/misiji na isto weak point stanje.
+Konstante `CLAN_ACTIVITY_BY_PHASE`, `CLAN_ACTIVITY_HIDDEN_MODIFIER` ostajajo, a trenutni engine uporablja samo:
 
-### 6. `CompletedRun.axisHistory` je napačen povzetek
+```text
+-CLAN_ACTIVITY_EXPOSURE_MODIFIER + allyBoost
+```
 
-Server ob koncu runa ne shrani dejanskega `newState.axisHistory`, ampak ustvari `{ hiding: 0, espionage: 0, defense: 0 }` in nastavi samo zadnjo os na 1. To bo slabo za statistiko in kasnejšo AI evolucijo.
+Ni fazne krivulje in ni posebnega hiding/focus vpliva.
 
-### 7. `PHASE_EVENT_BASE_DAMAGE` in `PREPARED_DAMAGE_REDUCTION` nista uporabljena
+### 11. `PhaseEvent` in fazni damage niso uporabljeni
 
-Komentarji govorijo o faznem razpletu in damage, vendar prehod faze samo razkrije/označi vozlišča. Igralec lahko pričakuje udarec ob prehodu, ki ga engine ne izvede.
+`PHASE_EVENT_BASE_DAMAGE` in `PREPARED_DAMAGE_REDUCTION` ostajata, vendar fazni prehod samo razkrije vozlišča in pripelje nove AI enote.
 
-### 8. Combat resolver ne uporablja RNG za izid
+### 12. Direct combat uporablja `state` pred novimi research spremembami
 
-`resolveCombat` izračuna verjetnost in nato deterministično izbere outcome po thresholdih. RNG se ne uporabi, čeprav komentarji in UI govorijo o verjetnosti. To ni nujno bug, če je dizajn determinističen "odds tier", vendar izraz `successProbability` daje vtis rolla.
+Če raziskovalci v isti rundi dokončajo `weaponResearchLevel`, neposredni `resolveCombat` še uporablja `state.weaponResearchLevel`, ne lokalno posodobljenega levela. Verjetno je to sprejemljivo, ker raziskava začne učinkovati naslednji mesec, ampak UI naj to ne predstavlja kot instant.
 
-### 9. Raid outcome je tudi determinističen glede na verjetnost odbitja
+### 13. Raid uporablja `state` pred delavniškimi spremembami pri obrambi
 
-AI raid se random sproži, a ko se sproži, je izid določen iz `raidRepelProbability` prek thresholdov, ne z rollom. To pomeni, da 64% vedno pomeni `partial`, 65% vedno `victory`.
+`raidRepelProbability(state, assignment)` uporablja `state.wallsBuilt` in `state.resources.combat`, ne lokalno v isti rundi zgrajenega orožja/obzidja. To pomeni, da novo zgrajeno obzidje učinkuje naslednji mesec. To je lahko pravilno, a mora biti razloženo.
 
-### 10. Lakota se sproži pri `survival <= 0`, čeprav survival nikoli ne gre pod 0
+### 14. `populationDelta` pri returning expeditions šteje vračanje kot spremembo klana?
 
-Engine survival po prehrani in odštevanjih clampa na 0. Nato `isStarving = survival <= 0`, kar pomeni, da se lakota sproži tudi, ko je hrana natančno 0 po normalni porabi. To je lahko namerno, vendar komentar govori "če hrana pade pod 0".
+`totalClanBefore` vključuje vse odprave. Ko returning odprava pride domov, ni več v `tickedExps`, ampak se doda v `finalPopulation`, zato delta bi moral ostati nevtralen. To je pravilno, vendar je občutljivo; test za to bi bil koristen.
 
-### 11. `rngInt` je komentarno opisan kot max exclusive, klici pa pogosto pričakujejo max inclusive
+### 15. Event log je še vedno frontend-only
 
-`rngInt(state, min, max)` vrača `[min, max)`. Primeri:
+Po refreshu izgine zgodovina razen zadnjega `lastRoundLog`.
 
-- `rngInt(rng, 20, 60)` nikoli ne vrne 60.
-- `rngInt(rng, 1, 4)` vrne 1-3, kar je morda namerno.
-- `rngInt(rng, rations.popMin, rations.popMax)` za obroke z `popMin=-5`, `popMax=-3` nikoli ne vrne -3. To verjetno ni skladno z besedilom "−5 do −3".
+### 16. `GameState.population` ime ostaja nejasno
 
-### 12. `aiKnowledgeGain` exposure uporablja kamp populacijo po odhodih in lahko eksplodira
-
-Exposure deli z `state.population`, ne s celotnim klanom. Ko je veliko ljudi na odpravah, je kamp populacija manjša, zato lahko raziskovalci/combatants pomenijo večjo izpostavljenost kot pričakovano.
-
-### 13. Frontend in engine imata podvojene konstante
-
-Rations, encounter risk, map path months in del workshop logike so podvojeni v UI. To lahko zlahka odstopi od engine pravil. Nekatere vrednosti so že frontend-only kopije.
-
-### 14. `GameState` tipi so podvojeni med backendom in frontendom
-
-`src/engine/types.ts` in `client/src/types.ts` se morata ročno usklajevati. Trenutno že obstaja razlika: backend `GameState` vključuje `rngCallCount`, frontend tip ga ne.
-
-### 15. Event log ni persistenten
-
-`EventLog` se akumulira samo v React state. Po refreshu se zgodovina izgubi, čeprav je `lastRoundLog` shranjen. Za produkcijsko igro to oteži debugging in igralčevo razumevanje runa.
-
-### 16. Feedback in sessions admin poti niso zaščitene
-
-`GET /api/feedback` in `GET /api/sessions` sta javni. Ker produkcija teče na javnem hostu, je to potencialna zasebnostna/operativna luknja.
-
-### 17. Ni try/catch okoli async API handlerjev
-
-Napake DB ali enginea v Express handlerjih nimajo centralnega error middlewarea. To lahko povzroči nejasne 500 odzive in potencialno unhandled promise situacije.
-
-### 18. `GameSession.updateOne({ runId }, newState)` zamenja veliko polj brez `$set`
-
-Mongoose bo to običajno obravnaval kot update dokument, vendar je varneje in jasneje uporabljati `$set`. Trenutno je odvisno od Mongoose interpretacije plain objekta.
-
-### 19. `runId = Date.now().toString(36)` lahko kolidira
-
-Če se dve igri ustvarita v istem milisekundnem oknu, lahko pride do unique konflikta. Verjetnost je majhna, vendar produkcijsko nepotrebna.
-
-### 20. Ni validacije assignment števil
-
-Server preveri le obstoj `assignment`. Negativne vrednosti, decimalke, previsoke vrednosti ali čudni objekti se zanašajo na engine/UI clampanje, kar ni dovolj za javni API.
+V engineu pomeni kamp populacijo, v nekaterih UI labelih še vedno izgleda kot celotna populacija. Ker je "na odpravi" ločeno prikazano, naj top label jasno govori "V kampu" ali naj se uvede derived `totalClanPopulation`.
 
 ## Tehnični dolg
 
-### Monolitni frontend
+### Monolitni `App.tsx`
 
-`App.tsx` bi bilo smiselno razdeliti na:
+`App.tsx` je 3630 vrstic. Smiselna delitev:
 
-- `screens/StartScreen.tsx`, `screens/GameScreen.tsx`, `screens/GameOverScreen.tsx`;
+- `screens/StartScreen.tsx`;
+- `screens/GameScreen.tsx`;
+- `screens/GameOverScreen.tsx`;
 - `components/map/HexMap.tsx`;
-- `components/panels/*`;
-- `components/modals/*`;
-- `hooks/useGameSession.ts`, `hooks/usePreviewOdds.ts`, `hooks/useEventLog.ts`;
-- `game-ui/constants.ts`.
+- `components/panels/DefensePanel.tsx`;
+- `FoodPanel.tsx`;
+- `WorkshopPanel.tsx`;
+- `ResearchPanel.tsx`;
+- `ExpeditionPanel.tsx`;
+- `AttackPanel.tsx`;
+- `hooks/useGameSession.ts`;
+- `hooks/useEventLog.ts`;
+- `hooks/useDraftPath.ts`.
 
-### Monolitni engine reducer
+### Monolitni `processRound`
 
-`processRound` bi bilo smiselno razdeliti na manjše čiste korake:
+`game.ts` je 1143 vrstic. Smiselni čisti moduli:
 
-- `normalizeAssignment`;
-- `applyFoodAndForaging`;
-- `applyResearch`;
-- `applyWorkshop`;
-- `resolveCampRaid`;
-- `tickExpeditions`;
-- `tickLegacyMissions` ali odstranitev legacy sistema;
-- `applyAllies`;
-- `advanceAI`;
-- `buildRoundLog`.
+- `round/food.ts`;
+- `round/research.ts`;
+- `round/workshop.ts`;
+- `round/raid.ts`;
+- `round/expeditions.ts`;
+- `round/missions.ts`;
+- `round/allies.ts`;
+- `round/ai-progress.ts`;
+- `round/log.ts`.
 
-### Podvojeni tipi in konstante
+### Legacy odstranitev
 
-Frontend bi moral uporabljati tipe iz deljenega paketa ali generirane tipe. Konstante za rations, workshop stroške, path risk in duration naj imajo en vir resnice.
+Odločitev:
 
-### Legacy sistemi
+1. odstraniti stare `activeMissions` in `missionAssignments`;
+2. ali jih preimenovati v "special operations" in jasno ločiti od path napadov.
 
-Treba je sprejeti odločitev:
+Trenutno je to največji gameplay dolg.
 
-- obdržati samo novi path-based expedition sistem;
-- ali obdržati tudi stare timer misije, a jih jasno poimenovati in testirati kot ločeno mehaniko.
+### Pravila in formula razlage
 
-Trenutno oba sistema obstajata in povečujeta kompleksnost.
+Treba je centralizirati pravila v dokument ali data strukturo, iz katere se polni UI. Trenutno so razlage raztresene:
 
-### Testi
+- `HELP`;
+- `RulesModal`;
+- panel text;
+- title atributi;
+- engine komentarji.
 
-Ni testnih datotek. Najbolj kritični testi:
+Zaradi tega se je `RulesModal` že razšel z engineom.
 
-- determinističnost `processRound` z istim seedom;
-- prehrana/lakota;
-- raid probability in raid result;
-- odprave po poti, encounterji in return populacija;
-- weak point discovery/exploit;
-- phase transition;
-- zavezniki;
-- delavnice;
-- API create/load/round flow z mock DB ali integration setupom.
+### API validacija poti
 
-### Validacija API vhoda
+Dodati server-side:
 
-`PlayerAction` naj se validira na strežniku. Minimalno:
+- validne koordinate;
+- pot se začne v kampu;
+- vsak korak je sosed;
+- `kind` validacija;
+- `assigned <= available population`;
+- food cost sanity;
+- prepoved negativnih `missionAssignments`.
 
-- vse številke morajo biti finite integer >= 0;
-- `rations` 1-5;
-- `axis` ena od treh vrednosti;
-- poti morajo biti sestavljene iz veljavnih sosednjih heksov;
-- razporeditev ne sme preseči razpoložljive populacije;
-- server naj ne zaupa frontend clampanju.
+### Test coverage
 
-### Persistenca zgodovine
+Dodati teste za najbolj tvegane stvari:
 
-Če je dnevnik pomemben za igralca in debugging, `GameState` potrebuje `roundLogs: RoundLog[]` ali ločeno kolekcijo. Trenutni `lastRoundLog` je premalo.
-
-### Admin zaščita
-
-`/api/feedback` GET in `/api/sessions` naj bosta zaščitena vsaj z osnovnim admin tokenom ali IP allowlistom.
-
-### Deploy/produkcija
-
-Repo se ureja neposredno na produkcijskem strežniku. To je dokumentirano v `AGENTS.md`, vendar povečuje tveganje. Minimalni varovalni ukrepi:
-
-- vedno test pred deployem;
-- commit/push pred deployem;
-- ne spreminjati `.env`;
-- ne posegati v druge PM2 aplikacije.
+- path attack formula in weak point success;
+- returning expeditions ne spremenijo total clan population;
+- carried loot se dostavi šele ob vrnitvi;
+- raid resource destruction;
+- server validation, če se doda unit/integration layer.
 
 ## Priporočena prioriteta
 
-1. Dodati osnovne engine teste za `processRound`, odprave, lakoto in phase transition.
-2. Popraviti `CompletedRun.axisHistory`, da shrani dejanski `newState.axisHistory`.
-3. Odločiti se glede starega `activeMissions` sistema in ga odstraniti ali jasno ločiti.
-4. Uskladiti pomen `population`: bodisi "kamp populacija" bodisi "celoten klan"; UI naj uporablja dosledna imena.
-5. Odstraniti ali izolirati neuporabljene frontend komponente in legacy state.
-6. Izločiti `App.tsx` v manjše komponente.
-7. Uvesti runtime validacijo API inputa.
-8. Zaščititi admin-like API poti.
-9. Deliti tipe/konstante med frontendom in engineom.
-10. Persistirati round history, če je časovni trak del core UX.
+1. Popraviti `RulesModal`, da opisuje trenutno igro: `obzidje/orozje/roboti`, AI enote, raziskave, `aiInsight`, path odprave.
+2. Uskladiti UI attack preview s pravo engine formulo za splošni napad in weak point napad.
+3. Popraviti pending expedition prikaz hrane/časa na `roundTripMonths`.
+4. Odstraniti ali jasno ločiti legacy `activeMissions`.
+5. Dodati server validacijo poti.
+6. Uvesti derived prikaz `totalClanPopulation = population + expeditions + activeMissions`.
+7. Popraviti max-exclusive razlage ali spremeniti `rngInt`/klice v inclusive helper.
+8. Razbiti `processRound` in `App.tsx` v module.
+9. Persistirati round history ali vsaj zadnjih N logov v `GameState`.
+10. Dodati teste za odprave, raid damage in UI/engine formula skladnost.
