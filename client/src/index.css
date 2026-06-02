@@ -263,12 +263,14 @@ b      { color: var(--text); font-weight: 600; }
   max-height: 100%;
 }
 .right-col {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;  /* dnevnik (raztegljiv) + V teku pod njim */
+  display: flex;
+  flex-direction: column;
   gap: .5rem;
   min-height: 0;
 }
-.rc-active { max-height: 40%; overflow-y: auto; }
+.right-col .rc-log { flex: 1 1 0; min-height: 120px; display: flex; flex-direction: column; }
+.right-col .rc-log .rc-log-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; }
+.rc-active { flex: 0 0 auto; max-height: 42%; overflow-y: auto; display: flex; flex-direction: column; }
 .rc-active .active-expeditions { display: flex; flex-direction: column; gap: .4rem; margin-top: .4rem; }
 
 /* Field panels (levi zavihki) */

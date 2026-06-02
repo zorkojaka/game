@@ -3017,15 +3017,6 @@ export default function App() {
 
         <div className="left-panel">
          <FitScale deps={[tab, game, defenders, foragers, workers, researchers, combatants, draftPath.length, pendingExpeditions.length]}>
-          {/* Vrstica prostih ljudi (vsi people-zavihki) */}
-          {(tab === 'food' || tab === 'workshop' || tab === 'research') && (
-            <div className="free-people">
-              <span className="dim small">Prosti ljudje:</span>
-              <b style={{ color: freePeople > 0 ? '#66cc88' : '#888' }}>{freePeople}</b>
-              <span className="dim small">/ {availablePop}</span>
-            </div>
-          )}
-
           {/* ─── OBRAMBA (grafični panel) ─── */}
           {tab === 'defense' && (() => {
             const raidP = odds?.raidProbability ?? 0;
@@ -3057,7 +3048,6 @@ export default function App() {
                     <button className="pa-btn" disabled={freePeople <= 0 || weaponsLeft <= 0} onClick={() => bumpRole('d', 1)}>+</button>
                   </div>
                 </div>
-                <div className="def-free">Prosti ljudje: <b style={{ color: freePeople > 0 ? '#66cc88' : '#888' }}>{freePeople}</b></div>
                 <div className="def-people-row">
                   {Array.from({ length: dots }).map((_, i) => <span key={i} className="def-person">👤</span>)}
                   {defenders > dots && <span className="def-person-more dim small">+{defenders - dots}</span>}
@@ -3151,7 +3141,6 @@ export default function App() {
                     <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('f', 1)}>+</button>
                   </div>
                 </div>
-                <div className="def-free">Prosti ljudje: <b style={{ color: freePeople > 0 ? '#66cc88' : '#888' }}>{freePeople}</b></div>
                 <div className="def-people-row">{Array.from({ length: dots }).map((_, i) => <span key={i} className="def-person">👤</span>)}{foragers > dots && <span className="def-person-more dim small">+{foragers - dots}</span>}</div>
               </div>
               <div className="def-card">
@@ -3202,7 +3191,6 @@ export default function App() {
                     <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('w', 1)}>+</button>
                   </div>
                 </div>
-                <div className="def-free">Prosti ljudje: <b style={{ color: freePeople > 0 ? '#66cc88' : '#888' }}>{freePeople}</b></div>
                 <div className="def-people-row">{Array.from({ length: dots }).map((_, i) => <span key={i} className="def-person">👤</span>)}{workers > dots && <span className="def-person-more dim small">+{workers - dots}</span>}</div>
               </div>
               <div className="def-card">
@@ -3254,7 +3242,6 @@ export default function App() {
                     <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('r', 1)}>+</button>
                   </div>
                 </div>
-                <div className="def-free">Prosti ljudje: <b style={{ color: freePeople > 0 ? '#66cc88' : '#888' }}>{freePeople}</b></div>
                 <div className="def-people-row">{Array.from({ length: dots }).map((_, i) => <span key={i} className="def-person">👤</span>)}{researchers > dots && <span className="def-person-more dim small">+{researchers - dots}</span>}</div>
               </div>
               <div className="def-card">
