@@ -2255,32 +2255,66 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
         {drawingMode && draftPath.length >= 2 && lastStep && (() => {
           const lp = shift(hexToPixel(lastStep.q, lastStep.r, SIZE));
           const cx = lp.x, cy = lp.y - SIZE * 1.15;  // nad zadnjim heksom
-          const Btn = ({ x, y, r = 9, fill, stroke, icon, fs = 11, disabled, onClick, title }:
-            { x: number; y: number; r?: number; fill: string; stroke: string; icon: string; fs?: number; disabled?: boolean; onClick: () => void; title: string }) => (
+          type DraftControlIcon = 'scout' | 'attack' | 'minus' | 'plus' | 'confirm';
+          const DraftIcon = ({ icon, color }: { icon: DraftControlIcon; color: string }) => {
+            if (icon === 'scout') {
+              return (
+                <g transform="translate(-6 -6)" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="5" cy="5" r="3.2" />
+                  <circle cx="11" cy="5" r="3.2" />
+                  <path d="M7.4 5h1.2M3.6 8.2 2 12M12.4 8.2 14 12" />
+                </g>
+              );
+            }
+            if (icon === 'attack') {
+              return (
+                <g transform="translate(-6 -6)" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 2l9 9M12 2 3 11M2.2 12.8 4.4 10.6M13.8 12.8 11.6 10.6" />
+                  <path d="M3 2h3M12 2H9" />
+                </g>
+              );
+            }
+            if (icon === 'minus') {
+              return <path d="M-4 0h8" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" />;
+            }
+            if (icon === 'plus') {
+              return (
+                <g fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round">
+                  <path d="M-4 0h8" />
+                  <path d="M0 -4v8" />
+                </g>
+              );
+            }
+            return <path d="M-4 .2-1.2 3.2 4.8-4" fill="none" stroke={color} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />;
+          };
+          const Btn = ({ x, y, r = 9, fill, stroke, icon, iconColor = '#f5f5f5', disabled, onClick, title }:
+            { x: number; y: number; r?: number; fill: string; stroke: string; icon: DraftControlIcon; iconColor?: string; disabled?: boolean; onClick: () => void; title: string }) => (
             <g style={{ cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.4 : 1 }}
                onClick={(e) => { e.stopPropagation(); if (!disabled) onClick(); }}>
               <title>{title}</title>
               <circle cx={x} cy={y} r={r} fill={fill} stroke={stroke} strokeWidth="1.5" />
-              <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fontSize={fs} style={{ pointerEvents: 'none' }}>{icon}</text>
+              <g transform={`translate(${x} ${y})`} style={{ pointerEvents: 'none' }}>
+                <DraftIcon icon={icon} color={iconColor} />
+              </g>
             </g>
           );
           return (
             <g className="draft-controls">
               {/* vrsta 1: izbira tipa odprave */}
               <Btn x={cx - 13} y={cy - 16} fill={draftKind === 'scout' ? '#3a2a00' : '#0a0a0a'} stroke={draftKind === 'scout' ? '#ffd84a' : '#555'}
-                icon="🔭" onClick={() => onDraftKind('scout')} title="Izvidniki (raziskovanje)" />
+                icon="scout" iconColor={draftKind === 'scout' ? '#ffd84a' : '#b8b8b8'} onClick={() => onDraftKind('scout')} title="Izvidniki (raziskovanje)" />
               <Btn x={cx + 13} y={cy - 16} fill={draftKind === 'attack' ? '#3a1010' : '#0a0a0a'} stroke={draftKind === 'attack' ? '#cc3333' : '#555'}
-                icon="⚔" onClick={() => onDraftKind('attack')} title="Napad" />
+                icon="attack" iconColor={draftKind === 'attack' ? '#ff7777' : '#b8b8b8'} onClick={() => onDraftKind('attack')} title="Napad" />
               {/* vrsta 2: število ljudi −/+ in potrdi */}
-              <Btn x={cx - 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="−" fs={13} disabled={draftPeople <= 1}
+              <Btn x={cx - 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="minus" disabled={draftPeople <= 1}
                 onClick={() => onDraftPeople(-1)} title="Manj ljudi" />
               <circle cx={cx} cy={cy + 7} r={11} fill="#11171f" stroke={draftKind === 'attack' ? '#cc3333' : '#ffd84a'} strokeWidth="1.5" />
               <text x={cx} y={cy + 7} textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold" fill="#fff" style={{ pointerEvents: 'none' }}>{draftPeople}</text>
-              <Btn x={cx + 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="+" fs={13} disabled={draftAddDisabled}
+              <Btn x={cx + 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="plus" disabled={draftAddDisabled}
                 onClick={() => onDraftPeople(1)} title="Več ljudi" />
               {/* potrdi */}
               <Btn x={cx} y={cy + 30} r={9} fill={canConfirmDraft ? '#0f2a14' : '#0a0a0a'} stroke={canConfirmDraft ? '#66cc88' : '#555'}
-                icon="✓" fs={12} disabled={!canConfirmDraft} onClick={onConfirmDraft} title="Pošlji odpravo" />
+                icon="confirm" iconColor={canConfirmDraft ? '#8df0a5' : '#b8b8b8'} disabled={!canConfirmDraft} onClick={onConfirmDraft} title="Pošlji odpravo" />
             </g>
           );
         })()}
