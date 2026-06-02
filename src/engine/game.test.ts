@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN } from './combat.js';
-import { encounterScoutFactor } from './expedition.js';
+import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths } from './expedition.js';
 import { createRNG } from './rng.js';
 import type { PlayerAction, GameState } from './types.js';
 
@@ -187,6 +187,19 @@ describe('aiInsight — odpira AI drevo, fazni stropi', () => {
     const g: GameState = { ...base, aiInsight: 0.55, phase: 'understand' };
     const r = processRound(g, action({ foragers: 5 }));
     expect(r.aiTree.some(n => n.visibility === 'revealed')).toBe(true);
+  });
+});
+
+describe('povratni čas odprav', () => {
+  // kamp je na (0,4)
+  it('zadnji heks ob kampu → kratek povratek (≤1 mesec)', () => {
+    const adjacent = [{ q: 0, r: 4 }, { q: 0, r: 3 }];
+    expect(returnMonths(adjacent)).toBeLessThanOrEqual(1);
+  });
+  it('daleč od kampa → povratek po isti poti (= pot tja); round-trip = 2× pot', () => {
+    const far = [{ q: 0, r: 4 }, { q: 0, r: 3 }, { q: 0, r: 2 }, { q: 0, r: 1 }];
+    expect(returnMonths(far)).toBe(pathMonths(far));
+    expect(roundTripMonths(far)).toBe(pathMonths(far) * 2);
   });
 });
 

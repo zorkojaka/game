@@ -2643,6 +2643,16 @@ export default function App() {
   const draftPathMonths = draftStealth
     ? Math.ceil(draftPathTiles * 1.5)        // skrivanje: +50 % trajanja
     : Math.max(0, Math.ceil(draftPathTiles / TILES_PER_MONTH_FE));
+  // Povratek: če zadnji heks meji na kamp → neposredno (0–1 m), sicer nazaj po isti poti.
+  const draftReturnMonths = (() => {
+    if (draftPath.length < 2) return 0;
+    const clan = game?.mapTiles?.find(t => t.isClanCamp);
+    if (!clan) return Math.max(0, draftPath.length - 1);
+    const last = draftPath[draftPath.length - 1];
+    const d = hexDistFE({ q: last.q, r: last.r }, { q: clan.q, r: clan.r });
+    return d <= 1 ? d : Math.max(0, draftPath.length - 1);
+  })();
+  const draftTotalMonths = draftPathMonths + draftReturnMonths;
   function tileEncounterMultFE(p: number, distFromCamp: number): number {
     let m = p < 0.25 ? 1.5 : p < 0.50 ? 1.2 : p < 1.0 ? 0.7 : 0.3;
     if (distFromCamp <= 1) m *= 0.5;
@@ -2776,14 +2786,23 @@ export default function App() {
   const campFoodCost = Math.round(inCampPop * rTier.foodMult);
   // Aktivne misije/odprave: ne jedo iz kampa (so vzele upfront)
   // Nove odprave/misije, ki bodo poslane TA mesec, vzamejo hrano s seboj iz kampa
+  const clanTile = game.mapTiles?.find(t => t.isClanCamp);
+  const roundTripMonthsFE = (path: { q: number; r: number }[]) => {
+    const oneWay = Math.max(0, path.length - 1);
+    if (path.length < 2) return 0;
+    const last = path[path.length - 1];
+    const ret = clanTile ? (hexDistFE({ q: last.q, r: last.r }, { q: clanTile.q, r: clanTile.r }) <= 1
+      ? hexDistFE({ q: last.q, r: last.r }, { q: clanTile.q, r: clanTile.r }) : oneWay) : oneWay;
+    return oneWay + ret;
+  };
   const pendingExpFood = pendingExpeditions.reduce((s, e) => {
-    const months = Math.max(1, e.path.length - 1);
+    const months = Math.max(1, roundTripMonthsFE(e.path));
     const t = RATIONS[e.rations] ?? RATIONS[3];
     return s + Math.round(e.assigned * months * t.foodMult);
   }, 0);
   const draftRTier = RATIONS[draftRations];
   const draftExpFood = (draftPath.length >= 2 && draftPeople > 0)
-    ? Math.round(draftPeople * (draftPath.length - 1) * draftRTier.foodMult) : 0;
+    ? Math.round(draftPeople * Math.max(1, (draftPath.length - 1) + draftReturnMonths) * draftRTier.foodMult) : 0;
   const newMissionFood = Object.entries(missions).reduce((s, [wpId, ppl]) => {
     // misije imajo fiksno trajanje per wp
     const dur = wpId === 'wp_power' ? 4 : wpId === 'wp_comm' ? 5 : wpId === 'wp_core' ? 6 : 4;
@@ -3114,7 +3133,7 @@ export default function App() {
                 <>
                   <div className="path-stats">
                     <div className="ps-row"><span className="dim small">Korakov:</span><b>{draftPath.length - 1}</b></div>
-                    <div className="ps-row"><span className="dim small">Trajanje:</span><b style={{ color: '#cc8800' }}>{draftPathMonths} mesec(ev)</b></div>
+                    <div className="ps-row"><span className="dim small">Trajanje (tja+nazaj):</span><b style={{ color: '#cc8800' }}>{draftTotalMonths} mes. <span className="dim small">({draftPathMonths} tja + {draftReturnMonths} nazaj)</span></b></div>
                     <div className="ps-row"><span className="dim small">Tveganje srečanja:</span><b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b></div>
                     <div className="ps-row">
                       <span className="dim small">Ljudje za to odpravo:</span>
@@ -3233,7 +3252,7 @@ export default function App() {
                     <div className="path-stats">
                       <div className="ps-row"><span className="dim small">Cilj:</span><b style={{ color: wpDisc ? '#ffd84a' : '#cc6655' }}>{targetLabel}</b></div>
                       <div className="ps-row"><span className="dim small">Korakov:</span><b>{draftPath.length - 1}</b></div>
-                      <div className="ps-row"><span className="dim small">Trajanje:</span><b style={{ color: '#cc8800' }}>{draftPathMonths} mesec(ev)</b></div>
+                      <div className="ps-row"><span className="dim small">Trajanje (tja+nazaj):</span><b style={{ color: '#cc8800' }}>{draftTotalMonths} mes. <span className="dim small">({draftPathMonths} tja + {draftReturnMonths} nazaj)</span></b></div>
                       <div className="ps-row"><span className="dim small">Tveganje srečanja na poti:</span><b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b></div>
                       <div className="ps-row">
                         <span className="dim small">Napadalci:</span>
@@ -3368,24 +3387,29 @@ export default function App() {
                 const remaining = Math.max(0, total - done);
                 const target = e.path[e.path.length - 1];
                 const isAttack = e.kind === 'mission';
-                const color = isAttack ? '#cc3333' : '#ffd84a';
+                const returning = e.status === 'returning';
+                const color = returning ? '#66cc88' : isAttack ? '#cc3333' : '#ffd84a';
                 const wp = e.weakPointId ? game.aiWeakPoints.find(w => w.id === e.weakPointId) : undefined;
-                const kindLabel = (isAttack ? (wp ? `⚔ Napad na ◆ ${wp.label}` : '⚔ Napad') : '🔭 Izvidnica') + (e.stealth ? ' · 🌙' : '');
+                const kindLabel = (returning ? '↩ Vračanje' : isAttack ? (wp ? `⚔ Napad na ◆ ${wp.label}` : '⚔ Napad') : '🔭 Izvidnica') + (e.stealth ? ' · 🌙' : '');
                 return (
                   <div key={e.id} className="exp-card">
                     <div className="exp-head">
                       <span className="exp-kind" style={{ color }}>{kindLabel} · {e.assigned} ljudi</span>
                       <span className="dim small">→ ({target?.q},{target?.r})</span>
                     </div>
-                    <div className="exp-progress">
-                      <div className="ep-track">
-                        <div className="ep-fill" style={{ width: `${(done / total) * 100}%`, background: color }} />
+                    {!returning && (
+                      <div className="exp-progress">
+                        <div className="ep-track">
+                          <div className="ep-fill" style={{ width: `${(done / total) * 100}%`, background: color }} />
+                        </div>
+                        <span className="dim small">mesec {done} / {total}</span>
                       </div>
-                      <span className="dim small">mesec {done} / {total}</span>
-                    </div>
+                    )}
                     <div className="exp-events dim small">
-                      {remaining === 0 ? 'prihod ta mesec' : `še ${remaining} mesec(ev) do cilja`}
-                      {e.encountersLog.length > 0 && ` · ${e.encountersLog.slice(-1)[0]}`}
+                      {returning
+                        ? `↩ vrača se v kamp — še ${e.returnRemaining ?? 0} mesec(ev)`
+                        : remaining === 0 ? 'prihod ta mesec' : `še ${remaining} mesec(ev) do cilja`}
+                      {!returning && e.encountersLog.length > 0 && ` · ${e.encountersLog.slice(-1)[0]}`}
                     </div>
                   </div>
                 );

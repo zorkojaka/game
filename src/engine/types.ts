@@ -88,6 +88,7 @@ export interface Expedition {
   monthsElapsed: number;
   encountersLog: string[];        // kratki opisi srečanj/dogodkov med potjo
   stealth?: boolean;              // način skrivanja: trajanje +50 %, srečanja ×0.5, boj +20 %
+  returnRemaining?: number;       // ko je status 'returning': mesecev do vrnitve v kamp
 }
 
 export interface NewExpeditionInput {

@@ -65,6 +65,24 @@ export function pathMonths(path: Array<{ q: number; r: number }>): number {
   return Math.ceil(steps / TILES_PER_MONTH);
 }
 
+/**
+ * Mesecev za POVRATEK v kamp.
+ * Če zadnji heks meji na kamp (ali je kamp), se vrnejo neposredno (0–1 mesec).
+ * Sicer se vrnejo po isti poti nazaj (toliko mesecev kot je trajala pot tja).
+ */
+export function returnMonths(path: Array<{ q: number; r: number }>): number {
+  if (path.length < 2) return 0;
+  const last = path[path.length - 1];
+  const d = hexDistance({ q: last.q, r: last.r }, CLAN_POS);
+  if (d <= 1) return d;                     // sosednji kampa (1) ali na kampu (0)
+  return pathMonths(path);                  // sicer retrace cele poti
+}
+
+/** Skupni čas odprave: pot tja + povratek. */
+export function roundTripMonths(path: Array<{ q: number; r: number }>): number {
+  return pathMonths(path) + returnMonths(path);
+}
+
 // Verjetnosti najdb na neraziskanem polju
 export const FIND_MATERIAL_CHANCE = 0.12;  // mala možnost — 12 %
 export const FIND_WEAPON_CHANCE   = 0.025; // zelo redko — 2.5 %
