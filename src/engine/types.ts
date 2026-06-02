@@ -11,6 +11,8 @@ export type Visibility = 'unknown' | 'partial' | 'revealed';
 
 // ─── AI tree ──────────────────────────────────────────────────────────────────
 
+export type AINodeRole = 'unit' | 'mechanical' | 'logical';
+
 export interface AITreeNode {
   id: string;
   phase: AIPhase;
@@ -18,6 +20,9 @@ export interface AITreeNode {
   visibility: Visibility;
   strength: number; // 0–100, how strong this node is
   executed: boolean;
+  role: AINodeRole;       // 1=enota, 2=mehanska šibka točka, 3=logična šibka točka
+  robot: 'scouts' | 'attackers' | 'peopleKillers';  // kateri tip robota zadeva
+  insightThreshold: number;  // koliko aiInsight je potrebno za razkritje
 }
 
 // Fiksne šibke točke AI (endgame cilji)
@@ -254,9 +259,11 @@ export interface GameState {
   artifactWorkshopProgress: number;   // delavec-mesecev za artefakt (vsakih 360 = +1 artefakt)
 
   // Raziskave nadgradenj (vsak level ×2 učinka; 120 raziskovalec-mesecev na level)
-  weaponResearchLevel: number;        // orožje: napad ×2 na level
+  robotsResearchLevel: number;        // roboti: odkrivanje šibkih točk; odklene orožje/obzidje
+  robotsResearchProgress: number;
+  weaponResearchLevel: number;        // orožje: napad ×2 na level (zaklenjeno za roboti level)
   weaponResearchProgress: number;     // raziskovalec-mesecev proti naslednjemu levelu
-  wallResearchLevel: number;          // obzidje: obramba ×2 na level
+  wallResearchLevel: number;          // obzidje: obramba ×2 na level (zaklenjeno za roboti level)
   wallResearchProgress: number;
 
   // Naše znanje o AI [0,1] — odpira AI drevo (start 1 %, faze do 30/60/90 %)

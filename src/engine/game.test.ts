@@ -150,16 +150,24 @@ describe('encounterScoutFactor — manj izvidnikov → manj srečanj', () => {
   });
 });
 
-describe('raziskave orožja/obzidja (×2, 120 r-mes)', () => {
-  it('120 raziskovalcev v eni rundi dvigne stopnjo orožja na 1', () => {
-    const g = newGame(8);
-    const r = processRound(g, { assignment: { axis: 'roboti', combatants: 0, defenders: 0, foragers: 0, workers: 0, researchers: 120, rations: 3, researchObjective: 'weapon' } });
-    expect(r.weaponResearchLevel).toBe(1);
+describe('raziskave: roboti odklepajo orožje/obzidje', () => {
+  const research = (g: GameState, obj: 'robots' | 'weapon' | 'wall', n: number) =>
+    processRound(g, { assignment: { axis: 'roboti', combatants: 0, defenders: 0, foragers: 0, workers: 0, researchers: n, rations: 3, researchObjective: obj } });
+
+  it('Roboti 120 razisk. → stopnja 1', () => {
+    expect(research(newGame(8), 'robots', 120).robotsResearchLevel).toBe(1);
   });
-  it('obzidje: 240 raziskovalcev → stopnja 2', () => {
-    const g = newGame(8);
-    const r = processRound(g, { assignment: { axis: 'roboti', combatants: 0, defenders: 0, foragers: 0, workers: 0, researchers: 240, rations: 3, researchObjective: 'wall' } });
-    expect(r.wallResearchLevel).toBe(2);
+
+  it('orožje je zaklenjeno dokler ni raziskan robot (level ostane 0)', () => {
+    const r = research(newGame(8), 'weapon', 120);
+    expect(r.weaponResearchLevel).toBe(0);
+  });
+
+  it('po Roboti I se orožje lahko dvigne na 1', () => {
+    let s = research(newGame(8), 'robots', 120);   // roboti -> 1
+    expect(s.robotsResearchLevel).toBe(1);
+    s = research(s, 'weapon', 120);                // zdaj orožje -> 1
+    expect(s.weaponResearchLevel).toBe(1);
   });
 });
 

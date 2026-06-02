@@ -54,21 +54,23 @@ export function adaptGenome(genome: AIGenome, history: AxisHistory): AIGenome {
 }
 
 // AI zgenerira vozlišča za drevo (fiksna za MVP, Faza 2+ generirana)
+// AI drevo = 3×3 matrika: 3 tipi robotov (po fazah) × 3 stopnje
+// (1) kateri robot je prišel, (2) mehanska šibka točka, (3) logična šibka točka.
+// Vse začne neznano; odpira se z našim znanjem o AI (aiInsight); fazni stropi 0.30/0.60/0.90.
 export function generateAITree(): AITreeNode[] {
   return [
-    // Faza 1 — Najti (vse začne neznano; drevo se odpira z našim znanjem o AI = aiInsight)
-    { id: 'find_drones',    phase: 'find',      label: 'Izvidniški droni',     visibility: 'unknown', strength: 40, executed: false },
-    { id: 'find_satellite', phase: 'find',      label: 'Satelitsko mapiranje', visibility: 'unknown', strength: 60, executed: false },
-    { id: 'find_sensors',   phase: 'find',      label: 'Senzorska mreža',      visibility: 'unknown', strength: 30, executed: false },
-    { id: 'find_agents',    phase: 'find',      label: 'Infiltracijski agenti', visibility: 'unknown', strength: 50, executed: false },
-    // Faza 2 — Razumeti
-    { id: 'und_patterns',   phase: 'understand', label: 'Analiza vzorcev',     visibility: 'unknown', strength: 55, executed: false },
-    { id: 'und_predict',    phase: 'understand', label: 'Predikcijsko jedro',   visibility: 'unknown', strength: 70, executed: false },
-    { id: 'und_psych',      phase: 'understand', label: 'Psihološki profil',   visibility: 'unknown', strength: 45, executed: false },
-    // Faza 3 — Iztrebiti
-    { id: 'eli_strike',     phase: 'eliminate',  label: 'Udarni protokol',     visibility: 'unknown', strength: 80, executed: false },
-    { id: 'eli_supply',     phase: 'eliminate',  label: 'Rezanje preskrbe',    visibility: 'unknown', strength: 65, executed: false },
-    { id: 'eli_final',      phase: 'eliminate',  label: 'Končna rešitev',       visibility: 'unknown', strength: 90, executed: false },
+    // Faza 1 — Najti · IZVIDNIKI (scouts)
+    { id: 'scout_unit',  phase: 'find',      robot: 'scouts',        role: 'unit',       label: 'Izvidniške enote',            visibility: 'unknown', strength: 30, executed: false, insightThreshold: 0.10 },
+    { id: 'scout_mech',  phase: 'find',      robot: 'scouts',        role: 'mechanical', label: 'Mehanska šibka točka izvidnikov', visibility: 'unknown', strength: 30, executed: false, insightThreshold: 0.20 },
+    { id: 'scout_logic', phase: 'find',      robot: 'scouts',        role: 'logical',    label: 'Logična šibka točka izvidnikov',  visibility: 'unknown', strength: 30, executed: false, insightThreshold: 0.30 },
+    // Faza 2 — Razumeti · NAPADALCI (attackers)
+    { id: 'atk_unit',    phase: 'understand', robot: 'attackers',    role: 'unit',       label: 'Napadalne enote',             visibility: 'unknown', strength: 60, executed: false, insightThreshold: 0.40 },
+    { id: 'atk_mech',    phase: 'understand', robot: 'attackers',    role: 'mechanical', label: 'Mehanska šibka točka napadalcev', visibility: 'unknown', strength: 60, executed: false, insightThreshold: 0.50 },
+    { id: 'atk_logic',   phase: 'understand', robot: 'attackers',    role: 'logical',    label: 'Logična šibka točka napadalcev',  visibility: 'unknown', strength: 60, executed: false, insightThreshold: 0.60 },
+    // Faza 3 — Iztrebiti · PEOPLE-KILLERJI (peopleKillers)
+    { id: 'pk_unit',     phase: 'eliminate',  robot: 'peopleKillers', role: 'unit',       label: 'People-killer enote',         visibility: 'unknown', strength: 90, executed: false, insightThreshold: 0.70 },
+    { id: 'pk_mech',     phase: 'eliminate',  robot: 'peopleKillers', role: 'mechanical', label: 'Mehanska šibka točka people-killerjev', visibility: 'unknown', strength: 90, executed: false, insightThreshold: 0.80 },
+    { id: 'pk_logic',    phase: 'eliminate',  robot: 'peopleKillers', role: 'logical',    label: 'Logična šibka točka people-killerjev',  visibility: 'unknown', strength: 90, executed: false, insightThreshold: 0.90 },
   ];
 }
 

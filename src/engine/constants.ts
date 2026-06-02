@@ -202,6 +202,9 @@ export const RESEARCH_EFFECT_MULT = 2;           // ×2 na level
 export function researchMult(level: number): number {
   return Math.pow(RESEARCH_EFFECT_MULT, Math.max(0, level | 0));
 }
+// Vsaka razkrita LOGIČNA šibka točka robota → +bonus naši bojni moči proti AI (brez nadgradenj).
+// Z orožjem lvl 1 je napadalec izenačen z robotom; z logično šibkostjo postane močnejši.
+export const LOGICAL_WEAKNESS_BONUS = 0.5; // +50 % bojne moči na razkrito logično šibko točko
 
 // ─── Naše znanje o AI (odpira AI drevo) ────────────────────────────────────────
 export const INITIAL_AI_INSIGHT = 0.01;  // na začetku vemo 1 %

@@ -16,14 +16,13 @@ export function intelRequiredForVisibility(target: Visibility): number {
  * že razkritih vozlišč (npr. retroaktivno razkritih ob izvedbi faze).
  */
 export function revealTreeByInsight(nodes: AITreeNode[], insight: number): AITreeNode[] {
-  const N = nodes.length;
-  if (N === 0) return nodes;
-  return nodes.map((n, i) => {
+  if (nodes.length === 0) return nodes;
+  return nodes.map(n => {
     if (n.visibility === 'revealed') return n;
-    const threshold = (i + 1) / N;       // koliko insighta zahteva to vozlišče za polno razkritje
+    const threshold = n.insightThreshold ?? 0.5;
     let vis: Visibility = n.visibility;
     if (insight >= threshold) vis = 'revealed';
-    else if (insight >= threshold - 0.5 / N && vis === 'unknown') vis = 'partial';
+    else if (insight >= threshold - 0.08 && vis === 'unknown') vis = 'partial';
     return vis === n.visibility ? n : { ...n, visibility: vis };
   });
 }

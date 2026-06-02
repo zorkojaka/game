@@ -12,6 +12,7 @@ import {
   AI_WEAK_POINT_EXPLOIT_BONUS,
   aiDefensePower,
   researchMult,
+  LOGICAL_WEAKNESS_BONUS,
   RATIONS_LEVELS,
   DEFAULT_RATIONS,
   INTEL_COMBAT_BONUS_PER_100,
@@ -36,6 +37,12 @@ export function calcHumanStrength(
 /** Intel bonus kot multiplikator: 1 + bonus */
 export function intelCombatMultiplier(intelligence: number): number {
   return 1 + Math.min(INTEL_COMBAT_BONUS_MAX, INTEL_COMBAT_BONUS_PER_100 * (intelligence / 100));
+}
+
+/** Bonus bojne moči iz razkritih LOGIČNIH šibkih točk robotov (brez nadgradenj). */
+export function logicalWeaknessBonus(state: GameState): number {
+  const revealed = (state.aiTree ?? []).filter(n => n.role === 'logical' && n.visibility === 'revealed').length;
+  return revealed * LOGICAL_WEAKNESS_BONUS;
 }
 
 export function calcAIStrength(
@@ -133,7 +140,8 @@ export function resolveCombat(
 ): { result: CombatResult; rng: RNGState } {
   const intelMult = intelCombatMultiplier(state.resources.intelligence);
   const weaponMult = researchMult(state.weaponResearchLevel ?? 0);
-  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase, weaponMult) * intelMult;
+  const logicalMult = 1 + logicalWeaknessBonus(state);
+  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase, weaponMult) * intelMult * logicalMult;
   const aiStr = calcAIStrength(state, state.phase);
   const weakBonus = exploitingWeakPoint ? AI_WEAK_POINT_EXPLOIT_BONUS : 0;
   const p = calcSuccessProbability(humanStr, aiStr, weakBonus);

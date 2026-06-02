@@ -38,7 +38,7 @@ import {
   MISSION_DURATION_MONTHS, MISSION_ENCOUNTER_BASE, MISSION_ENCOUNTER_PER_PERSON,
   MISSION_ENCOUNTER_AI_KNOW, MISSION_WP_DIFFICULTY, MISSION_MIN_TEAM,
 } from './constants.js';
-import { calcHumanStrength, calcAIStrength, calcSuccessProbability, rollOutcome } from './combat.js';
+import { calcHumanStrength, calcAIStrength, calcSuccessProbability, rollOutcome, logicalWeaknessBonus } from './combat.js';
 
 // ─── Pomožne funkcije za nove mehanike ───────────────────────────────────────
 
@@ -285,6 +285,8 @@ export function newGame(seed?: number): GameState {
     wallProgress: 0,
     wallsBuilt: 0,
     artifactWorkshopProgress: 0,
+    robotsResearchLevel: 0,
+    robotsResearchProgress: 0,
     weaponResearchLevel: 0,
     weaponResearchProgress: 0,
     wallResearchLevel: 0,
@@ -363,6 +365,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   const workshopEvents: string[] = [];
 
   // Raziskovalne nadgradnje — stanje
+  let robotsResearchLevel    = state.robotsResearchLevel ?? 0;
+  let robotsResearchProgress = state.robotsResearchProgress ?? 0;
   let weaponResearchLevel    = state.weaponResearchLevel ?? 0;
   let weaponResearchProgress = state.weaponResearchProgress ?? 0;
   let wallResearchLevel      = state.wallResearchLevel ?? 0;
@@ -370,21 +374,37 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
 
   if (researchers > 0) {
     if (researchObj === 'robots') {
-      const intelBonus = Math.floor(researchers * SCOUT_INTEL_YIELD * 3 * rations.strengthMult);
+      // Roboti: odkrivamo šibke točke; vsak nivo odklene orožje/obzidje iste stopnje
+      const intelBonus = Math.floor(researchers * SCOUT_INTEL_YIELD * rations.strengthMult);
       intelligence += intelBonus;
+      robotsResearchProgress += researchers;
+      while (robotsResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS) {
+        robotsResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
+        robotsResearchLevel += 1;
+        workshopEvents.push(`🔬 Roboti raziskani — stopnja ${robotsResearchLevel}! Odklenjeno Orožje ${robotsResearchLevel} in Obzidje ${robotsResearchLevel}.`);
+      }
     } else if (researchObj === 'weapon') {
-      weaponResearchProgress += researchers;
-      while (weaponResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS) {
-        weaponResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
-        weaponResearchLevel += 1;
-        workshopEvents.push(`🔬 Raziskava orožja dokončana — stopnja ${weaponResearchLevel}! Napad orožja ×${researchMult(weaponResearchLevel)}.`);
+      // Orožje je zaklenjeno za raziskavo robotov: ne more preseči robotsResearchLevel
+      if (weaponResearchLevel >= robotsResearchLevel) {
+        workshopEvents.push(`🔒 Orožje ${weaponResearchLevel + 1} zaklenjeno — najprej razišči Robote ${weaponResearchLevel + 1}.`);
+      } else {
+        weaponResearchProgress += researchers;
+        while (weaponResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && weaponResearchLevel < robotsResearchLevel) {
+          weaponResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
+          weaponResearchLevel += 1;
+          workshopEvents.push(`🔬 Raziskava orožja dokončana — stopnja ${weaponResearchLevel}! Napad orožja ×${researchMult(weaponResearchLevel)}.`);
+        }
       }
     } else if (researchObj === 'wall') {
-      wallResearchProgress += researchers;
-      while (wallResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS) {
-        wallResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
-        wallResearchLevel += 1;
-        workshopEvents.push(`🔬 Raziskava obzidja dokončana — stopnja ${wallResearchLevel}! Obramba obzidja ×${researchMult(wallResearchLevel)}.`);
+      if (wallResearchLevel >= robotsResearchLevel) {
+        workshopEvents.push(`🔒 Obzidje ${wallResearchLevel + 1} zaklenjeno — najprej razišči Robote ${wallResearchLevel + 1}.`);
+      } else {
+        wallResearchProgress += researchers;
+        while (wallResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && wallResearchLevel < robotsResearchLevel) {
+          wallResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
+          wallResearchLevel += 1;
+          workshopEvents.push(`🔬 Raziskava obzidja dokončana — stopnja ${wallResearchLevel}! Obramba obzidja ×${researchMult(wallResearchLevel)}.`);
+        }
       }
     }
   }
@@ -632,8 +652,9 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
               expeditionEvents.push(`✗ Napad na ${wpLabel} ni uspel — ${lost} padlih, ${survivors} se vrača.`);
             }
           } else {
-            // Splošni napad na AI robote — AI brani z obrambno močjo enot
-            const humanStr = survivors * 1.2 * aTier.strengthMult * stealthBonus;
+            // Splošni napad na AI robote — naša moč raste z orožjem in razkritimi logičnimi šibkostmi
+            const humanStr = survivors * 1.2 * aTier.strengthMult * stealthBonus
+              * researchMult(state.weaponResearchLevel ?? 0) * (1 + logicalWeaknessBonus(state));
             const aiStr = Math.max(1, aiDefensePower(aiUnits) * 0.05);
             const p = humanStr / (humanStr + aiStr);
             const [roll, rngA] = rngNext(rng); rng = rngA;
@@ -935,6 +956,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     expeditions: tickedExps,
     completedExpeditions: [...oldCompletedExps, ...finishedExps],
     weaponWorkshopProgress, weaponWorkshopScouts, wallProgress, wallsBuilt, artifactWorkshopProgress,
+    robotsResearchLevel, robotsResearchProgress,
     weaponResearchLevel, weaponResearchProgress, wallResearchLevel, wallResearchProgress,
     rngCallCount: rng.calls,
     lastRoundLog: log,
@@ -1032,7 +1054,7 @@ function buildNarrative(
 // Izračun obeta za dano dodelitev — UI prikaže pred akcijo
 export function previewOdds(state: GameState, assignment: Assignment) {
   const intelB = intelCombatBonus(state);
-  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase, researchMult(state.weaponResearchLevel ?? 0)) * (1 + intelB);
+  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase, researchMult(state.weaponResearchLevel ?? 0)) * (1 + intelB) * (1 + logicalWeaknessBonus(state));
   const aiStr = calcAIStrength(state, state.phase);
   const p = calcSuccessProbability(humanStr, aiStr);
 

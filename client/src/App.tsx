@@ -350,59 +350,57 @@ function AxisFocusBar({ value, onChange }: { value: HumanAxis; onChange: (a: Hum
   );
 }
 
-function HumanTree({ axisHistory, currentAxis, onFocusChange }: {
-  axisHistory?: Record<HumanAxis, number>;
-  currentAxis: HumanAxis;
-  onFocusChange: (a: HumanAxis) => void;
+function HumanTree({ robotsLevel, weaponLevel, wallLevel, focus, onFocus }: {
+  robotsLevel: number; weaponLevel: number; wallLevel: number;
+  focus: ResearchObjective;
+  onFocus: (o: ResearchObjective) => void;
 }) {
-  const hist = { ...EMPTY_HISTORY, ...(axisHistory ?? {}) };
-  const axes: HumanAxis[] = ['obzidje', 'orozje', 'roboti'];
-  const totalUnlocked = HUMAN_TREE.filter(n => hist[n.axis] >= n.threshold).length;
-
+  // Roboti prvi; Orožje in Obzidje zaklenjeni za stopnjo robotov.
+  const branches: Array<{ axis: HumanAxis; obj: ResearchObjective; level: number; gated: boolean }> = [
+    { axis: 'roboti',  obj: 'robots', level: robotsLevel, gated: false },
+    { axis: 'orozje',  obj: 'weapon', level: weaponLevel, gated: true },
+    { axis: 'obzidje', obj: 'wall',   level: wallLevel,   gated: true },
+  ];
   return (
     <div className="panel human-tree">
       <div className="panel-head">
-        <h3>NAŠ NAČRT PREŽIVETJA · klikni vejo za fokus tega meseca</h3>
-        <span className="panel-badge teal">{totalUnlocked}/{HUMAN_TREE.length} odklenjenih</span>
+        <h3>NAŠ NAČRT PREŽIVETJA · fokus določajo gumbi na raziskavah</h3>
       </div>
       <div className="ht-branches">
-        {axes.map(ax => {
-          const meta = HUMAN_AXIS_META[ax];
-          const cnt = hist[ax];
-          const isCurrent = currentAxis === ax;
+        {branches.map(b => {
+          const meta = HUMAN_AXIS_META[b.axis];
+          const isFocus = focus === b.obj;
           return (
-            <div key={ax} className={`ht-branch ${isCurrent ? 'ht-current ht-focus' : ''}`}
-                 onClick={() => onFocusChange(ax)}
-                 style={isCurrent ? { background: '#0a1a14', borderLeft: `2px solid ${meta.color}` } : { cursor: 'pointer' }}>
+            <div key={b.axis} className={`ht-branch ${isFocus ? 'ht-current ht-focus' : ''}`}
+                 onClick={() => onFocus(b.obj)}
+                 style={isFocus ? { background: '#0a1a14', borderLeft: `2px solid ${meta.color}` } : { cursor: 'pointer' }}>
               <div className="ht-br-head" style={{ color: meta.color }}>
                 <span className="ht-br-icon">{meta.icon}</span>
                 <span className="ht-br-label">{meta.label}</span>
-                {isCurrent && <span className="ht-focus-tag" style={{ background: meta.color }}>FOKUS</span>}
-                <span className="ht-br-count">{cnt}r</span>
+                {isFocus && <span className="ht-focus-tag" style={{ background: meta.color }}>FOKUS</span>}
+                <span className="ht-br-count">Lv{b.level}</span>
               </div>
               <div className="ht-nodes">
-                {HUMAN_TREE.filter(n => n.axis === ax).map(n => {
-                  const unlocked = cnt >= n.threshold;
-                  const progress = Math.min(1, cnt / n.threshold);
+                {[1, 2, 3].map(lvl => {
+                  const unlocked = b.level >= lvl;
+                  // Orožje/Obzidje stopnje lvl zahtevajo Robote vsaj lvl
+                  const lockedByRobots = b.gated && !unlocked && robotsLevel < lvl;
                   return (
-                    <div key={n.label} className={`ht-node ${unlocked ? 'unlocked' : 'locked'}`}
+                    <div key={lvl} className={`ht-node ${unlocked ? 'unlocked' : 'locked'}`}
                          style={unlocked ? { borderColor: meta.color } : {}}>
                       <div className="ht-node-head">
                         <span className="ht-node-lvl" style={{ color: unlocked ? meta.color : '#333' }}>
-                          {unlocked ? '◆' : `${cnt}/${n.threshold}`}
+                          {unlocked ? '◆' : lockedByRobots ? '🔒' : '◇'}
                         </span>
                         <span className="ht-node-label" style={{ color: unlocked ? '#c8e0d0' : '#3a3a3a' }}>
-                          {n.label}
+                          {meta.label.charAt(0) + meta.label.slice(1).toLowerCase()} {lvl}
                         </span>
                       </div>
-                      <div className="ht-node-eff" style={{ color: unlocked ? meta.color : '#2a2a2a' }}>
-                        {n.effect}
+                      <div className="ht-node-eff dim small" style={{ color: unlocked ? meta.color : '#2a2a2a' }}>
+                        {unlocked
+                          ? (b.obj === 'robots' ? 'šibke točke odkrite' : `učinek ×${Math.pow(2, lvl)}`)
+                          : lockedByRobots ? `rabi Robote ${lvl}` : 'razišči'}
                       </div>
-                      {!unlocked && (
-                        <div className="ht-node-track">
-                          <div className="ht-node-fill" style={{ width: `${progress * 100}%`, background: meta.color, opacity: .35 }} />
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -2198,11 +2196,11 @@ function WorkshopSelector({ value, onChange, weaponLevel, wallLevel }: { value: 
 }
 
 /** Izbira cilja raziskave (raziskovalci) */
-function ResearchSelector({ value, onChange, weaponLevel, wallLevel }: { value: ResearchObjective; onChange: (o: ResearchObjective) => void; weaponLevel: number; wallLevel: number }) {
-  const opts: Array<{ id: ResearchObjective; icon: string; label: string; color: string; desc: string; lvl?: number }> = [
-    { id: 'robots', icon: '🤖', label: 'AI roboti', color: '#cc8800', desc: '+veliko intela → boljši % v vseh bojih.' },
-    { id: 'weapon', icon: '⚔️', label: 'Orožje',   color: '#cc4433', desc: 'Vsaka stopnja podvoji napad orožja. 120 razisk.-mes. na stopnjo.', lvl: weaponLevel },
-    { id: 'wall',   icon: '🧱', label: 'Obzidje',  color: '#aabb88', desc: 'Vsaka stopnja podvoji obrambo obzidja. 120 razisk.-mes. na stopnjo.', lvl: wallLevel },
+function ResearchSelector({ value, onChange, robotsLevel, weaponLevel, wallLevel }: { value: ResearchObjective; onChange: (o: ResearchObjective) => void; robotsLevel: number; weaponLevel: number; wallLevel: number }) {
+  const opts: Array<{ id: ResearchObjective; icon: string; label: string; color: string; desc: string; lvl: number; locked: boolean }> = [
+    { id: 'robots', icon: '🤖', label: 'Roboti', color: '#cc8800', desc: 'Odkrivaj šibke točke robotov. Vsaka stopnja odklene Orožje in Obzidje iste stopnje.', lvl: robotsLevel, locked: false },
+    { id: 'weapon', icon: '⚔️', label: 'Orožje', color: '#cc4433', desc: 'Vsaka stopnja podvoji napad orožja (120 razisk.-mes.). Zaklenjeno za stopnjo Robotov.', lvl: weaponLevel, locked: weaponLevel >= robotsLevel },
+    { id: 'wall',   icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: 'Vsaka stopnja podvoji obrambo obzidja (120 razisk.-mes.). Zaklenjeno za stopnjo Robotov.', lvl: wallLevel, locked: wallLevel >= robotsLevel },
   ];
   const sel = opts.find(o => o.id === value);
   return (
@@ -2213,11 +2211,11 @@ function ResearchSelector({ value, onChange, weaponLevel, wallLevel }: { value: 
             style={value === o.id ? { borderColor: o.color, color: o.color } : {}}
             onClick={() => onChange(o.id)} title={`${o.label} — ${o.desc}`}>
             <span className="so-icon">{o.icon}</span>
-            <span className="so-label-mini">{o.label}{o.lvl !== undefined ? ` Lv${o.lvl}` : ''}</span>
+            <span className="so-label-mini">{o.label} Lv{o.lvl}{o.locked ? ' 🔒' : ''}</span>
           </button>
         ))}
       </div>
-      {sel && <div className="so-desc-line dim small">{sel.desc}</div>}
+      {sel && <div className="so-desc-line dim small">{sel.desc}{sel.locked ? ` · 🔒 najprej razišči Robote ${sel.lvl + 1}` : ''}</div>}
     </div>
   );
 }
@@ -3055,11 +3053,17 @@ export default function App() {
                   <button className="pa-btn" disabled={freePeople <= 0} onClick={() => bumpRole('r', 1)}>+</button>
                 </span>
               </div>
-              <div className="ps-row"><span className="dim small">Cilj:</span><ResearchSelector value={researchObj} onChange={setResearchObj} weaponLevel={game.weaponResearchLevel ?? 0} wallLevel={game.wallResearchLevel ?? 0} /></div>
-              {researchObj === 'robots' && <>
-                <div className="ps-row"><span className="dim small">+ Intel / mesec:</span><b style={{ color: '#3388cc' }}>+{researchIntel}</b></div>
-                <div className="ps-row"><span className="dim small">👁 Intel zaloga:</span><b>{game.resources.intelligence}</b></div>
-              </>}
+              <div className="ps-row"><span className="dim small">Cilj:</span><ResearchSelector value={researchObj} onChange={setResearchObj} robotsLevel={game.robotsResearchLevel ?? 0} weaponLevel={game.weaponResearchLevel ?? 0} wallLevel={game.wallResearchLevel ?? 0} /></div>
+              {researchObj === 'robots' && (() => {
+                const lvl = game.robotsResearchLevel ?? 0; const prog = game.robotsResearchProgress ?? 0;
+                const months = researchers > 0 ? Math.ceil((120 - prog) / researchers) : Infinity;
+                return <>
+                  <div className="ps-row"><span className="dim small">🤖 Roboti — stopnja:</span><b style={{ color: '#cc8800' }}>Lv{lvl} (odklene Orožje/Obzidje {lvl})</b></div>
+                  <div className="ps-row"><span className="dim small">Napredek do Lv{lvl + 1}:</span><b>{prog} / 120 razisk.-mes.</b></div>
+                  <div className="ps-row"><span className="dim small">Do stopnje (pri {researchers}):</span><b style={{ color: '#cc8800' }}>{researchers > 0 ? `${months} mesec(ev)` : '∞'}</b></div>
+                  <div className="ps-row"><span className="dim small">+ Intel / mesec:</span><b style={{ color: '#3388cc' }}>+{researchIntel}</b></div>
+                </>;
+              })()}
               {researchObj === 'weapon' && (() => {
                 const lvl = game.weaponResearchLevel ?? 0; const prog = game.weaponResearchProgress ?? 0;
                 const months = researchers > 0 ? Math.ceil((120 - prog) / researchers) : Infinity;
@@ -3082,7 +3086,8 @@ export default function App() {
             <p className="field-note dim small">Raziskovalci: „AI roboti" dajo intel (boljši boji); „Orožje" in „Obzidje" vsaka stopnja podvoji napad/obrambo (120 razisk.-mes. na stopnjo). AI drevo se odpira samodejno z znanjem o AI.</p>
           </div>
           <div className="band band-trees">
-            <HumanTree axisHistory={game.axisHistory} currentAxis={axis} onFocusChange={setAxis} />
+            <HumanTree robotsLevel={game.robotsResearchLevel ?? 0} weaponLevel={game.weaponResearchLevel ?? 0} wallLevel={game.wallResearchLevel ?? 0}
+              focus={researchObj} onFocus={setResearchObj} />
             <AITree nodes={game.aiTree} justRevealed={justRevealed} />
           </div>
           </>
