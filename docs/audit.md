@@ -73,8 +73,9 @@ Commit: `64850ca Fix map draft control icons`.
 
 Spremembe:
 
-- Gumbi na zadnjem hexu med risanjem poti ne uporabljajo več emoji teksta kot glavnega renderja.
-- Ikone za `scout`, `attack`, `+`, `-` in potrditev so zamenjane z inline SVG ikonami.
+- Gumbi na zadnjem hexu med risanjem poti uporabljajo stabiliziran render ikon, ločen od starega necentriranega emoji prikaza.
+- Ikoni za `scout` in `attack` sta usklajeni na stabilen centered text render (`🗺`, `⚔️`), ker se ti dve v praksi pravilneje prikažeta v majhnih map kontrolah.
+- `+`, `-` in potrditev ostajajo vektorsko risani, da imajo zanesljivo centriranje.
 - Popravljeno je centriranje in konsistenten prikaz ikon znotraj krožnih SVG gumbov.
 - Gameplay logika pošiljanja odprave ni bila spremenjena.
 

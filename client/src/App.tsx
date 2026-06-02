@@ -2288,21 +2288,10 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           type DraftControlIcon = 'scout' | 'attack' | 'minus' | 'plus' | 'confirm';
           const DraftIcon = ({ icon, color }: { icon: DraftControlIcon; color: string }) => {
             if (icon === 'scout') {
-              return (
-                <g transform="translate(-6 -6)" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="5" cy="5" r="3.2" />
-                  <circle cx="11" cy="5" r="3.2" />
-                  <path d="M7.4 5h1.2M3.6 8.2 2 12M12.4 8.2 14 12" />
-                </g>
-              );
+              return <text textAnchor="middle" dominantBaseline="central" fontSize="10" fill={color} style={{ userSelect: 'none' }}>🗺</text>;
             }
             if (icon === 'attack') {
-              return (
-                <g transform="translate(-6 -6)" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 2l9 9M12 2 3 11M2.2 12.8 4.4 10.6M13.8 12.8 11.6 10.6" />
-                  <path d="M3 2h3M12 2H9" />
-                </g>
-              );
+              return <text textAnchor="middle" dominantBaseline="central" fontSize="10" fill={color} style={{ userSelect: 'none' }}>⚔️</text>;
             }
             if (icon === 'minus') {
               return <path d="M-4 0h8" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" />;
