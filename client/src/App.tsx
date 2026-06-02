@@ -1944,12 +1944,25 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                       <text x={p.x + bx} y={cy} textAnchor="middle" dominantBaseline="central"
                         fontSize="12" fill={z.color} fontWeight="bold" fontFamily="'Courier New', monospace">+</text>
                     </g>
-                    {/* Slider — nastavi vrednost neposredno (max = trenutno + prosti) */}
-                    <foreignObject x={p.x - SIZE * 0.62} y={p.y + SIZE * 0.40} width={SIZE * 1.24} height={14}>
-                      <input type="range" min={0} max={z.count + freePeople} value={z.count}
-                        onChange={(e) => onCampSet(z.adj, parseInt(e.target.value))}
-                        style={{ width: '100%', height: 8, accentColor: z.color, cursor: 'pointer' }} />
-                    </foreignObject>
+                    {/* tanka podčrtana črta pod −število+ vrstico (v barvi cone) */}
+                    <line x1={p.x - bx - 7.5} y1={cy + 12} x2={p.x + bx + 7.5} y2={cy + 12}
+                      stroke={z.color} strokeWidth="1" opacity="0.45" pointerEvents="none" />
+                    {/* Slider — sleek, barvno polnjenje do thumb-a, okrogel gumb */}
+                    {(() => {
+                      const max = z.count + freePeople;
+                      const pct = max > 0 ? (z.count / max) * 100 : 0;
+                      return (
+                        <foreignObject x={p.x - SIZE * 0.62} y={p.y + SIZE * 0.42} width={SIZE * 1.24} height={16}>
+                          <input type="range" min={0} max={max} value={z.count}
+                            onChange={(e) => onCampSet(z.adj, parseInt(e.target.value))}
+                            className="cz-slider"
+                            style={{
+                              ['--zc' as string]: z.color,
+                              background: `linear-gradient(to right, ${z.color} 0%, ${z.color} ${pct}%, #1c2630 ${pct}%, #1c2630 100%)`,
+                            }} />
+                        </foreignObject>
+                      );
+                    })()}
                   </>
                 );
               })()}
