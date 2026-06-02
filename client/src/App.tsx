@@ -3286,105 +3286,62 @@ export default function App() {
           {/* ─── IZVIDNIKI / MAPA — nova odprava + aktivne odprave ─── */}
           {tab === 'map' && (
           <>
-          <div className="panel">
-            <div className="panel-head">
-              <h3>🗺 NOVA ODPRAVA</h3>
-              {pendingExpeditions.length > 0 && (
-                <span className="panel-badge">{pendingExpeditions.length} potrjenih · {pendingExpPpl} ljudi</span>
-              )}
+          <div className="panel def-panel">
+            <div className="def-head"><span className="def-head-icon">🔭</span>
+              <div><h3>IZVIDNIKI</h3><div className="def-sub">RAZISKOVANJE MAPE</div></div>
+              {pendingExpeditions.some(e => e.kind === 'scout') && <span className="panel-badge" style={{ marginLeft: 'auto' }}>{pendingExpeditions.filter(e => e.kind === 'scout').length} potrjenih</span>}
             </div>
-            <div className="path-builder">
-              <div className="pb-instr dim small">
-                Klikni sosednji heks na mapi za gradnjo poti. Klik na zadnji heks = odznači.
-              </div>
-              {draftPath.length < 2 ? (
-                <div className="map-hint">Pot je prazna. Začni s klikom na sosednji heks ⌂ klana.</div>
-              ) : (
-                <>
-                  <div className="path-stats">
-                    <div className="ps-row"><span className="dim small">Korakov:</span><b>{draftPath.length - 1}</b></div>
-                    <div className="ps-row"><span className="dim small">Trajanje (tja+nazaj):</span><b style={{ color: '#cc8800' }}>{draftTotalMonths} mes. <span className="dim small">({draftPathMonths} tja + {draftReturnMonths} nazaj)</span></b></div>
-                    <div className="ps-row"><span className="dim small">Tveganje srečanja:</span><b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b></div>
-                    <div className="ps-row">
-                      <span className="dim small">Ljudje za to odpravo:</span>
-                      <span className="pa-pm">
-                        <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
-                        <b className="pa-count">{draftPeople}</b>
-                        <button className="pa-btn" disabled={assignedHome + plannedTotal + draftPeople >= availablePop}
-                          onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
-                      </span>
+            <div className="pb-instr dim small">Klikni sosednje hekse na mapi za pot — odpravo lahko nastaviš tudi kar na zadnjem heksu (🔭/⚔ · −/+ · ✓).</div>
+            {draftPath.length < 2 ? (
+              <div className="map-hint">Pot je prazna. Začni s klikom na sosednji heks ⌂ klana.</div>
+            ) : (
+              <>
+                <div className="def-stat-grid">
+                  <div className="def-stat"><div className="def-stat-label">KORAKI</div><div className="def-stat-big">{draftPath.length - 1}</div></div>
+                  <div className="def-stat"><div className="def-stat-label">TRAJANJE</div><div className="def-stat-big" style={{ color: '#cc8800' }}>{draftTotalMonths}m</div><div className="def-stat-note">{draftPathMonths} tja + {draftReturnMonths} nazaj</div></div>
+                  <div className="def-stat"><div className="def-stat-label">VARNOST POTI</div><Gauge pct={Math.round((1 - draftRisk) * 100)} color={probColor(1 - draftRisk)} /></div>
+                </div>
+                <div className="def-card">
+                  <div className="def-card-title">ŠTEVILO IZVIDNIKOV</div>
+                  <div className="def-defenders">
+                    <div className="def-big-num" style={{ color: '#ffd84a' }}>{draftPeople}</div>
+                    <div className="def-slider-row" style={{ justifyContent: 'flex-end' }}>
+                      <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
+                      <button className="pa-btn" disabled={assignedHome + plannedTotal + draftPeople >= availablePop} onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
                     </div>
                   </div>
-                  <div className="exp-rations">
-                    <span className="dim small">Obroki odprave:</span>
-                    <RationsMini value={draftRations} onChange={setDraftRations} />
-                  </div>
-                  <label className="stealth-toggle" title="Trajanje +50 %, srečanja ×0.5, boj +20 % uspeha.">
+                  <div className="exp-rations" style={{ marginTop: '.45rem' }}><span className="dim small">Obroki:</span><RationsMini value={draftRations} onChange={setDraftRations} /></div>
+                  <label className="stealth-toggle" title="Trajanje +50 %, srečanja ×0.5.">
                     <input type="checkbox" checked={draftStealth} onChange={e => setDraftStealth(e.target.checked)} />
-                    <span>🌙 Skrivanje — pot +50 %, srečanja ×0.5, boj +20 %</span>
+                    <span>🌙 Skrivanje — pot +50 %, srečanja ×0.5</span>
                   </label>
-                  <div className="exp-takealong">
-                    <div className="dim small" style={{ marginBottom: 2 }}>Vzamejo s seboj iz kampa:</div>
-                    <div className="eta-row">
-                      <span>🍞 <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane</span>
-                      <span className="dim small">({draftPeople} × {draftPath.length - 1}m × ×{draftRTier.foodMult})</span>
+                  <div className="def-stat-note">🍞 vzamejo <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane · moč ×{draftRTier.strengthMult}</div>
+                  <button className="def-upgrade-btn" disabled={!canConfirmDraft} onClick={confirmDraftExpedition}>✓ Potrdi odpravo</button>
+                </div>
+              </>
+            )}
+            {pendingExpeditions.some(e => e.kind === 'scout') && (
+              <div className="pending-exps">
+                <div className="dim small" style={{ marginBottom: 4 }}>Potrjene odprave (sproži ob izvedbi meseca):</div>
+                {pendingExpeditions.map((e, i) => e.kind === 'scout' && (() => {
+                  const months = e.path.length - 1;
+                  const t = RATIONS[e.rations] ?? RATIONS[3];
+                  const food = Math.round(e.assigned * months * t.foodMult);
+                  return (
+                    <div key={i} className="pending-exp-row">
+                      <span>🔭 {e.assigned} · {months}m · {t.emoji} 🍞{food}{e.stealth ? ' · 🌙' : ''}</span>
+                      <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
                     </div>
-                    <div className="eta-row dim small">moč ekipe ×{draftRTier.strengthMult} (vpliva na preživetje srečanj)</div>
-                  </div>
-                  <button className="autofit-btn" disabled={!canConfirmDraft} onClick={confirmDraftExpedition}>
-                    ✓ Potrdi odpravo in nariši novo
-                  </button>
-                </>
-              )}
-              {pendingExpeditions.some(e => e.kind === 'scout') && (
-                <div className="pending-exps">
-                  <div className="dim small" style={{ marginBottom: 4 }}>Potrjene odprave (sproži ob izvedbi meseca):</div>
-                  {pendingExpeditions.map((e, i) => e.kind === 'scout' && (() => {
-                    const months = e.path.length - 1;
-                    const t = RATIONS[e.rations] ?? RATIONS[3];
-                    const food = Math.round(e.assigned * months * t.foodMult);
-                    return (
-                      <div key={i} className="pending-exp-row">
-                        <span>🔭 {e.assigned} · {months}m · {t.emoji} 🍞{food}{e.stealth ? ' · 🌙' : ''}</span>
-                        <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
-                      </div>
-                    );
-                  })())}
-                </div>
-              )}
-            </div>
-            {(game.expeditions ?? []).length > 0 && (
-              <div className="cmd-section">
-                <div className="cmd-label">Aktivne odprave ({game.expeditions.length})</div>
-                <div className="active-expeditions">
-                  {game.expeditions.map(e => {
-                    const steps = e.path.length - 1;
-                    const done = e.currentIndex;
-                    const target = e.path[e.path.length - 1];
-                    return (
-                      <div key={e.id} className="exp-card">
-                        <div className="exp-head">
-                          <span className="exp-kind" style={{ color: e.kind === 'mission' ? '#cc3333' : '#ffd84a' }}>
-                            {e.kind === 'mission' ? '🎯' : '🔭'} {e.assigned} ljudi
-                          </span>
-                          <span className="dim small">cilj: ({target?.q},{target?.r})</span>
-                        </div>
-                        <div className="exp-progress">
-                          <div className="ep-track">
-                            <div className="ep-fill" style={{ width: `${(done / Math.max(1, steps)) * 100}%`,
-                              background: e.kind === 'mission' ? '#cc3333' : '#ffd84a' }} />
-                          </div>
-                          <span className="dim small">{done} / {steps}</span>
-                        </div>
-                        {e.encountersLog.length > 0 && (
-                          <div className="exp-events dim small">{e.encountersLog.slice(-2).join(' · ')}</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                  );
+                })())}
               </div>
             )}
+            <div className="def-how">
+              <div className="def-how-title">KAKO DELUJE</div>
+              <div className="def-how-row"><span className="def-how-ic">🔭</span><span>Izvidniki raziskujejo hekse in odkrivajo šibke točke ter klane.</span></div>
+              <div className="def-how-row"><span className="def-how-ic">↩</span><span>Po cilju se vrnejo domov; krožna pot ob kampu = kratek povratek.</span></div>
+              <div className="def-how-row"><span className="def-how-ic">🌙</span><span>Skrivanje zniža srečanja, a podaljša pot.</span></div>
+            </div>
           </div>
           <AlliesPanel clans={game.otherClans ?? []} />
           </>
@@ -3393,81 +3350,72 @@ export default function App() {
           {/* ─── NAPAD — pošlji napadalce po poti, spopad ob prihodu ─── */}
           {tab === 'attack' && (
           <>
-          <div className="panel">
-            <div className="panel-head">
-              <h3>⚔ NOV NAPAD</h3>
-              {pendingExpeditions.filter(e => e.kind === 'mission').length > 0 && (
-                <span className="panel-badge">{pendingExpeditions.filter(e => e.kind === 'mission').length} napadov</span>
-              )}
+          <div className="panel def-panel">
+            <div className="def-head"><span className="def-head-icon">⚔</span>
+              <div><h3>NAPAD</h3><div className="def-sub">UDAR NA AI</div></div>
+              {pendingExpeditions.filter(e => e.kind === 'mission').length > 0 && <span className="panel-badge" style={{ marginLeft: 'auto' }}>{pendingExpeditions.filter(e => e.kind === 'mission').length} napadov</span>}
             </div>
-            <div className="path-builder">
-              <div className="pb-instr dim small">
-                Nariši pot na mapi do AI jedra (☣) ali razkrite šibke točke (◆) in pošlji napadalce.
-                Ob prihodu se sproži spopad; preživeli se vrnejo v kamp.
-              </div>
-              {draftPath.length < 2 ? (
-                <div className="map-hint">Pot je prazna. Klikni sosednji heks ⌂ klana za začetek poti do cilja.</div>
-              ) : (() => {
-                const last = draftPath[draftPath.length - 1];
-                const tile = game.mapTiles?.find(t => t.q === last.q && t.r === last.r);
-                const wp = tile?.hidesWeakPointId ? game.aiWeakPoints.find(w => w.id === tile.hidesWeakPointId) : undefined;
-                const wpDisc = !!wp?.discovered;
-                const targetLabel = wpDisc ? `◆ ${wp!.label}` : tile?.isAICore ? '☣ AI jedro' : `(${last.q},${last.r}) — splošni napad`;
-                const hStr = draftPeople * 1.2 * draftRTier.strengthMult * (draftStealth ? 1.2 : 1);
-                const aiUnits = game.aiUnits ?? { scouts: game.aiRobots ?? 0, attackers: 0, peopleKillers: 0 };
-                const aStr = Math.max(1, aiDefensePower(aiUnits) * 0.05);
-                const winP = hStr / (hStr + aStr);
-                return (
-                  <>
-                    <div className="path-stats">
-                      <div className="ps-row"><span className="dim small">Cilj:</span><b style={{ color: wpDisc ? '#ffd84a' : '#cc6655' }}>{targetLabel}</b></div>
-                      <div className="ps-row"><span className="dim small">Korakov:</span><b>{draftPath.length - 1}</b></div>
-                      <div className="ps-row"><span className="dim small">Trajanje (tja+nazaj):</span><b style={{ color: '#cc8800' }}>{draftTotalMonths} mes. <span className="dim small">({draftPathMonths} tja + {draftReturnMonths} nazaj)</span></b></div>
-                      <div className="ps-row"><span className="dim small">Tveganje srečanja na poti:</span><b style={{ color: probColor(1 - draftRisk) }}>{Math.round(draftRisk * 100)}%</b></div>
-                      <div className="ps-row">
-                        <span className="dim small">Napadalci:</span>
-                        <span className="pa-pm">
-                          <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
-                          <b className="pa-count">{draftPeople}</b>
-                          <button className="pa-btn" disabled={assignedHome + plannedTotal + draftPeople >= availablePop || weaponsLeft <= 0}
-                            onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
-                        </span>
+            <div className="pb-instr dim small">Nariši pot do AI jedra (☣) ali šibke točke (◆). Odpravo nastaviš tudi na zadnjem heksu. Spopad ob prihodu, preživeli se vrnejo.</div>
+            {draftPath.length < 2 ? (
+              <div className="map-hint">Pot je prazna. Klikni sosednji heks ⌂ klana za začetek poti do cilja.</div>
+            ) : (() => {
+              const last = draftPath[draftPath.length - 1];
+              const tile = game.mapTiles?.find(t => t.q === last.q && t.r === last.r);
+              const wp = tile?.hidesWeakPointId ? game.aiWeakPoints.find(w => w.id === tile.hidesWeakPointId) : undefined;
+              const wpDisc = !!wp?.discovered;
+              const targetLabel = wpDisc ? `◆ ${wp!.label}` : tile?.isAICore ? '☣ AI jedro' : `(${last.q},${last.r}) — splošni napad`;
+              const hStr = draftPeople * 1.2 * draftRTier.strengthMult * (draftStealth ? 1.2 : 1);
+              const aiUnits = game.aiUnits ?? { scouts: game.aiRobots ?? 0, attackers: 0, peopleKillers: 0 };
+              const aStr = Math.max(1, aiDefensePower(aiUnits) * 0.05);
+              const winP = hStr / (hStr + aStr);
+              return (
+                <>
+                  <div className="def-card">
+                    <div className="def-card-title">CILJ</div>
+                    <div className="def-big-num" style={{ fontSize: '1.1rem', color: wpDisc ? '#ffd84a' : '#cc6655' }}>{targetLabel}</div>
+                  </div>
+                  <div className="def-stat-grid">
+                    <div className="def-stat"><div className="def-stat-label">TRAJANJE</div><div className="def-stat-big" style={{ color: '#cc8800' }}>{draftTotalMonths}m</div><div className="def-stat-note">{draftPathMonths} tja + {draftReturnMonths} nazaj</div></div>
+                    <div className="def-stat"><div className="def-stat-label">VARNOST POTI</div><Gauge pct={Math.round((1 - draftRisk) * 100)} color={probColor(1 - draftRisk)} /></div>
+                    <div className="def-stat"><div className="def-stat-label">OCENA ZMAGE</div><Gauge pct={Math.round(winP * 100)} color={probColor(winP)} /></div>
+                  </div>
+                  <div className="def-card">
+                    <div className="def-card-title">NAPADALCI</div>
+                    <div className="def-defenders">
+                      <div className="def-big-num" style={{ color: '#cc4433' }}>⚔ {draftPeople}</div>
+                      <div className="def-slider-row" style={{ justifyContent: 'flex-end' }}>
+                        <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
+                        <button className="pa-btn" disabled={assignedHome + plannedTotal + draftPeople >= availablePop || weaponsLeft <= 0} onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
                       </div>
-                      <div className="ps-row"><span className="dim small">Ocena zmage v spopadu:</span>
-                        <b style={{ color: probColor(winP) }}>{wpDisc ? '~' : ''}{Math.round(winP * 100)}%</b></div>
                     </div>
-                    <div className="exp-rations">
-                      <span className="dim small">Obroki:</span>
-                      <RationsMini value={draftRations} onChange={setDraftRations} />
-                    </div>
+                    <div className="def-stat-note">Prosto orožja: <b style={{ color: weaponsLeft > 0 ? '#66cc88' : '#cc4444' }}>{weaponsLeft}</b> (vsak napadalec rabi orožje)</div>
+                    <div className="exp-rations" style={{ marginTop: '.45rem' }}><span className="dim small">Obroki:</span><RationsMini value={draftRations} onChange={setDraftRations} /></div>
                     <label className="stealth-toggle" title="Trajanje +50 %, srečanja ×0.5, boj +20 % uspeha.">
                       <input type="checkbox" checked={draftStealth} onChange={e => setDraftStealth(e.target.checked)} />
                       <span>🌙 Skrivanje — pot +50 %, srečanja ×0.5, boj +20 %</span>
                     </label>
-                    <div className="exp-takealong">
-                      <div className="dim small" style={{ marginBottom: 2 }}>Vzamejo s seboj:</div>
-                      <div className="eta-row">
-                        <span>🍞 <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane</span>
-                        <span className="dim small">moč ×{draftRTier.strengthMult}</span>
-                      </div>
-                    </div>
-                    <button className="autofit-btn" disabled={!canConfirmDraft} onClick={() => confirmDraft('attack')}>
-                      ✓ Pošlji napad
-                    </button>
-                  </>
-                );
-              })()}
-              {pendingExpeditions.filter(e => e.kind === 'mission').length > 0 && (
-                <div className="pending-exps">
-                  <div className="dim small" style={{ marginBottom: 4 }}>Potrjeni napadi (sproži ob izvedbi meseca):</div>
-                  {pendingExpeditions.map((e, i) => e.kind === 'mission' && (
-                    <div key={i} className="pending-exp-row">
-                      <span>⚔ {e.assigned} · {e.path.length - 1}m{e.weakPointId ? ' · ◆ šibka točka' : ''}{e.stealth ? ' · 🌙' : ''}</span>
-                      <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    <div className="def-stat-note">🍞 vzamejo <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane · moč ×{draftRTier.strengthMult}</div>
+                    <button className="def-upgrade-btn weapon" disabled={!canConfirmDraft} onClick={() => confirmDraft('attack')}>⚔ Pošlji napad</button>
+                  </div>
+                </>
+              );
+            })()}
+            {pendingExpeditions.filter(e => e.kind === 'mission').length > 0 && (
+              <div className="pending-exps">
+                <div className="dim small" style={{ marginBottom: 4 }}>Potrjeni napadi (sproži ob izvedbi meseca):</div>
+                {pendingExpeditions.map((e, i) => e.kind === 'mission' && (
+                  <div key={i} className="pending-exp-row">
+                    <span>⚔ {e.assigned} · {e.path.length - 1}m{e.weakPointId ? ' · ◆ šibka točka' : ''}{e.stealth ? ' · 🌙' : ''}</span>
+                    <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="def-how">
+              <div className="def-how-title">KAKO DELUJE</div>
+              <div className="def-how-row"><span className="def-how-ic">⚔</span><span>Napadalci udarijo po prihodu na cilj; orožje in razkrite logične šibkosti večajo moč.</span></div>
+              <div className="def-how-row"><span className="def-how-ic">◆</span><span>Razkrite šibke točke je lažje uničiti.</span></div>
+              <div className="def-how-row"><span className="def-how-ic">↩</span><span>Preživeli se vrnejo v kamp (čas povratka glede na pot).</span></div>
             </div>
           </div>
           <Missions wps={game.aiWeakPoints} aiTree={game.aiTree}
