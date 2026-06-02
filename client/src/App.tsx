@@ -2558,6 +2558,8 @@ export default function App() {
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
   const [tab,          setTab]          = useState<'defense' | 'food' | 'workshop' | 'research' | 'map' | 'attack' | 'log'>('food');
+  const [leftOpen,     setLeftOpen]     = useState(true);   // levi panel (vsebina zavihka) odprt/zaprt
+  const [rightOpen,    setRightOpen]    = useState(true);   // desni dnevnik odprt/zaprt
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
   const [draftPeople,  setDraftPeople]  = useState(5);
   const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
@@ -3061,7 +3063,11 @@ export default function App() {
       </header>
 
       {/* ─── SREDNJI DEL: levo meni+vsebina / karta / desno log+akcije ─── */}
-      <div className="main-cols">
+      <div className={`main-cols ${leftOpen ? '' : 'left-collapsed'} ${rightOpen ? '' : 'right-collapsed'}`}>
+
+      {/* preklop desnega dnevnika (vedno viden ob robu) */}
+      <button className={`col-toggle right-toggle ${rightOpen ? 'open' : ''}`} title={rightOpen ? 'Skrij dnevnik' : 'Prikaži dnevnik'}
+        onClick={() => setRightOpen(o => !o)}>{rightOpen ? '▶' : '◀'}</button>
 
       {/* LEVO: hitri meni + vsebina izbranega zavihka */}
       <aside className="left-col">
@@ -3074,12 +3080,20 @@ export default function App() {
             { id: 'map',      icon: '🗺', label: 'Izvidniki' },
             { id: 'attack',   icon: '⚔️', label: 'Napad' },
           ] as const).map(m => (
-            <button key={m.id} className={`sm-btn ${tab === m.id ? 'active' : ''} ${'mobileOnly' in m && m.mobileOnly ? 'sm-mobile-only' : ''}`}
-              onClick={() => { setTab(m.id); if (m.id === 'attack') setDraftKind('attack'); else if (m.id === 'map') setDraftKind('scout'); }} title={m.label}>
+            <button key={m.id} className={`sm-btn ${tab === m.id && leftOpen ? 'active' : ''} ${'mobileOnly' in m && m.mobileOnly ? 'sm-mobile-only' : ''}`}
+              onClick={() => {
+                if (m.id === tab && leftOpen) { setLeftOpen(false); return; }  // ponoven klik aktivnega = zapri
+                setTab(m.id); setLeftOpen(true);
+                if (m.id === 'attack') setDraftKind('attack'); else if (m.id === 'map') setDraftKind('scout');
+              }} title={m.label}>
               <span className="sm-icon">{m.icon}</span>
               <span className="sm-label">{m.label}</span>
             </button>
           ))}
+          <button className="sm-btn sm-toggle" title={leftOpen ? 'Skrij panel' : 'Prikaži panel'} onClick={() => setLeftOpen(o => !o)}>
+            <span className="sm-icon">{leftOpen ? '◀' : '▶'}</span>
+            <span className="sm-label">{leftOpen ? 'Skrij' : 'Odpri'}</span>
+          </button>
         </nav>
 
         <div className="left-panel">
