@@ -3194,7 +3194,7 @@ export default function App() {
             { id: 'food',     icon: '🌾', label: 'Prehrana' },
             { id: 'workshop', icon: '🔨', label: 'Delavnice' },
             { id: 'research', icon: '🔬', label: 'Raziskave' },
-            { id: 'map',      icon: '🗺', label: 'Izvidniki' },
+            { id: 'map',      icon: '🔭', label: 'Izvidniki' },
             { id: 'attack',   icon: '⚔️', label: 'Napad' },
           ] as const).map(m => (
             <button key={m.id} className={`sm-btn ${tab === m.id && leftOpen ? 'active' : ''} ${'mobileOnly' in m && m.mobileOnly ? 'sm-mobile-only' : ''}`}
