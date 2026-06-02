@@ -602,13 +602,26 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   const tickedExps: Expedition[] = [];
   const finishedExps: Expedition[] = [];
 
+  // Opis nošenega plena za dnevnik
+  const carriedStr = (c: { material: number; weapons: number; artifacts: number }) => {
+    const parts: string[] = [];
+    if (c.material > 0) parts.push(`${c.material} materiala`);
+    if (c.weapons > 0) parts.push(`${c.weapons} orožja`);
+    if (c.artifacts > 0) parts.push(`${c.artifacts} artefakt(ov)`);
+    return parts.join(', ');
+  };
+
   for (const e of oldExps) {
     // POVRATNI LEG — preživeli se vračajo v kamp (odštevanje mesecev)
     if (e.status === 'returning') {
       const rem = (e.returnRemaining ?? 1) - 1;
       if (rem <= 0) {
         population += Math.max(0, e.assigned);
-        expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${e.assigned} ljudi.`);
+        // dostava nošenega plena šele zdaj — ob vrnitvi v kamp
+        const c = e.carried ?? { material: 0, weapons: 0, artifacts: 0 };
+        material += c.material; combat += c.weapons; artifacts += c.artifacts;
+        const cs = carriedStr(c);
+        expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${e.assigned} ljudi${cs ? ` · prinesli: ${cs}` : ''}.`);
         finishedExps.push({ ...e, status: 'completed', returnRemaining: 0, monthsElapsed: e.monthsElapsed + 1 });
       } else {
         tickedExps.push({ ...e, returnRemaining: rem, monthsElapsed: e.monthsElapsed + 1 });
@@ -620,10 +633,12 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     rng = r.rng;
     mapTiles = r.tiles;
 
-    // Najdbe med potjo
-    if (r.finds.material > 0) material += r.finds.material;
-    if (r.finds.weapons > 0)  combat   += r.finds.weapons;
-    if (r.finds.artifacts > 0) artifacts += r.finds.artifacts;
+    // Najdbe med potjo — NE gredo takoj v kamp; odprava jih NOSI in dostavi ob vrnitvi
+    const carried = {
+      material:  (e.carried?.material  ?? 0) + r.finds.material,
+      weapons:   (e.carried?.weapons   ?? 0) + r.finds.weapons,
+      artifacts: (e.carried?.artifacts ?? 0) + r.finds.artifacts,
+    };
 
     // Dogodki med potjo (srečanja + najdbe)
     for (const ev of r.events) expeditionEvents.push(`🔭 ${ev}`);
@@ -674,14 +689,14 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
             if (roll < p) {
               const destroyed = Math.min(aiRobots, Math.round(survivors * (1 + p)));
               applyDestroy(destroyed);
-              material += destroyed;
+              carried.material += destroyed;  // plen nosijo s seboj, dostavijo ob vrnitvi
               const lost = Math.round(survivors * (1 - p) * 0.3);
               survivors = Math.max(0, survivors - lost);
               expeditionEvents.push(`⚔ Napad uspešen na (${target.q},${target.r}): ${destroyed} robotov uničenih, ${lost} padlih, ${survivors} se vrača.`);
             } else {
               const destroyed = Math.min(aiRobots, Math.round(survivors * 0.5));
               applyDestroy(destroyed);
-              material += destroyed;
+              carried.material += destroyed;  // plen nosijo s seboj, dostavijo ob vrnitvi
               const lost = Math.round(survivors * 0.6);
               survivors = Math.max(0, survivors - lost);
               expeditionEvents.push(`⚔ Napad odbit na (${target.q},${target.r}): ${destroyed} robotov, a ${lost} padlih, ${survivors} se vrača.`);
@@ -694,20 +709,29 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         survivors = Math.max(0, survivors);
         const ret = returnMonths(r.exp.path);
         if (survivors <= 0) {
-          finishedExps.push(r.exp);
+          // vsi padli na cilju → nošeni plen je izgubljen
+          const cs = carriedStr(carried);
+          if (cs) expeditionEvents.push(`☠ Z odpravo izgubljeno: ${cs} (nihče se ni vrnil).`);
+          finishedExps.push({ ...r.exp, carried });
         } else if (ret <= 0) {
           population += survivors;  // zadnji heks je kamp — takoj doma
-          finishedExps.push(r.exp);
+          material += carried.material; combat += carried.weapons; artifacts += carried.artifacts;
+          const cs = carriedStr(carried);
+          if (cs) expeditionEvents.push(`📦 Prineseno v kamp: ${cs}.`);
+          finishedExps.push({ ...r.exp, carried });
         } else {
           expeditionEvents.push(`↩ ${survivors} se vrača — še ${ret} mesec(ev) do kampa.`);
-          tickedExps.push({ ...r.exp, status: 'returning', assigned: survivors, returnRemaining: ret });
+          tickedExps.push({ ...r.exp, status: 'returning', assigned: survivors, returnRemaining: ret, carried });
         }
       } else {
-        expeditionEvents.push(`☠ Odprava izgubljena — vsi člani so padli.`);
-        finishedExps.push(r.exp);
+        // ODPRAVA IZGUBLJENA — vsi padli; karkoli so nosili, je izgubljeno
+        const cs = carriedStr(carried);
+        expeditionEvents.push(`☠ Odprava izgubljena — vsi člani so padli${cs ? ` · izgubljeno: ${cs}` : ''}.`);
+        finishedExps.push({ ...r.exp, carried });
       }
     } else {
-      tickedExps.push(r.exp);
+      // še na poti — nosi plen naprej
+      tickedExps.push({ ...r.exp, carried });
     }
   }
 
