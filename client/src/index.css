@@ -2057,3 +2057,11 @@ input[type=range]::-moz-range-thumb {
 .def-how-title { font-size: .58rem; letter-spacing: .12em; color: #6a8299; text-transform: uppercase; margin-bottom: .4rem; }
 .def-how-row { display: flex; gap: .5rem; align-items: flex-start; font-size: .72rem; color: #9fb0bb; line-height: 1.35; margin-bottom: .3rem; }
 .def-how-ic { font-size: .95rem; flex-shrink: 0; }
+
+/* Obramba — dodatne build kartice */
+.def-upgrade-btn.weapon { border-color: #5a3a2a; background: #1c1410; color: #cc8866; }
+.def-upgrade-btn.weapon:hover { background: #241a12; border-color: #7a5030; }
+.def-upgrade-btn.artifact { border-color: #5a4a10; background: #1c1808; color: #ffd84a; }
+.def-upgrade-btn.artifact:hover { background: #241f0c; border-color: #7a6418; }
+.def-progbar { height: 7px; background: #1e2730; border-radius: 3px; overflow: hidden; margin: .45rem 0; }
+.def-progbar-fill { display: block; height: 100%; border-radius: 3px; }

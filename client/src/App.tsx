@@ -2978,7 +2978,7 @@ export default function App() {
         <div className="left-panel">
          <FitScale deps={[tab, game, defenders, foragers, workers, researchers, combatants, draftPath.length, pendingExpeditions.length]}>
           {/* Vrstica prostih ljudi (vsi people-zavihki) */}
-          {(tab === 'defense' || tab === 'food' || tab === 'workshop' || tab === 'research') && (
+          {(tab === 'food' || tab === 'workshop' || tab === 'research') && (
             <div className="free-people">
               <span className="dim small">Prosti ljudje:</span>
               <b style={{ color: freePeople > 0 ? '#66cc88' : '#888' }}>{freePeople}</b>
@@ -3024,18 +3024,17 @@ export default function App() {
                 </div>
               </div>
 
-              {/* TVEGANJA */}
+              {/* TVEGANJA — najprej AI napad, nato verjetnost obrambe */}
               <div className="def-stat-grid">
                 <div className="def-stat">
-                  <div className="def-stat-label">VARNOST TABORA</div>
-                  <Gauge pct={repelPct} color={probColor(repel)} />
-                  <div className="def-stat-sub" style={{ color: probColor(repel) }}>{safety}</div>
-                  <div className="def-stat-note">Verjetnost odbitja napada</div>
+                  <div className="def-stat-label">AI NAPAD TA MESEC</div>
+                  <div className="def-stat-big" style={{ color: probColor(1 - raidP) }}>{raidPct}%</div>
+                  <div className="def-stat-note">{risk(raidP)}</div>
                 </div>
                 <div className="def-stat">
-                  <div className="def-stat-label">AI NAPAD TA MESEC</div>
-                  <div className="def-stat-big" style={{ color: probColor(1 - raidP) }}>🗼 {raidPct}%</div>
-                  <div className="def-stat-note">{risk(raidP)}</div>
+                  <div className="def-stat-label">VERJETNOST OBRAMBE</div>
+                  <Gauge pct={repelPct} color={probColor(repel)} />
+                  <div className="def-stat-sub" style={{ color: probColor(repel) }}>{safety}</div>
                 </div>
                 <div className="def-stat">
                   <div className="def-stat-label">VSAJ EN NAPAD V 6 MESECIH</div>
@@ -3047,12 +3046,13 @@ export default function App() {
               {/* OROŽJE + OBZIDJE */}
               <div className="def-bottom-grid">
                 <div className="def-card">
-                  <div className="def-card-title">OROŽJE</div>
-                  <div className="def-big-num" style={{ color: overArmed ? '#cc4444' : '#d8d8d8' }}>🔫 {armedTotal}<span className="def-cap"> / {weaponCap}</span></div>
-                  <div className="def-stat-note">{overArmed ? 'Premalo orožja!' : 'Popolnoma opremljeno'}</div>
+                  <div className="def-card-title">⚔ OROŽJE</div>
+                  <div className="def-big-num" style={{ color: overArmed ? '#cc4444' : '#cc7755' }}>⚔ {weaponCap}</div>
+                  <div className="def-stat-note">Prosto: <b style={{ color: weaponsLeft > 0 ? '#66cc88' : '#cc4444' }}>{weaponsLeft}</b> · v rabi {armedTotal}</div>
                   <div className="def-bullets">
                     {Array.from({ length: bullets }).map((_, i) => <span key={i} className={`def-bullet ${i < armedTotal ? 'used' : ''}`}>▮</span>)}
                   </div>
+                  <button className="def-upgrade-btn weapon" onClick={() => { setWorkshopObj('weapon'); setTab('workshop'); }}>⚔ GRADI OROŽJE</button>
                 </div>
                 <div className="def-card">
                   <div className="def-card-title">🏰 OBZIDJE</div>
@@ -3062,6 +3062,22 @@ export default function App() {
                   <button className="def-upgrade-btn" onClick={() => { setWorkshopObj('wall'); setTab('workshop'); }}>🧱 GRADI OBZIDJE</button>
                 </div>
               </div>
+
+              {/* ARTEFAKT */}
+              {(() => {
+                const arts = game.resources.artifacts ?? 0;
+                const artProg = game.artifactWorkshopProgress ?? 0;
+                const artPct = Math.min(100, Math.round((artProg / 360) * 100));
+                return (
+                  <div className="def-card">
+                    <div className="def-card-title">💎 ARTEFAKT</div>
+                    <div className="def-big-num" style={{ color: '#ffd84a' }}>💎 {arts}</div>
+                    <div className="def-stat-note">Instant uniči 1 šibko točko AI · napredek {artProg}/360</div>
+                    <div className="def-progbar"><span className="def-progbar-fill" style={{ width: `${artPct}%`, background: '#ffd84a' }} /></div>
+                    <button className="def-upgrade-btn artifact" onClick={() => { setWorkshopObj('artifact'); setTab('workshop'); }}>💎 GRADI ARTEFAKT</button>
+                  </div>
+                );
+              })()}
 
               {overArmed && (
                 <div className="weapon-warning">⚠ Premalo orožja: oboroženih {armedTotal}/{weaponCap}. Vsak branilec, napadalec in član odprave rabi orožje.</div>
