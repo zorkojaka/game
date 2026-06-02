@@ -2558,7 +2558,7 @@ export default function App() {
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
   const [tab,          setTab]          = useState<'defense' | 'food' | 'workshop' | 'research' | 'map' | 'attack' | 'log'>('food');
-  const [leftOpen,     setLeftOpen]     = useState(true);   // levi panel (vsebina zavihka) odprt/zaprt
+  const [leftOpen,     setLeftOpen]     = useState(() => typeof window !== 'undefined' ? window.innerWidth > 820 : true);   // panel: na telefonu privzeto zaprt (karta vidna)
   const [rightOpen,    setRightOpen]    = useState(true);   // desni dnevnik odprt/zaprt
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
   const [draftPeople,  setDraftPeople]  = useState(5);
@@ -3097,6 +3097,7 @@ export default function App() {
         </nav>
 
         <div className="left-panel">
+         <button className="lp-mob-close" onClick={() => setLeftOpen(false)} title="Zapri">✕</button>
          <FitScale deps={[tab, game, defenders, foragers, workers, researchers, combatants, draftPath.length, pendingExpeditions.length]}>
           {/* ─── OBRAMBA (grafični panel) ─── */}
           {tab === 'defense' && (() => {
