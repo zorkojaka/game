@@ -445,7 +445,9 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   const revealed: string[] = aiTree.filter(n => n.visibility === 'revealed' && !prevRevealed.has(n.id)).map(n => n.id);
   const unlockedTechLevel = Math.max(robotsResearchLevel, mechanicalTechUnlockLevel({ aiTree }));
   if (unlockedTechLevel > robotsResearchLevel) {
+    const unlockedLevels = unlockedTechLevel - robotsResearchLevel;
     robotsResearchLevel = unlockedTechLevel;
+    robotsResearchProgress = Math.max(0, robotsResearchProgress - RESEARCH_LEVEL_WORKER_MONTHS * unlockedLevels);
     workshopEvents.push(`🔓 Mehanska šibkost razkrita — odklenjena stopnja ${unlockedTechLevel} za orožje in obzidje.`);
   }
 

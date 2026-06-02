@@ -155,7 +155,9 @@ describe('raziskave: roboti odklepajo orožje/obzidje', () => {
     processRound(g, { assignment: { axis: 'roboti', combatants: 0, defenders: 0, foragers: 0, workers: 0, researchers: n, rations: 3, researchObjective: obj } });
 
   it('Roboti 120 razisk. → razkrije mehansko šibkost in odklene stopnjo 1', () => {
-    expect(research(newGame(8), 'robots', 120).robotsResearchLevel).toBe(1);
+    const r = research(newGame(8), 'robots', 120);
+    expect(r.robotsResearchLevel).toBe(1);
+    expect(r.robotsResearchProgress).toBe(0);
   });
 
   it('orožje je zaklenjeno dokler ni raziskan robot (level ostane 0)', () => {
