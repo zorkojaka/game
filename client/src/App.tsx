@@ -1559,7 +1559,7 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, pop }: {
+function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, research, pop }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   draftKind: 'scout' | 'attack';
@@ -1580,6 +1580,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
   workshopObj: WorkshopObjective; onWorkshop: (o: WorkshopObjective) => void;
   researchObj: ResearchObjective; onResearch: (o: ResearchObjective) => void;
   workshop: { wallsBuilt: number; weaponProgress: number; wallProgress: number; artifactProgress: number; workers: number };
+  research: { robotsLevel: number; robotsProgress: number; weaponLevel: number; weaponProgress: number; wallLevel: number; wallProgress: number; researchers: number };
   pop: { total: number; inCamp: number; away: number; free: number };
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
@@ -1990,10 +1991,24 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                     total: 360 } },
               ];
             } else if (z.adj === 'r') {
+              const R = 120;  // raziskovalec-mesecev na stopnjo
+              const seg = (obj: ResearchObjective, prog: number) => ({
+                done: prog,
+                next: researchObj === obj && research.researchers > 0 ? Math.min(R, prog + research.researchers) : prog,
+                total: R,
+              });
+              const wpnLocked = research.weaponLevel >= research.robotsLevel;
+              const wallLocked = research.wallLevel >= research.robotsLevel;
               btns = [
-                { label: '🤖', active: researchObj === 'robots', onClick: () => onResearch('robots'), title: 'AI roboti: +veliko intela → boljši % v vseh bojih' },
-                { label: '⚔️', active: researchObj === 'weapon', onClick: () => onResearch('weapon'), title: 'Raziskava orožja: vsaka stopnja podvoji napad (120 razisk.-mes.)' },
-                { label: '🧱', active: researchObj === 'wall',   onClick: () => onResearch('wall'),   title: 'Raziskava obzidja: vsaka stopnja podvoji obrambo (120 razisk.-mes.)' },
+                { label: '🤖', active: researchObj === 'robots', onClick: () => onResearch('robots'),
+                  title: `Roboti Lv${research.robotsLevel}: odkrivanje šibkih točk, odklene Orožje/Obzidje. 120 razisk.-mes. na stopnjo.`,
+                  segments: seg('robots', research.robotsProgress) },
+                { label: wpnLocked ? '🔒' : '⚔️', active: researchObj === 'weapon', onClick: () => onResearch('weapon'),
+                  title: `Orožje Lv${research.weaponLevel}: vsaka stopnja podvoji napad (120 razisk.-mes.).${wpnLocked ? ` Zaklenjeno — najprej Roboti ${research.weaponLevel + 1}.` : ''}`,
+                  segments: seg('weapon', research.weaponProgress) },
+                { label: wallLocked ? '🔒' : '🧱', active: researchObj === 'wall', onClick: () => onResearch('wall'),
+                  title: `Obzidje Lv${research.wallLevel}: vsaka stopnja podvoji obrambo (120 razisk.-mes.).${wallLocked ? ` Zaklenjeno — najprej Roboti ${research.wallLevel + 1}.` : ''}`,
+                  segments: seg('wall', research.wallProgress) },
               ];
             }
             if (!btns.length) return null;
@@ -3352,6 +3367,7 @@ export default function App() {
             workshopObj={workshopObj} onWorkshop={setWorkshopObj}
             researchObj={researchObj} onResearch={setResearchObj}
             workshop={{ wallsBuilt: game.wallsBuilt ?? 0, weaponProgress: game.weaponWorkshopProgress ?? 0, wallProgress: game.wallProgress ?? 0, artifactProgress: game.artifactWorkshopProgress ?? 0, workers }}
+            research={{ robotsLevel: game.robotsResearchLevel ?? 0, robotsProgress: game.robotsResearchProgress ?? 0, weaponLevel: game.weaponResearchLevel ?? 0, weaponProgress: game.weaponResearchProgress ?? 0, wallLevel: game.wallResearchLevel ?? 0, wallProgress: game.wallResearchProgress ?? 0, researchers }}
             pop={{ total: game.population, inCamp: Math.max(0, game.population - inMissions), away: inMissions, free: freePeople }} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
