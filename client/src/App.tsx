@@ -411,6 +411,16 @@ const RESEARCH_LEVEL_NAMES: Record<ResearchObjective, string[]> = {
   wall: ['Leseni zid', 'EMP obramba', 'Napredni obrambni sistemi'],
 };
 
+function isResearchLocked(obj: ResearchObjective, robotsLevel: number, weaponLevel: number, wallLevel: number): boolean {
+  if (obj === 'weapon') return weaponLevel >= robotsLevel;
+  if (obj === 'wall') return wallLevel >= robotsLevel;
+  return false;
+}
+
+function normalizeResearchObjective(obj: ResearchObjective, robotsLevel: number, weaponLevel: number, wallLevel: number): ResearchObjective {
+  return isResearchLocked(obj, robotsLevel, weaponLevel, wallLevel) ? 'robots' : obj;
+}
+
 /** Izbira osi (fokusa) meseca — viden gumb skrivanje / špijonaža / obramba. */
 function AxisFocusBar({ value, onChange }: { value: HumanAxis; onChange: (a: HumanAxis) => void }) {
   const axes: Array<{ id: HumanAxis; effect: string }> = [
@@ -459,10 +469,13 @@ function HumanTree({ robotsLevel, weaponLevel, wallLevel, focus, onFocus }: {
         {branches.map(b => {
           const meta = HUMAN_AXIS_META[b.axis];
           const isFocus = focus === b.obj;
+          const branchLocked = isResearchLocked(b.obj, robotsLevel, weaponLevel, wallLevel);
           return (
-            <div key={b.axis} className={`ht-branch ${isFocus ? 'ht-current ht-focus' : ''}`}
-                 onClick={() => onFocus(b.obj)}
-                 style={isFocus ? { background: '#0a1a14', borderLeft: `2px solid ${meta.color}` } : { cursor: 'pointer' }}>
+            <div key={b.axis} className={`ht-branch ${isFocus ? 'ht-current ht-focus' : ''} ${branchLocked ? 'locked' : ''}`}
+                 onClick={() => { if (!branchLocked) onFocus(b.obj); }}
+                 style={isFocus
+                  ? { background: '#0a1a14', borderLeft: `2px solid ${meta.color}` }
+                  : branchLocked ? { cursor: 'default', opacity: 0.55 } : { cursor: 'pointer' }}>
               <div className="ht-br-head" style={{ color: meta.color }}>
                 <span className="ht-br-icon">{meta.icon}</span>
                 <span className="ht-br-label">{meta.label}</span>
@@ -474,6 +487,7 @@ function HumanTree({ robotsLevel, weaponLevel, wallLevel, focus, onFocus }: {
                   const unlocked = b.level >= lvl;
                   // Orožje/Obzidje stopnje lvl zahtevajo Robote vsaj lvl
                   const lockedByRobots = b.gated && !unlocked && robotsLevel < lvl;
+                  const nodeLabel = lockedByRobots ? 'Zaklenjeno' : RESEARCH_LEVEL_NAMES[b.obj][lvl - 1];
                   return (
                     <div key={lvl} className={`ht-node ${unlocked ? 'unlocked' : 'locked'}`}
                          style={unlocked ? { borderColor: meta.color } : {}}>
@@ -482,7 +496,7 @@ function HumanTree({ robotsLevel, weaponLevel, wallLevel, focus, onFocus }: {
                           {unlocked ? '◆' : lockedByRobots ? '🔒' : '◇'}
                         </span>
                         <span className="ht-node-label" style={{ color: unlocked ? '#c8e0d0' : '#3a3a3a' }}>
-                          {RESEARCH_LEVEL_NAMES[b.obj][lvl - 1]}
+                          {nodeLabel}
                         </span>
                       </div>
                       <div className="ht-node-eff dim small" style={{ color: unlocked ? meta.color : '#2a2a2a' }}>
@@ -2077,7 +2091,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
             const px = -dy, py = dx;  // pravokotno za razporeditev gumbov
             // Definiraj gumbe glede na zono
-            type Btn = { label: string; active: boolean; onClick: () => void; title: string; sub?: string; segments?: { done: number; next: number; total: number } };
+            type Btn = { label: string; active: boolean; onClick: () => void; title: string; locked?: boolean; sub?: string; segments?: { done: number; next: number; total: number } };
             let btns: Btn[] = [];
             if (z.adj === 'f') {
               btns = [1,2,3,4,5].map(lvl => {
@@ -2127,12 +2141,15 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               const wallLocked = research.wallLevel >= research.robotsLevel;
               btns = [
                 { label: '🤖', active: researchObj === 'robots', onClick: () => onResearch('robots'),
+                  locked: false,
                   title: `Roboti Lv${research.robotsLevel}: odkrivanje šibkih točk, odklene Orožje/Obzidje. 120 razisk.-mes. na stopnjo.`,
                   segments: seg('robots', research.robotsProgress) },
                 { label: wpnLocked ? '🔒' : '⚔️', active: researchObj === 'weapon', onClick: () => onResearch('weapon'),
+                  locked: wpnLocked,
                   title: `Orožje Lv${research.weaponLevel}: vsaka stopnja podvoji napad (120 razisk.-mes.).${wpnLocked ? ` Zaklenjeno — najprej Roboti ${research.weaponLevel + 1}.` : ''}`,
                   segments: seg('weapon', research.weaponProgress) },
                 { label: wallLocked ? '🔒' : '🧱', active: researchObj === 'wall', onClick: () => onResearch('wall'),
+                  locked: wallLocked,
                   title: `Obzidje Lv${research.wallLevel}: vsaka stopnja podvoji obrambo (120 razisk.-mes.).${wallLocked ? ` Zaklenjeno — najprej Roboti ${research.wallLevel + 1}.` : ''}`,
                   segments: seg('wall', research.wallProgress) },
               ];
@@ -2159,9 +2176,10 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                 {btns.map((b, i) => {
                   const off = (i - (btns.length - 1) / 2) * sp;
                   const bxp = baseX + lpx * off, byp = baseY + lpy * off;
+                  const locked = b.locked ?? false;
                   return (
-                    <g key={i} style={{ cursor: 'pointer', opacity: b.active ? 1 : 0.45 }}
-                       onClick={(e) => { e.stopPropagation(); b.onClick(); }}>
+                    <g key={i} style={{ cursor: locked ? 'default' : 'pointer', opacity: locked ? 0.35 : b.active ? 1 : 0.45 }}
+                       onClick={(e) => { e.stopPropagation(); if (!locked) b.onClick(); }}>
                       <title>{b.title}</title>
                       {/* Aktivni gumb dobi rahel sij za boljšo opaznost */}
                       {b.active && (
@@ -2419,8 +2437,11 @@ function ResearchSelector({ value, onChange, robotsLevel, weaponLevel, wallLevel
       <div className="so-row" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
         {opts.map(o => (
           <button key={o.id} className={`so-btn ${value === o.id ? 'sel' : ''}`}
-            style={value === o.id ? { borderColor: o.color, color: o.color } : {}}
-            onClick={() => onChange(o.id)} title={`${o.label} — ${o.desc}`}>
+            disabled={o.locked}
+            style={o.locked
+              ? { opacity: 0.45, cursor: 'not-allowed' }
+              : value === o.id ? { borderColor: o.color, color: o.color } : {}}
+            onClick={() => { if (!o.locked) onChange(o.id); }} title={`${o.label} — ${o.desc}${o.locked ? ` · Zaklenjeno: najprej razišči Robote ${o.lvl + 1}.` : ''}`}>
             <span className="so-icon">{o.icon}</span>
             <span className="so-label-mini">{o.label} Lv{o.lvl}{o.locked ? ' 🔒' : ''}</span>
           </button>
@@ -2745,12 +2766,29 @@ export default function App() {
   // Preview odds — game?.totalRounds zagotovi ponoven klic po vsaki rundi
   useEffect(() => {
     if (!game || game.status !== 'active') return;
+    const safeResearchObj = normalizeResearchObjective(
+      researchObj,
+      game.robotsResearchLevel ?? 0,
+      game.weaponResearchLevel ?? 0,
+      game.wallResearchLevel ?? 0,
+    );
     const t = setTimeout(() => {
       previewOdds(game.runId, { axis, combatants, defenders, foragers, workers, researchers,
-        workshopObjective: workshopObj, researchObjective: researchObj, rations }).then(setOdds).catch(() => setOdds(null));
+        workshopObjective: workshopObj, researchObjective: safeResearchObj, rations }).then(setOdds).catch(() => setOdds(null));
     }, 250);
     return () => clearTimeout(t);
   }, [game?.runId, game?.totalRounds, axis, combatants, defenders, foragers, workers, researchers, workshopObj, researchObj, rations]);
+
+  useEffect(() => {
+    if (!game) return;
+    const normalized = normalizeResearchObjective(
+      researchObj,
+      game.robotsResearchLevel ?? 0,
+      game.weaponResearchLevel ?? 0,
+      game.wallResearchLevel ?? 0,
+    );
+    if (normalized !== researchObj) setResearchObj(normalized);
+  }, [game?.robotsResearchLevel, game?.weaponResearchLevel, game?.wallResearchLevel, researchObj, game]);
 
   const handleNew = async () => {
     setLoading(true);
@@ -2771,9 +2809,15 @@ export default function App() {
       if (draftPath.length >= 2 && draftPeople > 0) {
         newExps.push(buildDraftInput(tab === 'attack' ? 'attack' : draftKind));
       }
+      const safeResearchObj = normalizeResearchObjective(
+        researchObj,
+        game.robotsResearchLevel ?? 0,
+        game.weaponResearchLevel ?? 0,
+        game.wallResearchLevel ?? 0,
+      );
       const { state } = await playRound(game.runId, {
         assignment: { axis, combatants: 0, defenders, foragers, workers, researchers,
-          workshopObjective: workshopObj, researchObjective: researchObj, rations,
+          workshopObjective: workshopObj, researchObjective: safeResearchObj, rations,
           newExpeditions: newExps.length > 0 ? newExps : undefined,
           useArtifactOnWpId: artifactTargetWp || undefined },
         targetWeakPoint: targetWP || undefined,
@@ -2785,6 +2829,12 @@ export default function App() {
       const clan = state.mapTiles?.find((t: HexTile) => t.isClanCamp);
       setDraftPath(clan ? [{ q: clan.q, r: clan.r }] : []);
       setGame(state);
+      setResearchObj(normalizeResearchObjective(
+        safeResearchObj,
+        state.robotsResearchLevel ?? 0,
+        state.weaponResearchLevel ?? 0,
+        state.wallResearchLevel ?? 0,
+      ));
       setOdds(null);
     } finally { setLoading(false); }
   };
