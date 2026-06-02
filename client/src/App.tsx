@@ -110,9 +110,48 @@ function Gauge({ pct, color }: { pct: number; color: string }) {
   );
 }
 
-/** Info gumb (ℹ) — odpre popup z navodili (otroci). Ni stalno prikazano. */
-function InfoButton({ title, children }: { title: string; children: React.ReactNode }) {
+/** Navodila „Kako deluje" za posamezne panele. */
+const HELP: Record<string, { title: string; rows: [string, string][] }> = {
+  defense: { title: 'Kako deluje — Obramba', rows: [
+    ['👥', 'Več branilcev poveča verjetnost, da odbijemo napad AI.'],
+    ['🏰', 'Obzidje daje bonus k obrambi celotnega tabora (+20 % na stopnjo).'],
+    ['👁', 'Več ljudi v taboru poveča možnost, da nas AI odkrije.'],
+  ] },
+  food: { title: 'Kako deluje — Prehrana', rows: [
+    ['🌾', 'Nabiralci zbirajo hrano vsak mesec.'],
+    ['🍽', 'Višji obroki dajo več moči, a porabijo več hrane.'],
+    ['⚠', 'Če zaloga pade na 0, klan strada in izgublja ljudi.'],
+  ] },
+  workshop: { title: 'Kako deluje — Delavnice', rows: [
+    ['⚔', 'Orožje: 6 delavec-mes. + 1 material.'],
+    ['🏰', 'Obzidje: 12 delavec-mes. + 4 materiala (+20 % obrambe).'],
+    ['💎', 'Artefakt: 360 delavec-mes. + 20 materiala. Napredek se ohrani ob preklopu.'],
+  ] },
+  research: { title: 'Kako deluje — Raziskave', rows: [
+    ['🤖', 'Roboti: odkrivanje šibkih točk; vsaka stopnja odklene Orožje/Obzidje.'],
+    ['⚔', 'Orožje/Obzidje: vsaka stopnja podvoji napad/obrambo (120 razisk.-mes.).'],
+    ['🔭', 'AI drevo se odpira samodejno z znanjem o AI.'],
+  ] },
+  scout: { title: 'Kako deluje — Izvidniki', rows: [
+    ['🔭', 'Izvidniki raziskujejo hekse in odkrivajo šibke točke ter klane.'],
+    ['↩', 'Po cilju se vrnejo domov; krožna pot ob kampu = kratek povratek.'],
+    ['🌙', 'Skrivanje zniža srečanja, a podaljša pot.'],
+  ] },
+  attack: { title: 'Kako deluje — Napad', rows: [
+    ['⚔', 'Napadalci udarijo po prihodu na cilj; orožje in razkrite logične šibkosti večajo moč.'],
+    ['◆', 'Razkrite šibke točke je lažje uničiti.'],
+    ['↩', 'Preživeli se vrnejo v kamp (čas povratka glede na pot).'],
+  ] },
+  allies: { title: 'Kako deluje — Zavezniki', rows: [
+    ['🔭', 'Razišči heks klana, da ga najdeš v megli.'],
+    ['🤝', 'Pošlji odpravo do njega za zavezništvo — nato mesečno pomaga.'],
+  ] },
+};
+
+/** Info gumb (ℹ) v glavi panela — odpre popup z navodili. */
+function InfoButton({ kind }: { kind: keyof typeof HELP }) {
   const [open, setOpen] = useState(false);
+  const h = HELP[kind];
   return (
     <>
       <button className="info-btn" title="Kako deluje" onClick={(e) => { e.stopPropagation(); setOpen(true); }}>ℹ</button>
@@ -120,8 +159,12 @@ function InfoButton({ title, children }: { title: string; children: React.ReactN
         <div className="info-overlay" onClick={() => setOpen(false)}>
           <div className="info-box" onClick={e => e.stopPropagation()}>
             <button className="info-close" onClick={() => setOpen(false)}>✕</button>
-            <div className="info-title">{title}</div>
-            <div className="info-body">{children}</div>
+            <div className="info-title">{h.title}</div>
+            <div className="info-body">
+              {h.rows.map(([ic, txt], i) => (
+                <div key={i} className="def-how-row"><span className="def-how-ic">{ic}</span><span>{txt}</span></div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -1312,6 +1355,7 @@ function AlliesPanel({ clans }: { clans: OtherClan[] }) {
       <div className="def-head"><span className="def-head-icon">🤝</span>
         <div><h3>ZAVEZNIKI</h3><div className="def-sub">DRUGI KLANI</div></div>
         <span className="panel-badge teal" style={{ marginLeft: 'auto' }}>{allied.length} zavez. · {discovered.length}/{clans.length}</span>
+        <InfoButton kind="allies" />
       </div>
       {clans.map(c => {
         const s = specInfo[c.specialty];
@@ -1332,10 +1376,6 @@ function AlliesPanel({ clans }: { clans: OtherClan[] }) {
           </div>
         );
       })}
-      <InfoButton title="Kako deluje — Zavezniki">
-        <div className="def-how-row"><span className="def-how-ic">🔭</span><span>Razišči heks klana, da ga najdeš v megli.</span></div>
-        <div className="def-how-row"><span className="def-how-ic">🤝</span><span>Pošlji odpravo do njega za zavezništvo — nato mesečno pomaga.</span></div>
-      </InfoButton>
     </div>
   );
 }
@@ -1790,15 +1830,15 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                   {Math.round(t.researchProgress * 100)}%
                 </text>
               )}
-              {/* Številka koraka v draft poti */}
+              {/* Številka koraka v draft poti (majhna) */}
               {isInDraft && draftIdx(t) > 0 && (
-                <circle cx={p.x + SIZE * 0.55} cy={p.y - SIZE * 0.5} r="9" fill="#22ccff" />
-              )}
-              {isInDraft && draftIdx(t) > 0 && (
-                <text x={p.x + SIZE * 0.55} y={p.y - SIZE * 0.5 + 3} textAnchor="middle"
-                  fontSize="10" fill="#000" fontWeight="bold" fontFamily="'Courier New', monospace">
-                  {draftIdx(t)}
-                </text>
+                <>
+                  <circle cx={p.x + SIZE * 0.52} cy={p.y - SIZE * 0.52} r="5.5" fill="#22ccff" opacity="0.9" />
+                  <text x={p.x + SIZE * 0.52} y={p.y - SIZE * 0.52} textAnchor="middle" dominantBaseline="central"
+                    fontSize="7" fill="#001018" fontWeight="bold" fontFamily="'Courier New', monospace" pointerEvents="none">
+                    {draftIdx(t)}
+                  </text>
+                </>
               )}
               {/* CILJ oznaka, če je wp izbran */}
               {isWpSelected && (
@@ -2197,7 +2237,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                onClick={(e) => { e.stopPropagation(); if (!disabled) onClick(); }}>
               <title>{title}</title>
               <circle cx={x} cy={y} r={r} fill={fill} stroke={stroke} strokeWidth="1.5" />
-              <text x={x} y={y + fs * 0.34} textAnchor="middle" fontSize={fs} style={{ pointerEvents: 'none' }}>{icon}</text>
+              <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fontSize={fs} style={{ pointerEvents: 'none' }}>{icon}</text>
             </g>
           );
           return (
@@ -2211,7 +2251,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               <Btn x={cx - 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="−" fs={13} disabled={draftPeople <= 1}
                 onClick={() => onDraftPeople(-1)} title="Manj ljudi" />
               <circle cx={cx} cy={cy + 7} r={11} fill="#11171f" stroke={draftKind === 'attack' ? '#cc3333' : '#ffd84a'} strokeWidth="1.5" />
-              <text x={cx} y={cy + 11} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#fff" style={{ pointerEvents: 'none' }}>{draftPeople}</text>
+              <text x={cx} y={cy + 7} textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold" fill="#fff" style={{ pointerEvents: 'none' }}>{draftPeople}</text>
               <Btn x={cx + 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="+" fs={13} disabled={draftAddDisabled}
                 onClick={() => onDraftPeople(1)} title="Več ljudi" />
               {/* potrdi */}
@@ -3061,6 +3101,7 @@ export default function App() {
               <div className="def-head">
                 <span className="def-head-icon">🛡</span>
                 <div><h3>OBRAMBA</h3><div className="def-sub">ZAŠČITA TABORA</div></div>
+                <InfoButton kind="defense" />
               </div>
 
               {/* BRANILCI */}
@@ -3141,11 +3182,6 @@ export default function App() {
               )}
 
               {/* KAKO DELUJE */}
-              <InfoButton title="Kako deluje — Obramba">
-                <div className="def-how-row"><span className="def-how-ic">👥</span><span>Več branilcev poveča verjetnost, da odbijemo napad AI.</span></div>
-                <div className="def-how-row"><span className="def-how-ic">🏰</span><span>Obzidje daje bonus k obrambi celotnega tabora (+20 % na stopnjo).</span></div>
-                <div className="def-how-row"><span className="def-how-ic">👁</span><span>Več ljudi v taboru poveča možnost, da nas AI odkrije.</span></div>
-              </InfoButton>
             </div>
             );
           })()}
@@ -3156,7 +3192,7 @@ export default function App() {
             const dots = Math.min(24, foragers);
             return (
             <div className="panel def-panel">
-              <div className="def-head"><span className="def-head-icon">🌾</span><div><h3>PREHRANA</h3><div className="def-sub">OSKRBA S HRANO</div></div></div>
+              <div className="def-head"><span className="def-head-icon">🌾</span><div><h3>PREHRANA</h3><div className="def-sub">OSKRBA S HRANO</div></div><InfoButton kind="food" /></div>
               <div className="def-card">
                 <div className="def-card-title">NABIRALCI</div>
                 <div className="def-defenders">
@@ -3183,11 +3219,6 @@ export default function App() {
                 <div className="def-big-num" style={{ color: '#cc8800' }}>🍞 {game.resources.survival}</div>
                 <div className="def-stat-note">Naslednji mesec: <b style={{ color: foodNextMonth <= 0 ? '#cc2222' : '#9ed18a' }}>{foodNextMonth}{foodNextMonth <= 0 ? ' ⚠' : ''}</b></div>
               </div>
-              <InfoButton title="Kako deluje — Prehrana">
-                <div className="def-how-row"><span className="def-how-ic">🌾</span><span>Nabiralci zbirajo hrano vsak mesec.</span></div>
-                <div className="def-how-row"><span className="def-how-ic">🍽</span><span>Višji obroki dajo več moči, a porabijo več hrane.</span></div>
-                <div className="def-how-row"><span className="def-how-ic">⚠</span><span>Če zaloga pade na 0, klan strada in izgublja ljudi.</span></div>
-              </InfoButton>
             </div>
             );
           })()}
@@ -3205,7 +3236,7 @@ export default function App() {
             const dots = Math.min(24, workers);
             return (
             <div className="panel def-panel">
-              <div className="def-head"><span className="def-head-icon">🔨</span><div><h3>DELAVNICE</h3><div className="def-sub">IZDELAVA</div></div></div>
+              <div className="def-head"><span className="def-head-icon">🔨</span><div><h3>DELAVNICE</h3><div className="def-sub">IZDELAVA</div></div><InfoButton kind="workshop" /></div>
               <div className="def-card">
                 <div className="def-card-title">DELAVCI</div>
                 <div className="def-defenders">
@@ -3232,11 +3263,6 @@ export default function App() {
                 <div className="def-stat"><div className="def-stat-label">OROŽJE</div><div className="def-stat-big" style={{ color: '#cc7755' }}>{game.resources.combat}</div></div>
                 <div className="def-stat"><div className="def-stat-label">OBZIDJE</div><div className="def-stat-big" style={{ color: '#aabb88' }}>{game.wallsBuilt ?? 0}</div></div>
               </div>
-              <InfoButton title="Kako deluje — Delavnice">
-                <div className="def-how-row"><span className="def-how-ic">⚔</span><span>Orožje: 6 delavec-mes. + 1 material.</span></div>
-                <div className="def-how-row"><span className="def-how-ic">🏰</span><span>Obzidje: 12 delavec-mes. + 4 materiala (+20 % obrambe).</span></div>
-                <div className="def-how-row"><span className="def-how-ic">💎</span><span>Artefakt: 360 delavec-mes. + 20 materiala. Napredek se ohrani ob preklopu.</span></div>
-              </InfoButton>
             </div>
             );
           })()}
@@ -3255,7 +3281,7 @@ export default function App() {
             const dots = Math.min(24, researchers);
             return (
             <div className="panel def-panel">
-              <div className="def-head"><span className="def-head-icon">🔬</span><div><h3>RAZISKAVE</h3><div className="def-sub">RAZVOJ</div></div></div>
+              <div className="def-head"><span className="def-head-icon">🔬</span><div><h3>RAZISKAVE</h3><div className="def-sub">RAZVOJ</div></div><InfoButton kind="research" /></div>
               <div className="def-card">
                 <div className="def-card-title">RAZISKOVALCI</div>
                 <div className="def-defenders">
@@ -3277,11 +3303,6 @@ export default function App() {
                   <div className="def-stat-note">Do Lv{cfg.lvl + 1} (pri {researchers}): <b style={{ color: cfg.color }}>{researchers > 0 ? `${months} mesec(ev)` : '∞'}</b>{researchObj === 'robots' ? ` · +${researchIntel} intel/m` : ''}</div>
                 </div>
               </div>
-              <InfoButton title="Kako deluje — Raziskave">
-                <div className="def-how-row"><span className="def-how-ic">🤖</span><span>Roboti: odkrivanje šibkih točk; vsaka stopnja odklene Orožje/Obzidje.</span></div>
-                <div className="def-how-row"><span className="def-how-ic">⚔</span><span>Orožje/Obzidje: vsaka stopnja podvoji napad/obrambo (120 razisk.-mes.).</span></div>
-                <div className="def-how-row"><span className="def-how-ic">🔭</span><span>AI drevo se odpira samodejno z znanjem o AI.</span></div>
-              </InfoButton>
             </div>
             );
           })()}
@@ -3300,6 +3321,7 @@ export default function App() {
             <div className="def-head"><span className="def-head-icon">🔭</span>
               <div><h3>IZVIDNIKI</h3><div className="def-sub">RAZISKOVANJE MAPE</div></div>
               {pendingExpeditions.some(e => e.kind === 'scout') && <span className="panel-badge" style={{ marginLeft: 'auto' }}>{pendingExpeditions.filter(e => e.kind === 'scout').length} potrjenih</span>}
+              <InfoButton kind="scout" />
             </div>
             <div className="pb-instr dim small">Klikni sosednje hekse na mapi za pot — odpravo lahko nastaviš tudi kar na zadnjem heksu (🔭/⚔ · −/+ · ✓).</div>
             {draftPath.length < 2 ? (
@@ -3346,11 +3368,6 @@ export default function App() {
                 })())}
               </div>
             )}
-            <InfoButton title="Kako deluje — Izvidniki">
-              <div className="def-how-row"><span className="def-how-ic">🔭</span><span>Izvidniki raziskujejo hekse in odkrivajo šibke točke ter klane.</span></div>
-              <div className="def-how-row"><span className="def-how-ic">↩</span><span>Po cilju se vrnejo domov; krožna pot ob kampu = kratek povratek.</span></div>
-              <div className="def-how-row"><span className="def-how-ic">🌙</span><span>Skrivanje zniža srečanja, a podaljša pot.</span></div>
-            </InfoButton>
           </div>
           <AlliesPanel clans={game.otherClans ?? []} />
           </>
@@ -3363,6 +3380,7 @@ export default function App() {
             <div className="def-head"><span className="def-head-icon">⚔</span>
               <div><h3>NAPAD</h3><div className="def-sub">UDAR NA AI</div></div>
               {pendingExpeditions.filter(e => e.kind === 'mission').length > 0 && <span className="panel-badge" style={{ marginLeft: 'auto' }}>{pendingExpeditions.filter(e => e.kind === 'mission').length} napadov</span>}
+              <InfoButton kind="attack" />
             </div>
             <div className="pb-instr dim small">Nariši pot do AI jedra (☣) ali šibke točke (◆). Odpravo nastaviš tudi na zadnjem heksu. Spopad ob prihodu, preživeli se vrnejo.</div>
             {draftPath.length < 2 ? (
@@ -3420,11 +3438,6 @@ export default function App() {
                 ))}
               </div>
             )}
-            <InfoButton title="Kako deluje — Napad">
-              <div className="def-how-row"><span className="def-how-ic">⚔</span><span>Napadalci udarijo po prihodu na cilj; orožje in razkrite logične šibkosti večajo moč.</span></div>
-              <div className="def-how-row"><span className="def-how-ic">◆</span><span>Razkrite šibke točke je lažje uničiti.</span></div>
-              <div className="def-how-row"><span className="def-how-ic">↩</span><span>Preživeli se vrnejo v kamp (čas povratka glede na pot).</span></div>
-            </InfoButton>
           </div>
           <Missions wps={game.aiWeakPoints} aiTree={game.aiTree}
             active={game.activeMissions ?? []} plan={missions} planR={missionR}
