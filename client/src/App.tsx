@@ -110,6 +110,25 @@ function Gauge({ pct, color }: { pct: number; color: string }) {
   );
 }
 
+/** Info gumb (ℹ) — odpre popup z navodili (otroci). Ni stalno prikazano. */
+function InfoButton({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className="info-btn" title="Kako deluje" onClick={(e) => { e.stopPropagation(); setOpen(true); }}>ℹ</button>
+      {open && (
+        <div className="info-overlay" onClick={() => setOpen(false)}>
+          <div className="info-box" onClick={e => e.stopPropagation()}>
+            <button className="info-close" onClick={() => setOpen(false)}>✕</button>
+            <div className="info-title">{title}</div>
+            <div className="info-body">{children}</div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Stari ResStat ostal samo za morebitne legacy klice — preusmerjen na BigStat brez bar-a. */
 function ResStat({ icon, label, value, color }: { icon: string; label: string; value: number; max?: number; color?: string }) {
   return <BigStat icon={icon} label={label} value={value} color={color ?? '#88aacc'} />;
@@ -1313,11 +1332,10 @@ function AlliesPanel({ clans }: { clans: OtherClan[] }) {
           </div>
         );
       })}
-      <div className="def-how">
-        <div className="def-how-title">KAKO DELUJE</div>
+      <InfoButton title="Kako deluje — Zavezniki">
         <div className="def-how-row"><span className="def-how-ic">🔭</span><span>Razišči heks klana, da ga najdeš v megli.</span></div>
         <div className="def-how-row"><span className="def-how-ic">🤝</span><span>Pošlji odpravo do njega za zavezništvo — nato mesečno pomaga.</span></div>
-      </div>
+      </InfoButton>
     </div>
   );
 }
@@ -3126,12 +3144,11 @@ export default function App() {
               )}
 
               {/* KAKO DELUJE */}
-              <div className="def-how">
-                <div className="def-how-title">KAKO DELUJE</div>
+              <InfoButton title="Kako deluje — Obramba">
                 <div className="def-how-row"><span className="def-how-ic">👥</span><span>Več branilcev poveča verjetnost, da odbijemo napad AI.</span></div>
                 <div className="def-how-row"><span className="def-how-ic">🏰</span><span>Obzidje daje bonus k obrambi celotnega tabora (+20 % na stopnjo).</span></div>
                 <div className="def-how-row"><span className="def-how-ic">👁</span><span>Več ljudi v taboru poveča možnost, da nas AI odkrije.</span></div>
-              </div>
+              </InfoButton>
             </div>
             );
           })()}
@@ -3169,12 +3186,11 @@ export default function App() {
                 <div className="def-big-num" style={{ color: '#cc8800' }}>🍞 {game.resources.survival}</div>
                 <div className="def-stat-note">Naslednji mesec: <b style={{ color: foodNextMonth <= 0 ? '#cc2222' : '#9ed18a' }}>{foodNextMonth}{foodNextMonth <= 0 ? ' ⚠' : ''}</b></div>
               </div>
-              <div className="def-how">
-                <div className="def-how-title">KAKO DELUJE</div>
+              <InfoButton title="Kako deluje — Prehrana">
                 <div className="def-how-row"><span className="def-how-ic">🌾</span><span>Nabiralci zbirajo hrano vsak mesec.</span></div>
                 <div className="def-how-row"><span className="def-how-ic">🍽</span><span>Višji obroki dajo več moči, a porabijo več hrane.</span></div>
                 <div className="def-how-row"><span className="def-how-ic">⚠</span><span>Če zaloga pade na 0, klan strada in izgublja ljudi.</span></div>
-              </div>
+              </InfoButton>
             </div>
             );
           })()}
@@ -3219,12 +3235,11 @@ export default function App() {
                 <div className="def-stat"><div className="def-stat-label">OROŽJE</div><div className="def-stat-big" style={{ color: '#cc7755' }}>{game.resources.combat}</div></div>
                 <div className="def-stat"><div className="def-stat-label">OBZIDJE</div><div className="def-stat-big" style={{ color: '#aabb88' }}>{game.wallsBuilt ?? 0}</div></div>
               </div>
-              <div className="def-how">
-                <div className="def-how-title">KAKO DELUJE</div>
+              <InfoButton title="Kako deluje — Delavnice">
                 <div className="def-how-row"><span className="def-how-ic">⚔</span><span>Orožje: 6 delavec-mes. + 1 material.</span></div>
                 <div className="def-how-row"><span className="def-how-ic">🏰</span><span>Obzidje: 12 delavec-mes. + 4 materiala (+20 % obrambe).</span></div>
                 <div className="def-how-row"><span className="def-how-ic">💎</span><span>Artefakt: 360 delavec-mes. + 20 materiala. Napredek se ohrani ob preklopu.</span></div>
-              </div>
+              </InfoButton>
             </div>
             );
           })()}
@@ -3265,12 +3280,11 @@ export default function App() {
                   <div className="def-stat-note">Do Lv{cfg.lvl + 1} (pri {researchers}): <b style={{ color: cfg.color }}>{researchers > 0 ? `${months} mesec(ev)` : '∞'}</b>{researchObj === 'robots' ? ` · +${researchIntel} intel/m` : ''}</div>
                 </div>
               </div>
-              <div className="def-how">
-                <div className="def-how-title">KAKO DELUJE</div>
+              <InfoButton title="Kako deluje — Raziskave">
                 <div className="def-how-row"><span className="def-how-ic">🤖</span><span>Roboti: odkrivanje šibkih točk; vsaka stopnja odklene Orožje/Obzidje.</span></div>
                 <div className="def-how-row"><span className="def-how-ic">⚔</span><span>Orožje/Obzidje: vsaka stopnja podvoji napad/obrambo (120 razisk.-mes.).</span></div>
                 <div className="def-how-row"><span className="def-how-ic">🔭</span><span>AI drevo se odpira samodejno z znanjem o AI.</span></div>
-              </div>
+              </InfoButton>
             </div>
             );
           })()}
@@ -3335,12 +3349,11 @@ export default function App() {
                 })())}
               </div>
             )}
-            <div className="def-how">
-              <div className="def-how-title">KAKO DELUJE</div>
+            <InfoButton title="Kako deluje — Izvidniki">
               <div className="def-how-row"><span className="def-how-ic">🔭</span><span>Izvidniki raziskujejo hekse in odkrivajo šibke točke ter klane.</span></div>
               <div className="def-how-row"><span className="def-how-ic">↩</span><span>Po cilju se vrnejo domov; krožna pot ob kampu = kratek povratek.</span></div>
               <div className="def-how-row"><span className="def-how-ic">🌙</span><span>Skrivanje zniža srečanja, a podaljša pot.</span></div>
-            </div>
+            </InfoButton>
           </div>
           <AlliesPanel clans={game.otherClans ?? []} />
           </>
@@ -3410,12 +3423,11 @@ export default function App() {
                 ))}
               </div>
             )}
-            <div className="def-how">
-              <div className="def-how-title">KAKO DELUJE</div>
+            <InfoButton title="Kako deluje — Napad">
               <div className="def-how-row"><span className="def-how-ic">⚔</span><span>Napadalci udarijo po prihodu na cilj; orožje in razkrite logične šibkosti večajo moč.</span></div>
               <div className="def-how-row"><span className="def-how-ic">◆</span><span>Razkrite šibke točke je lažje uničiti.</span></div>
               <div className="def-how-row"><span className="def-how-ic">↩</span><span>Preživeli se vrnejo v kamp (čas povratka glede na pot).</span></div>
-            </div>
+            </InfoButton>
           </div>
           <Missions wps={game.aiWeakPoints} aiTree={game.aiTree}
             active={game.activeMissions ?? []} plan={missions} planR={missionR}

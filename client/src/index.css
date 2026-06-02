@@ -2091,3 +2091,29 @@ input[type=range]::-moz-range-thumb {
   background: var(--zc, #66cc88); border: 2px solid #0a0f0c; cursor: pointer;
 }
 .cz-slider::-moz-range-track { height: 5px; border-radius: 3px; background: transparent; }
+
+/* Info gumb + popup (Kako deluje) */
+.info-btn {
+  margin-left: auto; flex-shrink: 0;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid #2a3a4a; background: #11171f; color: #6a8299;
+  font-size: .8rem; font-style: italic; font-weight: 700; cursor: pointer; line-height: 1;
+}
+.info-btn:hover { border-color: #3a5a7a; color: #9ec0e0; }
+.info-overlay {
+  position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.info-box {
+  position: relative; max-width: 420px; width: 100%;
+  background: #10161e; border: 1px solid #2a3a4a; border-radius: 12px; padding: 1rem 1.1rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+.info-close {
+  position: absolute; top: .5rem; right: .5rem; width: 26px; height: 26px;
+  border: none; background: transparent; color: #6a8299; font-size: 1rem; cursor: pointer;
+}
+.info-close:hover { color: #cfe3ff; }
+.info-title { font-size: .9rem; font-weight: 700; letter-spacing: .04em; color: #cfe3ff; margin-bottom: .6rem; }
+.info-body { display: flex; flex-direction: column; gap: .5rem; }
+.info-body .def-how-row { font-size: .8rem; }
