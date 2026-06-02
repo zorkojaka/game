@@ -1732,11 +1732,12 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
   const campZoneIds = new Set(CAMP_ZONES.map(z => `${z.q},${z.r}`));
   const CAMP_EXTENT = SIZE * 1.85;  // prostor za kontrole okoli kampa (da niso odrezane)
   const pts = tiles.map(t => hexToPixel(t.q, t.r, SIZE));
-  const PAD = SIZE * 0.85;          // obroba okoli heksov
-  let minX = Math.min(...pts.map(p => p.x)) - PAD;
-  let maxX = Math.max(...pts.map(p => p.x)) + PAD;
+  const PADX = SIZE * 1.05;         // vodoravno: pol-širina pointy-top heksa ≈ 0.87×SIZE + rob
+  const PADY = SIZE * 0.85;         // navpično
+  let minX = Math.min(...pts.map(p => p.x)) - PADX;
+  let maxX = Math.max(...pts.map(p => p.x)) + PADX;
   let minY = Math.min(...pts.map(p => p.y)) - SIZE * 1.5;  // zgoraj več (kontrole nad zadnjim heksom)
-  let maxY = Math.max(...pts.map(p => p.y)) + PAD;
+  let maxY = Math.max(...pts.map(p => p.y)) + PADY;
   // Razširi okvir, da je veliki kamp v celoti viden (ne odreže ga rob)
   const clanForBounds = tiles.find(t => t.isClanCamp);
   if (clanForBounds) {
