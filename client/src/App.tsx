@@ -2373,11 +2373,12 @@ function FitScale({ children, deps }: { children: React.ReactNode; deps?: unknow
     const recompute = () => {
       const o = outer.current, n = inner.current;
       if (!o || !n) return;
-      const ih = n.scrollHeight, iw = n.scrollWidth;
-      const oh = o.clientHeight, ow = o.clientWidth;
-      if (ih <= 0 || iw <= 0) return;
-      const s = Math.min(1, oh / ih, ow / iw);
-      setScale(s > 0.2 ? s : 0.2);
+      const iw = n.scrollWidth;
+      const ow = o.clientWidth;
+      if (iw <= 0) return;
+      // Prilagodi le po ŠIRINI (besedilo ostane berljivo); previsoka vsebina se drsi navpično.
+      const s = Math.min(1, ow / iw);
+      setScale(s > 0.6 ? s : 0.6);
     };
     recompute();
     const ro = new ResizeObserver(recompute);
