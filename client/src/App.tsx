@@ -1206,7 +1206,11 @@ function EventLog({ entries }: { entries: EventEntry[] }) {
               </div>
               {isOpen && (
                 <div className="tl-row-detail">
-                  <p className="ee-text">{e.narrative}</p>
+                  <ul className="ee-events">
+                    {e.narrative.split('\n').filter(Boolean).map((line, li) => (
+                      <li key={li} className="ee-event-line">{line}</li>
+                    ))}
+                  </ul>
                   {e.ledger.length > top.length && (
                     <div className="ee-ledger">
                       {e.ledger.map((item, idx) => <LedgerChip key={idx} item={item} />)}

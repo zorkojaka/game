@@ -1093,7 +1093,7 @@ function buildNarrative(
     parts.push(`AI je zaključil fazo ${phaseLabels[phase]}. Nova faza se začne.`);
   }
 
-  return parts.join(' ') || 'Mesec je minil mirno.';
+  return parts.join('\n') || 'Mesec je minil mirno.';
 }
 
 // ─── Pomožne funkcije za UI ───────────────────────────────────────────────────
