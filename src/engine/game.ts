@@ -611,7 +611,35 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     return parts.join(', ');
   };
 
-  for (const e of oldExps) {
+  // Sprejmi NOVE odprave PRED tikanjem — da gredo takoj ven iz kampa (premaknejo se še ta mesec)
+  const newlyCreated: Expedition[] = [];
+  for (const inp of incomingExps) {
+    if (!inp.path || inp.path.length < 2) continue;
+    if (inp.assigned < 1) continue;
+    const [idRoll, rngId] = rngInt(rng, 1000, 9999); rng = rngId;
+    population -= inp.assigned;
+    // Hrana za celotno pot TJA IN NAZAJ, vzeta iz zalog upfront
+    const months = Math.max(1, roundTripMonths(inp.path));
+    const eTier = RATIONS_LEVELS[inp.rations] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
+    const foodPack = Math.round(inp.assigned * months * eTier.foodMult);
+    survival = Math.max(0, survival - foodPack);
+    expeditionEvents.push(`🎒 Odprava (${inp.assigned} ljudi, ${months}m tja+nazaj) vzela ${foodPack} hrane s seboj.`);
+    newlyCreated.push({
+      id: `exp_${state.totalRounds}_${idRoll}`,
+      kind: inp.kind,
+      weakPointId: inp.weakPointId,
+      path: inp.path,
+      currentIndex: 0,
+      assigned: inp.assigned,
+      rations: inp.rations,
+      status: 'traveling',
+      monthsElapsed: 0,
+      encountersLog: [],
+      stealth: inp.stealth,
+    });
+  }
+
+  for (const e of [...oldExps, ...newlyCreated]) {
     // POVRATNI LEG — preživeli se vračajo v kamp (odštevanje mesecev)
     if (e.status === 'returning') {
       const rem = (e.returnRemaining ?? 1) - 1;
@@ -735,32 +763,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     }
   }
 
-  // Sprejmi nove odprave — pop se zmanjša + hrana za pot se odšteje iz zalog kampa
-  for (const inp of incomingExps) {
-    if (!inp.path || inp.path.length < 2) continue;
-    if (inp.assigned < 1) continue;
-    const [idRoll, rngId] = rngInt(rng, 1000, 9999); rng = rngId;
-    population -= inp.assigned;
-    // Hrana za celotno pot TJA IN NAZAJ, vzeta iz zalog upfront
-    const months = Math.max(1, roundTripMonths(inp.path));
-    const eTier = RATIONS_LEVELS[inp.rations] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
-    const foodPack = Math.round(inp.assigned * months * eTier.foodMult);
-    survival = Math.max(0, survival - foodPack);
-    expeditionEvents.push(`🎒 Odprava (${inp.assigned} ljudi, ${months}m tja+nazaj) vzela ${foodPack} hrane s seboj.`);
-    tickedExps.push({
-      id: `exp_${state.totalRounds}_${idRoll}`,
-      kind: inp.kind,
-      weakPointId: inp.weakPointId,
-      path: inp.path,
-      currentIndex: 0,
-      assigned: inp.assigned,
-      rations: inp.rations,
-      status: 'traveling',
-      monthsElapsed: 0,
-      encountersLog: [],
-      stealth: inp.stealth,
-    });
-  }
+  // (nove odprave so sprejete in stikane zgoraj — gredo ven takoj)
 
   // Avtomatsko razkrivanje šibkih točk: če je heks z wp dosegel >= 0.50 raziskanost, je discovered
   for (let i = 0; i < aiWeakPoints.length; i++) {
