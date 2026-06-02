@@ -203,7 +203,8 @@ export function missionSuccessProbability(state: GameState, weakPointId: string,
   const diff = MISSION_WP_DIFFICULTY[weakPointId] ?? 100;
   const tier = RATIONS_LEVELS[rationsLevel] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
   const equip = Math.min(state.resources.combat, assigned);
-  const teamPower = (Math.sqrt(assigned) * COMBAT_BASE_HUMAN_MULTIPLIER * 8 + equip * 1.2) * tier.strengthMult;
+  const wMult = researchMult(state.weaponResearchLevel ?? 0);
+  const teamPower = (Math.sqrt(assigned) * COMBAT_BASE_HUMAN_MULTIPLIER * 8 + equip * 1.2 * wMult) * tier.strengthMult;
   const intelB = intelCombatBonus(state);
   return (teamPower * (1 + intelB)) / (teamPower * (1 + intelB) + diff);
 }
@@ -408,6 +409,11 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       const intelBonus = Math.floor(researchers * SCOUT_INTEL_YIELD * rations.strengthMult);
       intelligence += intelBonus;
       robotsResearchProgress += researchers;
+      while (robotsResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && robotsResearchLevel < 3) {
+        robotsResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
+        robotsResearchLevel += 1;
+        workshopEvents.push(`🔬 Raziskava robotov dokončana — stopnja ${robotsResearchLevel}! Odklenjena stopnja za orožje in obzidje.`);
+      }
     } else if (researchObj === 'weapon') {
       const unlocked = Math.max(state.robotsResearchLevel ?? 0, mechanicalTechUnlockLevel(state));
       if (weaponResearchLevel >= unlocked) {

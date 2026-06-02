@@ -2288,7 +2288,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           type DraftControlIcon = 'scout' | 'attack' | 'minus' | 'plus' | 'confirm';
           const DraftIcon = ({ icon, color }: { icon: DraftControlIcon; color: string }) => {
             if (icon === 'scout') {
-              return <text textAnchor="middle" dominantBaseline="central" fontSize="10" fill={color} style={{ userSelect: 'none' }}>🗺</text>;
+              return <text textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none' }}>🔭</text>;
             }
             if (icon === 'attack') {
               return <text textAnchor="middle" dominantBaseline="central" fontSize="10" fill={color} style={{ userSelect: 'none' }}>⚔️</text>;
