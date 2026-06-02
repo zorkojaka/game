@@ -1576,7 +1576,7 @@ function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }):
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, research, pop }: {
+function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, research, pop, draftPeople, onDraftKind, onDraftPeople, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   draftKind: 'scout' | 'attack';
@@ -1599,6 +1599,12 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
   workshop: { wallsBuilt: number; weaponProgress: number; wallProgress: number; artifactProgress: number; workers: number };
   research: { robotsLevel: number; robotsProgress: number; weaponLevel: number; weaponProgress: number; wallLevel: number; wallProgress: number; researchers: number };
   pop: { total: number; inCamp: number; away: number; free: number };
+  draftPeople: number;
+  onDraftKind: (k: 'scout' | 'attack') => void;
+  onDraftPeople: (delta: number) => void;
+  onConfirmDraft: () => void;
+  canConfirmDraft: boolean;
+  draftAddDisabled: boolean;
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
@@ -2153,6 +2159,40 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             </g>
           );
         })}
+
+        {/* ─── Kontrole odprave na ZADNJEM heksu poti ─── */}
+        {drawingMode && draftPath.length >= 2 && lastStep && (() => {
+          const lp = shift(hexToPixel(lastStep.q, lastStep.r, SIZE));
+          const cx = lp.x, cy = lp.y - SIZE * 1.15;  // nad zadnjim heksom
+          const Btn = ({ x, y, r = 9, fill, stroke, icon, fs = 11, disabled, onClick, title }:
+            { x: number; y: number; r?: number; fill: string; stroke: string; icon: string; fs?: number; disabled?: boolean; onClick: () => void; title: string }) => (
+            <g style={{ cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.4 : 1 }}
+               onClick={(e) => { e.stopPropagation(); if (!disabled) onClick(); }}>
+              <title>{title}</title>
+              <circle cx={x} cy={y} r={r} fill={fill} stroke={stroke} strokeWidth="1.5" />
+              <text x={x} y={y + fs * 0.34} textAnchor="middle" fontSize={fs} style={{ pointerEvents: 'none' }}>{icon}</text>
+            </g>
+          );
+          return (
+            <g className="draft-controls">
+              {/* vrsta 1: izbira tipa odprave */}
+              <Btn x={cx - 13} y={cy - 16} fill={draftKind === 'scout' ? '#3a2a00' : '#0a0a0a'} stroke={draftKind === 'scout' ? '#ffd84a' : '#555'}
+                icon="🔭" onClick={() => onDraftKind('scout')} title="Izvidniki (raziskovanje)" />
+              <Btn x={cx + 13} y={cy - 16} fill={draftKind === 'attack' ? '#3a1010' : '#0a0a0a'} stroke={draftKind === 'attack' ? '#cc3333' : '#555'}
+                icon="⚔" onClick={() => onDraftKind('attack')} title="Napad" />
+              {/* vrsta 2: število ljudi −/+ in potrdi */}
+              <Btn x={cx - 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="−" fs={13} disabled={draftPeople <= 1}
+                onClick={() => onDraftPeople(-1)} title="Manj ljudi" />
+              <circle cx={cx} cy={cy + 7} r={11} fill="#11171f" stroke={draftKind === 'attack' ? '#cc3333' : '#ffd84a'} strokeWidth="1.5" />
+              <text x={cx} y={cy + 11} textAnchor="middle" fontSize="12" fontWeight="bold" fill="#fff" style={{ pointerEvents: 'none' }}>{draftPeople}</text>
+              <Btn x={cx + 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="+" fs={13} disabled={draftAddDisabled}
+                onClick={() => onDraftPeople(1)} title="Več ljudi" />
+              {/* potrdi */}
+              <Btn x={cx} y={cy + 30} r={9} fill={canConfirmDraft ? '#0f2a14' : '#0a0a0a'} stroke={canConfirmDraft ? '#66cc88' : '#555'}
+                icon="✓" fs={12} disabled={!canConfirmDraft} onClick={onConfirmDraft} title="Pošlji odpravo" />
+            </g>
+          );
+        })()}
       </svg>
 
       {/* Popup za izbrano/hovered odpravo */}
@@ -3452,7 +3492,16 @@ export default function App() {
             researchObj={researchObj} onResearch={setResearchObj}
             workshop={{ wallsBuilt: game.wallsBuilt ?? 0, weaponProgress: game.weaponWorkshopProgress ?? 0, wallProgress: game.wallProgress ?? 0, artifactProgress: game.artifactWorkshopProgress ?? 0, workers }}
             research={{ robotsLevel: game.robotsResearchLevel ?? 0, robotsProgress: game.robotsResearchProgress ?? 0, weaponLevel: game.weaponResearchLevel ?? 0, weaponProgress: game.weaponResearchProgress ?? 0, wallLevel: game.wallResearchLevel ?? 0, wallProgress: game.wallResearchProgress ?? 0, researchers }}
-            pop={{ total: game.population, inCamp: Math.max(0, game.population - inMissions), away: inMissions, free: freePeople }} />
+            pop={{ total: game.population, inCamp: Math.max(0, game.population - inMissions), away: inMissions, free: freePeople }}
+            draftPeople={draftPeople}
+            onDraftKind={(k) => setDraftKind(k)}
+            onDraftPeople={(d) => {
+              if (d > 0) { if (!(assignedHome + plannedTotal + draftPeople >= availablePop || weaponsLeft <= 0)) setDraftPeople(draftPeople + 1); }
+              else setDraftPeople(Math.max(1, draftPeople - 1));
+            }}
+            onConfirmDraft={() => confirmDraft(draftKind)}
+            canConfirmDraft={canConfirmDraft}
+            draftAddDisabled={assignedHome + plannedTotal + draftPeople >= availablePop || weaponsLeft <= 0} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
