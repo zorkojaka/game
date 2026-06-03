@@ -115,38 +115,38 @@ function Gauge({ pct, color }: { pct: number; color: string }) {
 /** Navodila „Kako deluje" za posamezne panele. */
 const HELP: Record<string, { title: string; rows: [string, string][] }> = {
   defense: { title: 'Kako deluje — Obramba', rows: [
-    ['👥', 'Več branilcev poveča verjetnost, da odbijemo napad AI.'],
-    ['🏰', 'Obzidje daje +20 % k obrambi na zgrajeno stopnjo, raziskava obzidja ta učinek podvoji po levelih.'],
-    ['◆', 'Razkrite logične šibkosti zmanjšajo moč ustreznih AI napadov.'],
+    ['👥', 'Več branilcev poveča verjetnost odbitja AI napada.'],
+    ['🏰', 'Vsako zgrajeno obzidje doda +20 % k obrambi; vsaka stopnja raziskave obzidja ta bonus podvoji (×2/stopnjo).'],
+    ['◆', 'Razkrite logične šibkosti zmanjšajo napadalno moč ustreznih AI enot pri vsakem napadu.'],
   ] },
   food: { title: 'Kako deluje — Prehrana', rows: [
-    ['🌾', 'Nabiralci zbirajo hrano vsak mesec.'],
-    ['🍽', 'Višji obroki dajo več moči, a porabijo več hrane.'],
-    ['⚠', 'Če zaloga pade na 0, klan strada in izgublja ljudi.'],
+    ['🌾', 'Nabiralci pridelajo hrano vsak mesec (×4 na nabiralca, pomnoženo z jakostjo obrokov).'],
+    ['🍽', 'Višji obroki (1–5) dajo večjo bojno moč in rast populacije, a porabijo več hrane.'],
+    ['⚠', 'Če zaloga pade na 0, klan strada in vsak mesec izgublja ljudi (25 % → 50 % → 75 %).'],
   ] },
   workshop: { title: 'Kako deluje — Delavnice', rows: [
-    ['⚔', 'Orožje: 6 delavec-mes. + 1 material.'],
-    ['🏰', 'Obzidje: 12 delavec-mes. + 4 materiala (+20 % obrambe).'],
-    ['💎', 'Artefakt: 360 delavec-mes. + 20 materiala. Napredek se ohrani ob preklopu.'],
+    ['⚔', 'Orožje: 6 delavec-mes. + 1 material. Dovoli enemu borcu, da se bori z orožjem.'],
+    ['🏰', 'Obzidje: 12 delavec-mes. + 4 materiala. Vsaka stopnja doda +20 % k obrambi.'],
+    ['💎', 'Artefakt: 360 delavec-mes. + 20 materiala. Takoj uniči eno odkrito šibko točko.'],
   ] },
   research: { title: 'Kako deluje — Raziskave', rows: [
-    ['🤖', 'Roboti: raziskovalci ustvarjajo intel in odpirajo AI drevo.'],
-    ['⚙', 'Mehanske šibkosti odklenejo nove stopnje orožja in obrambe.'],
-    ['◆', 'Logične šibkosti takoj dodajo pasivne bonuse v boju/obrambi.'],
+    ['🤖', 'Roboti (120 razisk.-mes./stopnjo, max 3): napredek raste z raziskovalci in odklepa stopnje orožja in obzidja.'],
+    ['⚙', 'Mehanske šibkosti v AI drevesu prav tako odklenejo tech stopnje. Vsaka stopnja orožja/obzidja podvoji učinek (×2/stopnjo).'],
+    ['◆', 'Logične šibkosti takoj dodajo pasivne bonuse v vseh bojih in obrambi.'],
   ] },
   scout: { title: 'Kako deluje — Izvidniki', rows: [
-    ['🔭', 'Izvidniki raziskujejo hekse in odkrivajo šibke točke ter klane.'],
-    ['↩', 'Po cilju se vrnejo domov; krožna pot ob kampu = kratek povratek.'],
-    ['🌙', 'Skrivanje zniža srečanja, a podaljša pot.'],
+    ['🔭', 'Izvidniki raziskujejo hekse in odkrivajo šibke točke, klane in vire. Pot narišeš s kliki na hekse.'],
+    ['↩', 'Po cilju se samodejno vrnejo; hrana se vzame za tja+nazaj. Obroki in skrivanje nastavljaš na mapi.'],
+    ['🌙', 'Skrivanje (🌙 na mapi) zniža srečanja z AI za 50 %, a vsak 3. mesec preskoči korak.'],
   ] },
   attack: { title: 'Kako deluje — Napad', rows: [
-    ['⚔', 'Napadalci udarijo po prihodu na cilj; orožje in razkrite logične šibkosti večajo moč.'],
-    ['◆', 'Razkrite šibke točke je lažje uničiti.'],
-    ['↩', 'Preživeli se vrnejo v kamp (čas povratka glede na pot).'],
+    ['⚔', 'Napadalci udarijo ob prihodu. Moč raste z orožjem, stopnjo raziskave orožja (×2/stopnjo) in razk. log. šibkostmi.'],
+    ['◆', 'Napad na razkrito šibko točko (◆) ima bonus verjetnosti uspeha in je lažji od splošnega napada.'],
+    ['↩', 'Preživeli se vrnejo v kamp; material iz uničenih robotov nesejo s seboj in ga dostavijo ob vrnitvi.'],
   ] },
   allies: { title: 'Kako deluje — Zavezniki', rows: [
-    ['🔭', 'Razišči heks klana, da ga najdeš v megli.'],
-    ['🤝', 'Pošlji odpravo do njega za zavezništvo — nato mesečno pomaga.'],
+    ['🔭', 'Razišči heks klana (⛺), da ga odkriješ v megli.'],
+    ['🤝', 'Pošlji odpravo do njega za zavezništvo — nato mesečno pomaga z viri in dviguje aktivnost klanov (AI manj napada).'],
   ] },
 };
 
@@ -1491,35 +1491,36 @@ function RulesModal({ onClose }: { onClose: () => void }) {
         <li>Pod ikonami so + / − za premik prostih ljudi v vsako območje.</li>
       </ul>
     ) },
-    { id: 'karta', icon: '🗺', title: 'Karta & odprave', body: (
+    { id: 'karta', icon: '🔭', title: 'Karta & odprave', body: (
       <ul>
-        <li>Karta je v megli; razkrivaš jo z odpravami (raziskanost polja raste z obiski).</li>
-        <li>V zavihku <b>Izvidniki</b> narišeš pot (klikaš sosednje hekse) in pošlješ izvidnike.</li>
-        <li>Odprave vzamejo hrano s seboj; na poti so možna srečanja in najdbe (material, orožje, artefakt).</li>
-        <li>Odprave in napadi so edini sistem misij; stare timer misije niso več del normalnega igranja.</li>
-        <li>Pot odprave je <b>rumena</b>.</li>
+        <li>Karta je v megli; razkrivaš jo z odpravami — raziskanost polja raste z vsakim obiskom.</li>
+        <li>Pot narišeš s kliki na sosednje hekse. Na <b>zadnjem heksu</b> se prikažejo gumbi: vrsta/število ljudi, 🍽 obroki (klikni za 1–5) in 🌙 skrivanje.</li>
+        <li>✓ (potrdi odpravo) je na sredini zadnjega hexa. Hrana se vzame za pot <b>tja in nazaj</b>.</li>
+        <li>Na poti so možna srečanja z AI in najdbe (material, orožje, artefakt) — dostavljeno ob vrnitvi.</li>
+        <li>Pot izvidnice je <b>rumena</b>, napadalna pot je <b>rdeča</b>.</li>
       </ul>
     ) },
     { id: 'napad', icon: '⚔', title: 'Napad', body: (
       <ul>
-        <li>V zavihku <b>Napad</b> narišeš pot do <b>AI jedra (☣)</b> ali odkrite <b>šibke točke (◆)</b> in pošlješ napadalce.</li>
-        <li>Spopad se sproži <b>ob prihodu</b>; preživeli se vrnejo v kamp.</li>
-        <li>Pot napada je <b>rdeča</b>.</li>
+        <li>V zavihku <b>Napad</b> narišeš pot do odkrite <b>šibke točke (◆)</b> ali splošni napad na AI jedro (☣).</li>
+        <li>Spopad se sproži <b>ob prihodu</b>; moč napada raste z orožjem, <b>stopnjo raziskave orožja</b> (×2/stopnjo) in razk. logičnimi šibkostmi.</li>
+        <li>Napad na ◆ ima poseben bonus in je lažji od splošnega napada — priporočljivo za uničevanje šibkih točk.</li>
+        <li>Preživeli se vrnejo v kamp; material iz uničenih robotov nesejo s seboj.</li>
       </ul>
     ) },
     { id: 'obramba', icon: '🧱', title: 'Obramba & obzidje', body: (
       <ul>
-        <li>Verjetnost napada AI je <b>na mesec</b> in raste z AI močjo, znanjem o nas in številom ljudi v kampu.</li>
-        <li>Branilci in <b>obzidje</b> ne znižajo verjetnosti napada, ampak povečajo <b>odbitje</b>.</li>
-        <li>Vsako <b>obzidje</b> doda <b>+20 %</b> moči obrambe; raziskava obzidja učinek podvoji po stopnjah.</li>
+        <li>Verjetnost AI napada na kamp raste z močjo AI, AI znanjem o nas in številom ljudi v kampu.</li>
+        <li>Branilci in obzidje <b>ne znižajo verjetnosti</b> napada — povečajo <b>verjetnost odbitja</b>.</li>
+        <li>Vsako zgrajeno obzidje doda <b>+20 %</b> obrambni moči; vsaka stopnja <b>raziskave obzidja</b> ta bonus podvoji (×2/stopnjo).</li>
       </ul>
     ) },
     { id: 'raziskave', icon: '🔬', title: 'Research loop', body: (
       <ul>
-        <li><b>Research → Intel → AI weak points → Upgrades → Survival</b>.</li>
-        <li><b>Roboti</b> raziskava najhitreje dviguje AI znanje in odpira AI drevo.</li>
-        <li><b>Mehanske šibkosti</b> odklenejo stopnje orožja in obzidja: izvidniki 1, napadalci 2, people-killerji 3.</li>
-        <li><b>Logične šibkosti</b> takoj dajo pasivne bonuse proti ustreznim AI enotam.</li>
+        <li><b>Roboti</b> (120 razisk.-mes./stopnjo, max 3 stopnje) odklepajo možnost nadgradnje orožja in obzidja — najprej razišči robote.</li>
+        <li><b>Mehanske šibkosti</b> v AI drevesu prav tako odklenejo tech stopnje (izvidniki → 1, napadalci → 2, people-killerji → 3).</li>
+        <li><b>Orožje / Obzidje</b>: vsaka stopnja podvoji učinek (×2/stopnjo). Stopnja orožja veča moč <b>vseh</b> napadov — v kampu in na odpravah.</li>
+        <li><b>Logične šibkosti</b> takoj dajo pasivne bonuse v boju in obrambi brez nadaljnjega dela.</li>
       </ul>
     ) },
     { id: 'zavezniki', icon: '⛺', title: 'Drugi klani (zavezniki)', body: (
