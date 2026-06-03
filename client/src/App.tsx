@@ -2328,32 +2328,38 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           );
           return (
             <g className="draft-controls">
-              {/* število ljudi na sredini hexa */}
-              <circle cx={lp.x} cy={lp.y} r={13} fill="#11171f99" stroke={draftKind === 'attack' ? '#cc3333' : '#ffd84a'} strokeWidth="1.5" style={{ pointerEvents: 'none' }} />
-              <text x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="central" fontSize="13" fontWeight="bold" fill="#fff" style={{ pointerEvents: 'none' }}>{draftPeople}</text>
+              {/* potrditev na sredini hexa */}
+              <g style={{ cursor: canConfirmDraft ? 'pointer' : 'default', opacity: canConfirmDraft ? 1 : 0.4 }}
+                 onClick={(e) => { e.stopPropagation(); if (canConfirmDraft) onConfirmDraft(); }}>
+                <title>Pošlji odpravo</title>
+                <circle cx={lp.x} cy={lp.y} r={13} fill={canConfirmDraft ? '#0f2a14' : '#11171f99'} stroke={canConfirmDraft ? '#66cc88' : '#555'} strokeWidth="1.5" />
+                <g transform={`translate(${lp.x} ${lp.y})`} style={{ pointerEvents: 'none' }}>
+                  <path d="M-5 .2-2.2 3.2 5.2-4.5" fill="none" stroke={canConfirmDraft ? '#8df0a5' : '#b8b8b8'} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
+                </g>
+              </g>
               {/* vrsta 1: izbira tipa odprave */}
               <Btn x={cx - 13} y={cy - 16} fill={draftKind === 'scout' ? '#3a2a00' : '#0a0a0a'} stroke={draftKind === 'scout' ? '#ffd84a' : '#555'}
                 icon="scout" iconColor={draftKind === 'scout' ? '#ffd84a' : '#b8b8b8'} onClick={() => onDraftKind('scout')} title="Izvidniki (raziskovanje)" />
               <Btn x={cx + 13} y={cy - 16} fill={draftKind === 'attack' ? '#3a1010' : '#0a0a0a'} stroke={draftKind === 'attack' ? '#cc3333' : '#555'}
                 icon="attack" iconColor={draftKind === 'attack' ? '#ff7777' : '#b8b8b8'} onClick={() => onDraftKind('attack')} title="Napad" />
-              {/* vrsta 2: − skrivanje + */}
+              {/* vrsta 2: − število + */}
               <Btn x={cx - 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="minus" disabled={draftPeople <= 1}
                 onClick={() => onDraftPeople(-1)} title="Manj ljudi" />
-              <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftStealth(!draftStealth); }}>
-                <title>{draftStealth ? 'Skrivanje vklopljeno' : 'Skrivanje izklopljeno'}</title>
-                <circle cx={cx} cy={cy + 7} r={11} fill={draftStealth ? '#1a1a2e' : '#0a0a0a'} stroke={draftStealth ? '#8888ff' : '#555'} strokeWidth="1.5" />
-                <text x={cx} y={cy + 7} textAnchor="middle" dominantBaseline="central" fontSize="11" style={{ userSelect: 'none', pointerEvents: 'none', opacity: draftStealth ? 1 : 0.35 }}>🌙</text>
-              </g>
+              <circle cx={cx} cy={cy + 7} r={11} fill="#11171f" stroke={draftKind === 'attack' ? '#cc3333' : '#ffd84a'} strokeWidth="1.5" />
+              <text x={cx} y={cy + 7} textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold" fill="#fff" style={{ pointerEvents: 'none' }}>{draftPeople}</text>
               <Btn x={cx + 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="plus" disabled={draftAddDisabled}
                 onClick={() => onDraftPeople(1)} title="Več ljudi" />
-              {/* vrsta 3: obroki (cycle) + potrdi */}
+              {/* vrsta 3: obroki (cycle) + skrivanje */}
               <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftRations(draftRations % 5 + 1); }}>
                 <title>{`Obroki: ${draftRations} — klikni za spremembo`}</title>
                 <circle cx={cx - 16} cy={cy + 30} r={9} fill="#0a1a0a" stroke="#668866" strokeWidth="1.5" />
                 <text x={cx - 16} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>{RATIONS_EMOJI[draftRations] ?? '🍞'}</text>
               </g>
-              <Btn x={cx + 16} y={cy + 30} r={9} fill={canConfirmDraft ? '#0f2a14' : '#0a0a0a'} stroke={canConfirmDraft ? '#66cc88' : '#555'}
-                icon="confirm" iconColor={canConfirmDraft ? '#8df0a5' : '#b8b8b8'} disabled={!canConfirmDraft} onClick={onConfirmDraft} title="Pošlji odpravo" />
+              <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftStealth(!draftStealth); }}>
+                <title>{draftStealth ? 'Skrivanje vklopljeno' : 'Skrivanje izklopljeno'}</title>
+                <circle cx={cx + 16} cy={cy + 30} r={9} fill={draftStealth ? '#1a1a2e' : '#0a0a0a'} stroke={draftStealth ? '#8888ff' : '#555'} strokeWidth="1.5" />
+                <text x={cx + 16} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none', opacity: draftStealth ? 1 : 0.35 }}>🌙</text>
+              </g>
             </g>
           );
         })()}
