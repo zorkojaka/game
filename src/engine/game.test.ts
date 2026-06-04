@@ -116,7 +116,7 @@ describe('AI enote po fazah (scouts/attackers/peopleKillers)', () => {
 
   it('faza 1 ima raide (tudi izvidniki napadajo) — verjetnost > 0', () => {
     const g = newGame(123);
-    expect(raidProbability(g, 'roboti')).toBeGreaterThan(0);
+    expect(raidProbability(g)).toBeGreaterThan(0);
   });
 
   it('uničenje vseh robotov = zmaga tudi v fazi 1 (varovalo odstranjeno)', () => {

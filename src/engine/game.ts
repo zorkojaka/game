@@ -16,7 +16,7 @@ import {
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
   AI_UNIT_DEFS, aiAttackPower, aiDefensePower, AI_FULL_ATTACK_POWER,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
-  SCOUT_INTEL_YIELD, CLAN_ACTIVITY_EXPOSURE_MODIFIER,
+  SCOUT_INTEL_YIELD, CLAN_ACTIVITY_DECAY_PER_PHASE,
   RATIONS_LEVELS, DEFAULT_RATIONS,
   WEAPON_WORKER_MONTHS, WALL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS,
   WEAPON_MATERIAL_COST, WALL_MATERIAL_COST, ARTIFACT_MATERIAL_COST,
@@ -131,7 +131,7 @@ export function destroyAIUnits(units: AIUnits, count: number): AIUnits {
 }
 
 /** Verjetnost, da AI najde in napade kamp v tej rundi. Vezana na ofenzivno moč prisotnih enot (tudi izvidniki napadajo). */
-export function raidProbability(state: GameState, axis: HumanAxis): number {
+export function raidProbability(state: GameState): number {
   const attackPow = aiAttackPower(readAIUnits(state));
   if (attackPow <= 0) return 0;
   const popFactor = Math.min(1, state.population / RAID_POP_REFERENCE);
@@ -181,7 +181,7 @@ export function scoutCaptureProbability(state: GameState, assignment: Assignment
 
 /** Pričakovana varnost za nabiralce. */
 export function forageSafetyProbability(state: GameState, assignment: Assignment): number {
-  const pRaid = raidProbability(state, assignment.axis);
+  const pRaid = raidProbability(state);
   const pRepel = raidRepelProbability(state, assignment);
   return Math.max(0, Math.min(1, 1 - pRaid * (1 - pRepel)));
 }
@@ -571,7 +571,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
 
   // 6b. RAID — AI najde kamp z neko verjetnostjo
   let raidLog: RaidResult | null = null;
-  const pRaid = raidProbability(state, assignment.axis);
+  const pRaid = raidProbability(state);
   const [raidRoll, rngR1] = rngNext(rng); rng = rngR1;
   if (raidRoll < pRaid) {
     const { result: raidRes, rng: rngR2 } = resolveRaid(state, assignment, rng);
@@ -850,9 +850,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     expeditionEvents.push(`🤝 Zavezniki (${gifts}) so poslali pomoč ta mesec.`);
   }
 
-  // 7. Klan aktivnost — krivulja + vedenjski modifikator
-  // Padec klanske podpore (os skrivanja odstranjena — nevtralen padec)
-  const clanDelta = -CLAN_ACTIVITY_EXPOSURE_MODIFIER;
+  // 7. Klan aktivnost — fazna krivulja (faza 2/3 pada hitreje, da dosežemo tarčne vrednosti)
+  const clanDelta = -CLAN_ACTIVITY_DECAY_PER_PHASE[state.phase];
   const clanActivity = Math.max(0, Math.min(1, state.clanActivity + clanDelta + clanAllyBoost));
 
   // 8. AI surveillance gain (skupna izpostavljenost: combatants + scouts)
@@ -1086,7 +1085,7 @@ export function previewOdds(state: GameState, assignment: Assignment) {
     mAxisModifier: 1.0,
     humanStrength: humanStr,
     aiStrength: aiStr,
-    raidProbability: raidProbability(state, assignment.axis),
+    raidProbability: raidProbability(state),
     raidRepelProbability: raidRepelProbability(state, assignment),
     scoutSuccessProbability: scoutSuccessProbability(state, assignment),
     scoutCaptureProbability: scoutCaptureProbability(state, assignment),

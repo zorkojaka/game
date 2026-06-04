@@ -99,16 +99,26 @@ export const DEFEAT_THRESHOLD = 0.20;      // P 20–45 % → defeat (nekaj pre�
 // P < 20 % → annihilation
 
 // ─── Krivulja aktivnosti klanov ───────────────────────────────────────────────
-// Vrednosti ob koncu vsake faze (3 vrednosti)
+// Tarčne vrednosti ob koncu vsake faze (brez zavezniških bonusov):
+//   find: 0.60 → 0.55 (−0.05 / 12 rund)
+//   understand: 0.55 → 0.38 (−0.17 / 12 rund)
+//   eliminate: 0.38 → 0.20 (−0.18 / 12 rund)
 export const CLAN_ACTIVITY_BY_PHASE: Record<AIPhase, number> = {
-  find: 0.55,       // začne ~0.6, konča ~0.55 po fazi 1
-  understand: 0.38, // padec med fazo 2
-  eliminate: 0.20,  // skoraj sam na koncu
+  find:       0.55,
+  understand: 0.38,
+  eliminate:  0.20,
 };
 
-// Vedenjski modifikator: koliko izpostavljenost vpliva na krivuljo
-export const CLAN_ACTIVITY_EXPOSURE_MODIFIER = 0.004; // per round, aktiven → počasnejši padec
-export const CLAN_ACTIVITY_HIDDEN_MODIFIER = 0.008;   // per round, skrit → hitrejši padec
+// Hitrost padca klanske aktivnosti po fazi (brez zaveznikov)
+export const CLAN_ACTIVITY_DECAY_PER_PHASE: Record<AIPhase, number> = {
+  find:       0.0042,  // faza 1: počasen padec (0.60 → ~0.55)
+  understand: 0.0142,  // faza 2: hitrejši padec (0.55 → ~0.38)
+  eliminate:  0.0150,  // faza 3: najhitrejši padec (0.38 → ~0.20)
+};
+
+// (Neuporabljeno — rezervirano za prihodnje: skrivanje kampa zniža P(raid))
+export const CLAN_ACTIVITY_EXPOSURE_MODIFIER = 0.004; // legacy — nadomeščeno s CLAN_ACTIVITY_DECAY_PER_PHASE
+export const CLAN_ACTIVITY_HIDDEN_MODIFIER = 0.008;   // rezervirano
 
 // ─── Obroki / rations (1–5) ──────────────────────────────────────────────────
 // Učinkuje na: porabo hrane (foodMult), spremembo populacije (pop±) in moč ljudi (strengthMult).
