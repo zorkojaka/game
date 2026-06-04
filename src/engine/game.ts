@@ -6,7 +6,7 @@ import type { RNGState } from './rng.js';
 import { rngInt, rngNext, seedFromString } from './rng.js';
 import { resolveCombat } from './combat.js';
 import { revealTreeByInsight, revealNodeRetroactive } from './fog.js';
-import { generateMap, generateOtherClans } from './map.js';
+import { generateMap, generateOtherClans, randomizePlacements } from './map.js';
 import { tickExpedition, returnMonths, roundTripMonths } from './expedition.js';
 import type { Expedition } from './types.js';
 import { calcAISurveillanceGain, generateAITree, generateAIWeakPoints, DEFAULT_GENOME } from './ai-brain.js';
@@ -303,8 +303,11 @@ export function newGame(seed?: number): GameState {
     activeMissions: [],
     completedMissions: [],
     consecutiveStarvationMonths: 0,
-    mapTiles: generateMap(),
-    otherClans: generateOtherClans(),
+    ...(() => {
+      // Naključna postavitev šibkih točk in klanov (seed ločen od game RNG da ne vpliva na potek igre)
+      const { wpPositions, clanDefs } = randomizePlacements(rngSeed ^ 0xdeadbeef);
+      return { mapTiles: generateMap(wpPositions, clanDefs), otherClans: clanDefs };
+    })(),
     expeditions: [],
     completedExpeditions: [],
     weaponWorkshopProgress: 0,

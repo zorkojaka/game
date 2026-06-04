@@ -7,24 +7,72 @@
 
 import type { HexTile, Visibility, OtherClan } from './types.js';
 import { tileId } from './types.js';
+import { rngInt, createRNG } from './rng.js';
+import type { RNGState } from './rng.js';
 
 export const MAP_COLS = 6;
 export const MAP_ROWS = 5;
 
-// Drugi človeški klani — fiksne lokacije, skriti v megli dokler jih ne najdeš
-export const OTHER_CLAN_DEFS: OtherClan[] = [
-  { id: 'clan_north', label: 'Severni klan',  q: 1, r: 0, discovered: false, allied: false, specialty: 'people' },
-  { id: 'clan_east',  label: 'Vzhodni klan',  q: 4, r: 3, discovered: false, allied: false, specialty: 'material' },
-  { id: 'clan_mid',   label: 'Dolinski klan', q: 2, r: 1, discovered: false, allied: false, specialty: 'food' },
-];
-
-/** Sveže kopije definicij klanov (za nov state). */
-export function generateOtherClans(): OtherClan[] {
-  return OTHER_CLAN_DEFS.map(c => ({ ...c }));
-}
-
 const CLAN_POS = { q: 0, r: MAP_ROWS - 1 };
 const CORE_POS = { q: MAP_COLS - 1, r: 0 };
+
+/** Fisher-Yates shuffle s seedanim RNG. */
+function shufflePositions(arr: Array<{q:number,r:number}>, rng: RNGState): [Array<{q:number,r:number}>, RNGState] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    let idx: number;
+    [idx, rng] = rngInt(rng, 0, i + 1);
+    [a[i], a[idx]] = [a[idx], a[i]];
+  }
+  return [a, rng];
+}
+
+/** Generiraj naključne pozicije za šibke točke in klane (en klic na novo igro). */
+export function randomizePlacements(rngSeed: number): {
+  wpPositions: Record<string, {q:number, r:number}>;
+  clanDefs: OtherClan[];
+} {
+  // Vsi veljavni heksi razen kampa, AI jedra in neposrednih sosedov kampa
+  const candidates: Array<{q:number,r:number}> = [];
+  for (let r = 0; r < MAP_ROWS; r++) {
+    for (let q = 0; q < MAP_COLS; q++) {
+      if (q === CLAN_POS.q && r === CLAN_POS.r) continue;  // kamp
+      if (q === CORE_POS.q && r === CORE_POS.r) continue;  // AI jedro
+      if (hexDistance({q,r}, CLAN_POS) < 2) continue;       // preblizu kampa
+      candidates.push({q, r});
+    }
+  }
+
+  let rng = createRNG(rngSeed);
+  let shuffled: Array<{q:number,r:number}>;
+  [shuffled, rng] = shufflePositions(candidates, rng);
+
+  // Prvih 3 = šibke točke, naslednjih 3 = klani
+  const [wp0, wp1, wp2, cl0, cl1, cl2] = shuffled;
+
+  const wpPositions: Record<string, {q:number,r:number}> = {
+    wp_power: wp0,
+    wp_comm:  wp1,
+    wp_core:  wp2,
+  };
+
+  const clanDefs: OtherClan[] = [
+    { id: 'clan_north', label: 'Severni klan',  q: cl0.q, r: cl0.r, discovered: false, allied: false, specialty: 'people' },
+    { id: 'clan_east',  label: 'Vzhodni klan',  q: cl1.q, r: cl1.r, discovered: false, allied: false, specialty: 'material' },
+    { id: 'clan_mid',   label: 'Dolinski klan', q: cl2.q, r: cl2.r, discovered: false, allied: false, specialty: 'food' },
+  ];
+
+  return { wpPositions, clanDefs };
+}
+
+/** Sveže kopije klanov — za backward compat (brez randomizacije). */
+export function generateOtherClans(): OtherClan[] {
+  return [
+    { id: 'clan_north', label: 'Severni klan',  q: 1, r: 0, discovered: false, allied: false, specialty: 'people' },
+    { id: 'clan_east',  label: 'Vzhodni klan',  q: 4, r: 3, discovered: false, allied: false, specialty: 'material' },
+    { id: 'clan_mid',   label: 'Dolinski klan', q: 2, r: 1, discovered: false, allied: false, specialty: 'food' },
+  ];
+}
 
 export function hexDistance(a: { q: number; r: number }, b: { q: number; r: number }): number {
   const aq = a.q, ar = a.r, as_ = -aq - ar;
@@ -47,18 +95,22 @@ export function visibilityFromProgress(p: number): Visibility {
   return 'revealed';
 }
 
-/** Generiraj heks mapo. Klan: progress=1. Sosednji klanu: progress=0.40 (delno znano). Ostali: 0. */
-export function generateMap(): HexTile[] {
+/** Generiraj heks mapo. Sprejme pozicije šibkih točk in klanov (ali uporabi privzete fiksne). */
+export function generateMap(
+  wpPositions?: Record<string, {q:number,r:number}>,
+  clanDefs?: OtherClan[],
+): HexTile[] {
   const maxDist = hexDistance(CLAN_POS, CORE_POS);
 
-  const wpAssign: Record<string, { q: number; r: number }> = {
+  const wpAssign: Record<string, { q: number; r: number }> = wpPositions ?? {
     wp_power: { q: 2, r: 3 },
     wp_comm:  { q: 3, r: 2 },
     wp_core:  { q: 4, r: 1 },
   };
 
+  const clansToUse = clanDefs ?? generateOtherClans();
   const clanTileMap: Record<string, string> = {};
-  for (const c of OTHER_CLAN_DEFS) clanTileMap[`${c.q},${c.r}`] = c.id;
+  for (const c of clansToUse) clanTileMap[`${c.q},${c.r}`] = c.id;
 
   const tiles: HexTile[] = [];
   const clanNeighbors = new Set(neighbors(CLAN_POS).map(n => tileId(n)));
