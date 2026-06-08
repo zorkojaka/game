@@ -2823,9 +2823,9 @@ export default function App() {
     setLoading(true);
     try {
       const newExps: NewExpeditionInput[] = [...pendingExpeditions];
-      // Če uporabnik ni potrdil tekoče poti a ima veljaven draft, ga pošlji tudi (z vrsto trenutnega zavihka)
+      // Če uporabnik ni potrdil tekoče poti a ima veljaven draft, ga pošlji tudi z dejansko izbrano vrsto.
       if (draftPath.length >= 2 && draftPeople > 0) {
-        newExps.push(buildDraftInput(tab === 'attack' ? 'attack' : draftKind));
+        newExps.push(buildDraftInput(draftKind));
       }
       const safeResearchObj = normalizeResearchObjective(
         researchObj,
@@ -3634,7 +3634,7 @@ export default function App() {
             </span>
           </div>
           <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
-            draftKind={tab === 'attack' ? 'attack' : draftKind}
+            draftKind={draftKind}
             plannedPaths={pendingExpeditions.map(e => ({ path: e.path, kind: e.kind }))}
             onPathClick={handlePathClick}
             onWpSelect={(id) => setTargetWP(targetWP === id ? '' : id)}
@@ -3655,7 +3655,11 @@ export default function App() {
             draftPeople={draftPeople}
             draftRations={draftRations}
             draftStealth={draftStealth}
-            onDraftKind={(k) => setDraftKind(k)}
+            onDraftKind={(k) => {
+              setDraftKind(k);
+              setTab(k === 'attack' ? 'attack' : 'map');
+              setLeftOpen(true);
+            }}
             onDraftPeople={(d) => {
               if (d > 0) { if (!(assignedHome + plannedTotal + draftPeople >= availablePop || weaponsLeft <= 0)) setDraftPeople(draftPeople + 1); }
               else setDraftPeople(Math.max(1, draftPeople - 1));
