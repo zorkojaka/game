@@ -6,6 +6,7 @@ import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api
 import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, researchMult } from '../../src/engine/constants';
 import { missionSuccessProbability } from '../../src/engine/game';
 import { logicalWeaknessBonus } from '../../src/engine/combat';
+import { MAP_COLS, MAP_ROWS } from '../../src/engine/map';
 
 // ─── Konstante ───────────────────────────────────────────────────────────────
 
@@ -1181,6 +1182,7 @@ interface RoundEventCardData {
   id: string;
   kind: RoundEventKind;
   tone: 'good' | 'bad' | 'warn' | 'info';
+  image: string;
   eyebrow: string;
   title: string;
   body: string;
@@ -1198,10 +1200,35 @@ function aiNodeLabel(game: GameState, id: string): string {
   return game.aiTree?.find(n => n.id === id)?.label ?? id;
 }
 
+const ROUND_EVENT_IMAGES = {
+  raidAttack: '/assets/events/raid-ai-attack.png',
+  raidDefense: '/assets/events/raid-defense-holds.png',
+  breachFood: '/assets/events/breach-food.png',
+  breachWorkshop: '/assets/events/breach-workshop.png',
+  research: '/assets/events/research-breakthrough.png',
+  artifact: '/assets/events/artifact.png',
+  weakpoint: '/assets/events/weakpoint-destroyed.png',
+} as const;
+
+function defaultRoundEventImage(kind: RoundEventKind, tone: RoundEventCardData['tone']): string {
+  if (kind === 'raid') return tone === 'good' ? ROUND_EVENT_IMAGES.raidDefense : ROUND_EVENT_IMAGES.raidAttack;
+  if (kind === 'breach-food') return ROUND_EVENT_IMAGES.breachFood;
+  if (kind === 'breach-workshop') return ROUND_EVENT_IMAGES.breachWorkshop;
+  if (kind === 'breach-research') return ROUND_EVENT_IMAGES.research;
+  if (kind === 'breach-defense') return ROUND_EVENT_IMAGES.raidAttack;
+  if (kind === 'combat-win' || kind === 'weakpoint') return ROUND_EVENT_IMAGES.weakpoint;
+  if (kind === 'combat-loss' || kind === 'phase') return ROUND_EVENT_IMAGES.raidAttack;
+  if (kind === 'research') return ROUND_EVENT_IMAGES.research;
+  if (kind === 'artifact') return ROUND_EVENT_IMAGES.artifact;
+  return tone === 'bad' ? ROUND_EVENT_IMAGES.raidAttack : ROUND_EVENT_IMAGES.raidDefense;
+}
+
 function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardData[] {
   if (!log) return [];
   const cards: RoundEventCardData[] = [];
-  const add = (card: RoundEventCardData) => cards.push(card);
+  const add = (card: Omit<RoundEventCardData, 'image'> & { image?: string }) => {
+    cards.push({ ...card, image: card.image ?? defaultRoundEventImage(card.kind, card.tone) });
+  };
 
   if (log.raid?.occurred && log.raid.outcome) {
     const r = log.raid;
@@ -1515,72 +1542,83 @@ function EventLog({ entries }: { entries: EventEntry[] }) {
   );
 }
 
-function RoundEventScene({ kind }: { kind: RoundEventKind }) {
+function RoundEventScene({ card }: { card: RoundEventCardData }) {
+  const kind = card.kind;
   const isBreach = kind.startsWith('breach');
+  const hasImage = card.image.length > 0;
   return (
-    <div className={`rec-scene rec-scene-${kind} ${isBreach ? 'rec-scene-breach' : ''}`} aria-hidden="true">
-      <div className="rec-sky" />
-      <div className="rec-terrain">
-        <span className="rec-hex h1" />
-        <span className="rec-hex h2" />
-        <span className="rec-hex h3" />
-      </div>
-      {(kind === 'raid' || isBreach) && (
+    <div className={`rec-scene rec-scene-${kind} ${isBreach ? 'rec-scene-breach' : ''} ${hasImage ? 'has-image' : ''}`} aria-hidden="true">
+      {hasImage ? (
         <>
-          <div className="rec-camp">
-            <span className="rec-wall" />
-            <span className="rec-tent t1" />
-            <span className="rec-tent t2" />
-          </div>
-          {kind === 'breach-food' && <div className="rec-area-symbol rec-food"><span /><span /><span /></div>}
-          {kind === 'breach-workshop' && <div className="rec-area-symbol rec-workshop"><span /><span /></div>}
-          {kind === 'breach-research' && <div className="rec-area-symbol rec-research"><span /><span /><span /></div>}
-          {kind === 'breach-defense' && <div className="rec-area-symbol rec-defense"><span /><span /><span /></div>}
-          <div className="rec-robots">
-            <span />
-            <span />
-            <span />
-          </div>
-          <span className="rec-impact" />
+          <img className="rec-image" src={card.image} alt="" draggable={false} />
+          <div className="rec-image-shade" />
         </>
-      )}
-      {(kind === 'combat-win' || kind === 'combat-loss' || kind === 'weakpoint') && (
+      ) : (
         <>
-          <div className="rec-fighters humans"><span /><span /><span /></div>
-          <div className="rec-fighters bots"><span /><span /><span /></div>
-          <span className="rec-blast" />
+          <div className="rec-sky" />
+          <div className="rec-terrain">
+            <span className="rec-hex h1" />
+            <span className="rec-hex h2" />
+            <span className="rec-hex h3" />
+          </div>
+          {(kind === 'raid' || isBreach) && (
+            <>
+              <div className="rec-camp">
+                <span className="rec-wall" />
+                <span className="rec-tent t1" />
+                <span className="rec-tent t2" />
+              </div>
+              {kind === 'breach-food' && <div className="rec-area-symbol rec-food"><span /><span /><span /></div>}
+              {kind === 'breach-workshop' && <div className="rec-area-symbol rec-workshop"><span /><span /></div>}
+              {kind === 'breach-research' && <div className="rec-area-symbol rec-research"><span /><span /><span /></div>}
+              {kind === 'breach-defense' && <div className="rec-area-symbol rec-defense"><span /><span /><span /></div>}
+              <div className="rec-robots">
+                <span />
+                <span />
+                <span />
+              </div>
+              <span className="rec-impact" />
+            </>
+          )}
+          {(kind === 'combat-win' || kind === 'combat-loss' || kind === 'weakpoint') && (
+            <>
+              <div className="rec-fighters humans"><span /><span /><span /></div>
+              <div className="rec-fighters bots"><span /><span /><span /></div>
+              <span className="rec-blast" />
+            </>
+          )}
+          {kind === 'research' && (
+            <div className="rec-lab">
+              <span className="rec-node n1" />
+              <span className="rec-node n2" />
+              <span className="rec-node n3" />
+              <span className="rec-link l1" />
+              <span className="rec-link l2" />
+            </div>
+          )}
+          {kind === 'artifact' && (
+            <div className="rec-artifact">
+              <span className="rec-gem" />
+              <span className="rec-ring r1" />
+              <span className="rec-ring r2" />
+            </div>
+          )}
+          {kind === 'expedition' && (
+            <div className="rec-expedition">
+              <span className="rec-path-dot d1" />
+              <span className="rec-path-dot d2" />
+              <span className="rec-path-dot d3" />
+              <span className="rec-party" />
+            </div>
+          )}
+          {kind === 'phase' && (
+            <div className="rec-phase-core">
+              <span className="rec-core" />
+              <span className="rec-scan s1" />
+              <span className="rec-scan s2" />
+            </div>
+          )}
         </>
-      )}
-      {kind === 'research' && (
-        <div className="rec-lab">
-          <span className="rec-node n1" />
-          <span className="rec-node n2" />
-          <span className="rec-node n3" />
-          <span className="rec-link l1" />
-          <span className="rec-link l2" />
-        </div>
-      )}
-      {kind === 'artifact' && (
-        <div className="rec-artifact">
-          <span className="rec-gem" />
-          <span className="rec-ring r1" />
-          <span className="rec-ring r2" />
-        </div>
-      )}
-      {kind === 'expedition' && (
-        <div className="rec-expedition">
-          <span className="rec-path-dot d1" />
-          <span className="rec-path-dot d2" />
-          <span className="rec-path-dot d3" />
-          <span className="rec-party" />
-        </div>
-      )}
-      {kind === 'phase' && (
-        <div className="rec-phase-core">
-          <span className="rec-core" />
-          <span className="rec-scan s1" />
-          <span className="rec-scan s2" />
-        </div>
       )}
     </div>
   );
@@ -1603,7 +1641,7 @@ function RoundEventOverlay({ cards, onClose }: { cards: RoundEventCardData[]; on
           <span className="rec-count">DOGODEK {idx + 1}/{cards.length}</span>
           <button className="rec-skip" onClick={onClose}>Preskoči</button>
         </div>
-        <RoundEventScene kind={card.kind} />
+        <RoundEventScene card={card} />
         <div className="rec-copy">
           <div className="rec-eyebrow">{card.eyebrow}</div>
           <h2>{card.title}</h2>
@@ -3275,6 +3313,38 @@ export default function App() {
     setDraftPath([...draftPath, tile]);
   }
 
+  /** Pohlepna najkrajša pot od kampa do ciljnega heksa (vključno z obema). */
+  function pathFromCampTo(target: { q: number; r: number }): Array<{ q: number; r: number }> {
+    const clan = game?.mapTiles?.find(t => t.isClanCamp);
+    if (!clan) return [];
+    const path: Array<{ q: number; r: number }> = [{ q: clan.q, r: clan.r }];
+    let cur = { q: clan.q, r: clan.r };
+    let guard = 0;
+    while (!(cur.q === target.q && cur.r === target.r) && guard++ < 64) {
+      let best: { q: number; r: number } | undefined;
+      let bestD = Infinity;
+      for (const d of PATH_NEIGHBOR_DIRS) {
+        const n = { q: cur.q + d.q, r: cur.r + d.r };
+        if (n.q < 0 || n.q >= MAP_COLS || n.r < 0 || n.r >= MAP_ROWS) continue;
+        const dist = hexDistFE(n, target);
+        if (dist < bestD) { bestD = dist; best = n; }
+      }
+      if (!best) break;
+      cur = best;
+      path.push(cur);
+    }
+    return path;
+  }
+
+  /** Izberi odkrito šibko točko v zavihku Napad → samodejno nariše napadalno pot do nje. */
+  function selectWeakPointAttack(wp: AIWeakPoint) {
+    const tile = game?.mapTiles?.find(t => t.hidesWeakPointId === wp.id);
+    if (!tile) return;
+    setDraftKind('attack');
+    setTargetWP(wp.id);
+    setDraftPath(pathFromCampTo({ q: tile.q, r: tile.r }));
+  }
+
   // Statistike za draft pot (mesecev + tveganje)
   const TILES_PER_MONTH_FE = 1;  // en korak = en mesec
   const draftPathTiles = Math.max(0, draftPath.length - 1);
@@ -3908,6 +3978,44 @@ export default function App() {
               <InfoButton kind="attack" />
             </div>
             <div className="pb-instr dim small">Nariši pot do AI jedra (☣) ali šibke točke (◆). Odpravo nastaviš tudi na zadnjem heksu. Spopad ob prihodu, preživeli se vrnejo.</div>
+
+            {/* GRAFIČNE ŠIBKE TOČKE — skrite dokler niso odkrite; klik nariše napadalno pot */}
+            <div className="def-card wp-attack-card">
+              <div className="def-card-title">ŠIBKE TOČKE AI</div>
+              <div className="wp-attack-grid">
+                {game.aiWeakPoints.map(wp => {
+                  const dead = wp.exploited;
+                  const known = wp.discovered && !dead;
+                  const sel = targetWP === wp.id && known;
+                  const tile = game.mapTiles?.find(t => t.hidesWeakPointId === wp.id);
+                  const cls = dead ? 'dead' : known ? (sel ? 'known selected' : 'known') : 'locked';
+                  const hasArt = (game.resources.artifacts ?? 0) > 0;
+                  return (
+                    <div key={wp.id} className={`wp-chip ${cls}`}
+                      onClick={() => { if (known && tile) selectWeakPointAttack(wp); }}>
+                      <div className="wp-chip-icon">{dead ? '✓' : known ? '◆' : '🔒'}</div>
+                      <div className="wp-chip-label">{known || dead ? wp.label : '??? neodkrita'}</div>
+                      {known && tile && <div className="wp-chip-sub">({tile.q},{tile.r}){sel ? ' · cilj napada' : ''}</div>}
+                      {dead && <div className="wp-chip-sub">uničena</div>}
+                      {!known && !dead && <div className="wp-chip-sub dim">razišči heks (≥ 50 %)</div>}
+                      {known && hasArt && (
+                        <button className={`wp-art-btn${artifactTargetWp === wp.id ? ' on' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); setArtifactTargetWp(artifactTargetWp === wp.id ? '' : wp.id); }}>
+                          💎 {artifactTargetWp === wp.id ? '✓ uniči ob izvedbi' : `uniči z artefaktom`}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {(game.resources.artifacts ?? 0) > 0 && (
+                <div className="def-stat-note">💎 Imaš <b style={{ color: '#ffd84a' }}>{game.resources.artifacts}</b> artefakt(ov) — izberi odkrito šibko točko in jo uniči brez napada (sproži se ob potezi).</div>
+              )}
+              {!game.aiWeakPoints.some(w => w.discovered || w.exploited) && (
+                <div className="def-stat-note dim">Nobena šibka točka še ni odkrita. Pošlji izvidnike, da raziščejo hekse.</div>
+              )}
+            </div>
+
             {draftPath.length < 2 ? (
               <div className="map-hint">Pot je prazna. Klikni sosednji heks ⌂ klana za začetek poti do cilja.</div>
             ) : (() => {
