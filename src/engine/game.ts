@@ -7,7 +7,7 @@ import { rngInt, rngNext, seedFromString } from './rng.js';
 import { resolveCombat } from './combat.js';
 import { revealTreeByInsight, revealNodeRetroactive } from './fog.js';
 import { generateMap, generateOtherClans, randomizePlacements } from './map.js';
-import { tickExpedition, returnMonths, roundTripMonths } from './expedition.js';
+import { tickExpedition, roundTripMonths, pathToCamp } from './expedition.js';
 import type { Expedition } from './types.js';
 import { calcAISurveillanceGain, generateAITree, generateAIWeakPoints, DEFAULT_GENOME } from './ai-brain.js';
 import {
@@ -151,7 +151,7 @@ export function raidRepelProbability(state: GameState, assignment: Assignment): 
   const intelB = intelCombatBonus(state);
   const weaponMult = researchMult(state.weaponResearchLevel ?? 0);  // raziskava orožja ×2/level
   const wallMult = researchMult(state.wallResearchLevel ?? 0);      // raziskava obzidja ×2/level
-  const wallBonus = 1 + 0.20 * wallMult * (state.wallsBuilt ?? 0);  // vsak zid: +20 % (× raziskava)
+  const wallBonus = 1 + 0.02 * wallMult * (state.wallsBuilt ?? 0);  // vsak zid: +2 % (× raziskava)
   const base = defenders * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult;
   const equip = Math.min(state.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT * weaponMult;
   const defStr = (base + equip) * (1 + intelB) * wallBonus;
@@ -498,7 +498,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
           wallsBuilt += made;
           material -= made * WALL_MATERIAL_COST;
           wallProgress -= made * WALL_WORKER_MONTHS;
-          workshopEvents.push(`🧱 Obrambno obzidje dograjeno! +${made} obzidje (−${made * WALL_MATERIAL_COST} materiala). Skupaj ${wallsBuilt}, +${20*made} % obrambe. Napredek: ${wallProgress}/${WALL_WORKER_MONTHS}.`);
+          workshopEvents.push(`🧱 Obrambno obzidje dograjeno! +${made} obzidje (−${made * WALL_MATERIAL_COST} materiala). Skupaj ${wallsBuilt}, +${2*made} % obrambe. Napredek: ${wallProgress}/${WALL_WORKER_MONTHS}.`);
         } else {
           workshopEvents.push(`🧱 Gradnja obzidja: ${wallProgress}/${WALL_WORKER_MONTHS} delavec-mesecev.`);
         }
@@ -643,6 +643,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   const oldCompletedExps = state.completedExpeditions ?? [];
   const tickedExps: Expedition[] = [];
   const finishedExps: Expedition[] = [];
+  let returnedThisMonth = 0;  // ljudje, ki so se TA mesec vrnili v kamp — izvzeti iz lakote/obrokov (hrano so imeli s seboj)
 
   // Opis nošenega plena za dnevnik
   const carriedStr = (c: { material: number; weapons: number; artifacts: number }) => {
@@ -658,21 +659,30 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   for (const inp of incomingExps) {
     if (!inp.path || inp.path.length < 2) continue;
     if (inp.assigned < 1) continue;
+    // VARNOST: nikoli ne pošlji več ljudi, kot jih je dejansko v kampu (prepreči negativno populacijo).
+    const take = Math.min(inp.assigned, Math.max(0, population));
+    if (take < 1) {
+      expeditionEvents.push(`⚠ Odprava preklicana — v kampu ni dovolj ljudi.`);
+      continue;
+    }
+    if (take < inp.assigned) {
+      expeditionEvents.push(`⚠ Odprava zmanjšana na ${take} ljudi (v kampu jih ni bilo dovolj za ${inp.assigned}).`);
+    }
     const [idRoll, rngId] = rngInt(rng, 1000, 9999); rng = rngId;
-    population -= inp.assigned;
+    population -= take;
     // Hrana za celotno pot TJA IN NAZAJ, vzeta iz zalog upfront
     const months = Math.max(1, roundTripMonths(inp.path));
     const eTier = RATIONS_LEVELS[inp.rations] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
-    const foodPack = Math.round(inp.assigned * months * eTier.foodMult);
+    const foodPack = Math.round(take * months * eTier.foodMult);
     survival = Math.max(0, survival - foodPack);
-    expeditionEvents.push(`🎒 Odprava (${inp.assigned} ljudi, ${months}m tja+nazaj) vzela ${foodPack} hrane s seboj.`);
+    expeditionEvents.push(`🎒 Odprava (${take} ljudi, ${months}m tja+nazaj) vzela ${foodPack} hrane s seboj.`);
     newlyCreated.push({
       id: `exp_${state.totalRounds}_${idRoll}`,
       kind: inp.kind,
       weakPointId: inp.weakPointId,
       path: inp.path,
       currentIndex: 0,
-      assigned: inp.assigned,
+      assigned: take,
       rations: inp.rations,
       status: 'traveling',
       monthsElapsed: 0,
@@ -682,23 +692,6 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   }
 
   for (const e of [...oldExps, ...newlyCreated]) {
-    // POVRATNI LEG — preživeli se vračajo v kamp (odštevanje mesecev)
-    if (e.status === 'returning') {
-      const rem = (e.returnRemaining ?? 1) - 1;
-      if (rem <= 0) {
-        population += Math.max(0, e.assigned);
-        // dostava nošenega plena šele zdaj — ob vrnitvi v kamp
-        const c = e.carried ?? { material: 0, weapons: 0, artifacts: 0 };
-        material += c.material; combat += c.weapons; artifacts += c.artifacts;
-        const cs = carriedStr(c);
-        expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${e.assigned} ljudi${cs ? ` · prinesli: ${cs}` : ''}.`);
-        finishedExps.push({ ...e, status: 'completed', returnRemaining: 0, monthsElapsed: e.monthsElapsed + 1 });
-      } else {
-        tickedExps.push({ ...e, returnRemaining: rem, monthsElapsed: e.monthsElapsed + 1 });
-      }
-      continue;
-    }
-
     const scoutEncounterUnits = Math.round(aiUnits.scouts * (1 - (logicalWeaknessByRobot({ ...state, aiTree } as GameState).scouts ? LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION : 0)));
     const r = tickExpedition(e, mapTiles, aiKnowledge, rng, scoutEncounterUnits);
     rng = r.rng;
@@ -713,6 +706,27 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
 
     // Dogodki med potjo (srečanja + najdbe)
     for (const ev of r.events) expeditionEvents.push(`🔭 ${ev}`);
+
+    // ── POVRATNI LEG — odprava potuje nazaj po NOVI poti proti kampu: raziskuje polja in je vidna na mapi ──
+    if (e.status === 'returning') {
+      if (r.exp.status === 'lost') {
+        const cs = carriedStr(carried);
+        expeditionEvents.push(`☠ Odprava izgubljena na poti domov${cs ? ` · izgubljeno: ${cs}` : ''}.`);
+        finishedExps.push({ ...r.exp, carried });
+      } else if (r.exp.currentIndex >= r.exp.path.length - 1) {
+        // prispeli v kamp — šele zdaj dostavimo ljudi in plen
+        returnedThisMonth += Math.max(0, r.exp.assigned);
+        material += carried.material; combat += carried.weapons; artifacts += carried.artifacts;
+        const cs = carriedStr(carried);
+        expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${r.exp.assigned} ljudi${cs ? ` · prinesli: ${cs}` : ''}.`);
+        finishedExps.push({ ...r.exp, status: 'completed', carried });
+      } else {
+        const stepsLeft = (r.exp.path.length - 1) - r.exp.currentIndex;
+        expeditionEvents.push(`↩ ${r.exp.assigned} se vrača — še ${stepsLeft} polj(e) do kampa.`);
+        tickedExps.push({ ...r.exp, carried });
+      }
+      continue;
+    }
 
     if (r.exp.status === 'completed' || r.exp.status === 'lost') {
       if (r.exp.status === 'completed') {
@@ -776,23 +790,24 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         } else {
           expeditionEvents.push(`✓ Izvidniška odprava dospela na (${target.q},${target.r}).`);
         }
-        // POVRATEK — preživeli se vračajo (čas glede na pot / sosednost kampa)
+        // POVRATEK — preživeli krenejo nazaj po NOVI (najkrajši) poti proti kampu in raziskujejo polja
         survivors = Math.max(0, survivors);
-        const ret = returnMonths(r.exp.path);
+        const retPath = pathToCamp(target);
         if (survivors <= 0) {
           // vsi padli na cilju → nošeni plen je izgubljen
           const cs = carriedStr(carried);
           if (cs) expeditionEvents.push(`☠ Z odpravo izgubljeno: ${cs} (nihče se ni vrnil).`);
           finishedExps.push({ ...r.exp, carried });
-        } else if (ret <= 0) {
-          population += survivors;  // zadnji heks je kamp — takoj doma
+        } else if (retPath.length <= 1) {
+          // cilj je kamp — takoj doma
+          returnedThisMonth += survivors;
           material += carried.material; combat += carried.weapons; artifacts += carried.artifacts;
           const cs = carriedStr(carried);
-          if (cs) expeditionEvents.push(`📦 Prineseno v kamp: ${cs}.`);
+          expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${survivors} ljudi${cs ? ` · prinesli: ${cs}` : ''}.`);
           finishedExps.push({ ...r.exp, carried });
         } else {
-          expeditionEvents.push(`↩ ${survivors} se vrača — še ${ret} mesec(ev) do kampa.`);
-          tickedExps.push({ ...r.exp, status: 'returning', assigned: survivors, returnRemaining: ret, carried });
+          expeditionEvents.push(`↩ ${survivors} se vrača proti kampu — še ${retPath.length - 1} polj(e).`);
+          tickedExps.push({ ...r.exp, status: 'returning', path: retPath, currentIndex: 0, assigned: survivors, carried });
         }
       } else {
         // ODPRAVA IZGUBLJENA — vsi padli; karkoli so nosili, je izgubljeno
@@ -862,7 +877,9 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   const aiKnowledgeGain = calcAISurveillanceGain(DEFAULT_GENOME, clanActivity, exposure);
   const finalAiKnowledge = Math.min(1, aiKnowledge + aiKnowledgeGain);
 
-  // 9. Stopnjevana lakota — če hrana pade pod 0, izgubljamo % populacije
+  // 9. Stopnjevana lakota — če hrana pade pod 0, izgubljamo % populacije.
+  // Ta-mesečni vrnjenci so IZVZETI iz lakote/obrokov (s seboj so imeli vnaprej plačano hrano) —
+  // dodamo jih šele po izračunu, da ne kaže lažnih žrtev ob vrnitvi.
   let finalPopulation = population;
   const isStarving = survival <= 0;
   const prevStarvStreak = state.consecutiveStarvationMonths ?? 0;
@@ -884,6 +901,12 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     if (rationsDelta > 0) {
       finalMaxPopulation = Math.max(state.maxPopulation, finalPopulation);
     }
+  }
+
+  // Ta-mesečni vrnjenci — dodani po lakoti/obrokih, nedotaknjeni
+  if (returnedThisMonth > 0) {
+    finalPopulation += returnedThisMonth;
+    finalMaxPopulation = Math.max(finalMaxPopulation, finalPopulation);
   }
 
   // 10. Statusni check — izumrtje le če je CEL klan mrtev (kamp + misije + odprave)

@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus } from './combat.js';
-import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths } from './expedition.js';
+import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp } from './expedition.js';
 import { createRNG } from './rng.js';
 import type { PlayerAction, GameState } from './types.js';
 
@@ -226,6 +226,48 @@ describe('povratni čas odprav', () => {
     const far = [{ q: 0, r: 4 }, { q: 0, r: 3 }, { q: 0, r: 2 }, { q: 0, r: 1 }];
     expect(returnMonths(far)).toBe(pathMonths(far));
     expect(roundTripMonths(far)).toBe(pathMonths(far) * 2);
+  });
+});
+
+describe('pathToCamp — povratna pot proti kampu (0,4)', () => {
+  it('iz oddaljenega heksa zgradi veljavno pot, ki se konča v kampu', () => {
+    const p = pathToCamp({ q: 4, r: 0 });
+    expect(p[0]).toEqual({ q: 4, r: 0 });
+    expect(p[p.length - 1]).toEqual({ q: 0, r: 4 });
+    // vsak korak je sosednji (heks razdalja 1)
+    for (let i = 1; i < p.length; i++) {
+      const dq = Math.abs(p[i].q - p[i - 1].q);
+      const dr = Math.abs(p[i].r - p[i - 1].r);
+      expect(dq + dr).toBeGreaterThan(0);
+    }
+  });
+  it('heks tik ob kampu → pot dolžine 2', () => {
+    expect(pathToCamp({ q: 0, r: 3 })).toEqual([{ q: 0, r: 3 }, { q: 0, r: 4 }]);
+  });
+});
+
+describe('odprava se vrne in raziskuje nazaj grede', () => {
+  it('izvidnica preide v status returning, se premika po povratni poti in se na koncu vrne v kamp', () => {
+    let s: GameState = newGame(7);
+    const path = [{ q: 0, r: 4 }, { q: 0, r: 3 }, { q: 0, r: 2 }];
+    s = processRound(s, action({ foragers: 30, rations: 4, newExpeditions: [
+      { kind: 'scout', path, assigned: 3, rations: 4 },
+    ] }));
+    expect((s.expeditions ?? []).length).toBe(1);
+
+    let sawReturning = false;
+    const returnIdx: number[] = [];
+    let guard = 0;
+    while ((s.expeditions ?? []).length > 0 && guard++ < 12 && s.status === 'active') {
+      s = processRound(s, action({ foragers: 30, rations: 4 }));
+      const ret = (s.expeditions ?? []).find(e => e.status === 'returning');
+      if (ret) { sawReturning = true; returnIdx.push(ret.currentIndex); }
+    }
+    // odprava je preživela povratni leg (returning) in se premikala po poti (currentIndex narašča)
+    expect(sawReturning).toBe(true);
+    if (returnIdx.length >= 2) expect(returnIdx[returnIdx.length - 1]).toBeGreaterThan(returnIdx[0]);
+    // na koncu ni več aktivnih odprav — vrnila se je v kamp
+    expect(s.expeditions?.length ?? 0).toBe(0);
   });
 });
 

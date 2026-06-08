@@ -11,6 +11,7 @@ import { rngNext, rngInt } from './rng.js';
 import { tileId } from './types.js';
 import {
   visibilityFromProgress, tileEncounterMultiplier, researchPerVisit, hexDistance,
+  neighbors, MAP_COLS, MAP_ROWS,
 } from './map.js';
 import {
   SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_AI_KNOWLEDGE_BONUS,
@@ -84,6 +85,30 @@ export function roundTripMonths(path: Array<{ q: number; r: number }>): number {
   return pathMonths(path) + returnMonths(path);
 }
 
+/**
+ * Pohlepna pot od poljubnega heksa do kampa (vključno z začetnim heksom in kampom).
+ * Vsak korak izbere soseda, ki je najbliže kampu — kratka, vedno veljavna pot domov.
+ * Uporabljeno za POVRATNI leg odprave (raziskuje polja nazaj grede).
+ */
+export function pathToCamp(from: { q: number; r: number }): Array<{ q: number; r: number }> {
+  const path: Array<{ q: number; r: number }> = [{ q: from.q, r: from.r }];
+  let cur = { q: from.q, r: from.r };
+  let guard = 0;
+  while (!(cur.q === CLAN_POS.q && cur.r === CLAN_POS.r) && guard++ < 64) {
+    const opts = neighbors(cur).filter(n => n.q >= 0 && n.q < MAP_COLS && n.r >= 0 && n.r < MAP_ROWS);
+    let best: { q: number; r: number } | undefined;
+    let bestD = Infinity;
+    for (const o of opts) {
+      const d = hexDistance(o, CLAN_POS);
+      if (d < bestD) { bestD = d; best = o; }
+    }
+    if (!best) break;
+    cur = { q: best.q, r: best.r };
+    path.push(cur);
+  }
+  return path;
+}
+
 // Verjetnosti najdb na neraziskanem polju
 export const FIND_MATERIAL_CHANCE = 0.12;  // mala možnost — 12 %
 export const FIND_WEAPON_CHANCE   = 0.025; // zelo redko — 2.5 %
@@ -99,7 +124,8 @@ export function tickExpedition(
   rng: RNGState,
   aiScouts: number = ENCOUNTER_SCOUT_REFERENCE,
 ): { exp: Expedition; tiles: HexTile[]; rng: RNGState; populationDelta: number; events: string[]; finds: ExpeditionFinds } {
-  if (exp.status !== 'traveling') return { exp, tiles, rng, populationDelta: 0, events: [], finds: { material: 0, weapons: 0, artifacts: 0 } };
+  // Premikamo se na ODHODNEM ('traveling') in POVRATNEM ('returning') legu — oba raziskujeta polja po poti.
+  if (exp.status !== 'traveling' && exp.status !== 'returning') return { exp, tiles, rng, populationDelta: 0, events: [], finds: { material: 0, weapons: 0, artifacts: 0 } };
 
   let newTiles = [...tiles];
   let popLoss = 0;
@@ -168,7 +194,9 @@ export function tickExpedition(
 
   let newStatus: Expedition['status'] = exp.status;
   if (lostAll) newStatus = 'lost';
-  else if (curIdx >= exp.path.length - 1) newStatus = 'completed';
+  // Odhodni leg, ki doseže cilj → 'completed' (sproži spopad/prihod v game.ts).
+  // Povratni leg ostane 'returning'; prihod v kamp game.ts zazna prek currentIndex.
+  else if (curIdx >= exp.path.length - 1 && exp.status === 'traveling') newStatus = 'completed';
 
   return {
     exp: {

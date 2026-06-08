@@ -116,7 +116,7 @@ function Gauge({ pct, color }: { pct: number; color: string }) {
 const HELP: Record<string, { title: string; rows: [string, string][] }> = {
   defense: { title: 'Kako deluje — Obramba', rows: [
     ['👥', 'Več branilcev poveča verjetnost odbitja AI napada.'],
-    ['🏰', 'Vsako zgrajeno obzidje doda +20 % k obrambi; vsaka stopnja raziskave obzidja ta bonus podvoji (×2/stopnjo).'],
+    ['🏰', 'Vsako zgrajeno obzidje doda +2 % k obrambi; vsaka stopnja raziskave obzidja ta bonus podvoji (×2/stopnjo).'],
     ['◆', 'Razkrite logične šibkosti zmanjšajo napadalno moč ustreznih AI enot pri vsakem napadu.'],
   ] },
   food: { title: 'Kako deluje — Prehrana', rows: [
@@ -126,7 +126,7 @@ const HELP: Record<string, { title: string; rows: [string, string][] }> = {
   ] },
   workshop: { title: 'Kako deluje — Delavnice', rows: [
     ['⚔', 'Orožje: 6 delavec-mes. + 1 material. Dovoli enemu borcu, da se bori z orožjem.'],
-    ['🏰', 'Obzidje: 12 delavec-mes. + 4 materiala. Vsaka stopnja doda +20 % k obrambi.'],
+    ['🏰', 'Obzidje: 12 delavec-mes. + 4 materiala. Vsaka stopnja doda +2 % k obrambi.'],
     ['💎', 'Artefakt: 360 delavec-mes. + 20 materiala. Takoj uniči eno odkrito šibko točko.'],
   ] },
   research: { title: 'Kako deluje — Raziskave', rows: [
@@ -1512,7 +1512,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
       <ul>
         <li>Verjetnost AI napada na kamp raste z močjo AI, AI znanjem o nas in številom ljudi v kampu.</li>
         <li>Branilci in obzidje <b>ne znižajo verjetnosti</b> napada — povečajo <b>verjetnost odbitja</b>.</li>
-        <li>Vsako zgrajeno obzidje doda <b>+20 %</b> obrambni moči; vsaka stopnja <b>raziskave obzidja</b> ta bonus podvoji (×2/stopnjo).</li>
+        <li>Vsako zgrajeno obzidje doda <b>+2 %</b> obrambni moči; vsaka stopnja <b>raziskave obzidja</b> ta bonus podvoji (×2/stopnjo).</li>
       </ul>
     ) },
     { id: 'raziskave', icon: '🔬', title: 'Research loop', body: (
@@ -1762,8 +1762,8 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
   const draftIdx = (t: HexTile) => draftPath.findIndex(s => s.q === t.q && s.r === t.r);
   const lastStep = draftPath[draftPath.length - 1];
 
-  // Trenutno pozicije aktivnih odprav (currentIndex tile)
-  const expPositions = expeditions.filter(e => e.status === 'traveling')
+  // Trenutno pozicije aktivnih odprav (currentIndex tile) — odhodne IN povratne
+  const expPositions = expeditions.filter(e => e.status === 'traveling' || e.status === 'returning')
     .map(e => ({ exp: e, tile: e.path[e.currentIndex] }));
 
   return (
@@ -1913,9 +1913,9 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           );
         })}
 
-        {/* Aktivne odprave: prepotovana pot (polna) + preostala pot (črtkana) */}
-        {expeditions.filter(e => e.status === 'traveling').map(e => {
-          const color = e.kind === 'mission' ? COL_ATK : COL_EXP;
+        {/* Aktivne odprave: prepotovana pot (polna) + preostala pot (črtkana) — odhod IN povratek */}
+        {expeditions.filter(e => e.status === 'traveling' || e.status === 'returning').map(e => {
+          const color = e.status === 'returning' ? '#66cc88' : e.kind === 'mission' ? COL_ATK : COL_EXP;
           return (
             <g key={`path_${e.id}`} className="path-lines" pointerEvents="none">
               {e.path.slice(0, -1).map((s, i) => {
@@ -2268,7 +2268,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
         {expPositions.map(({ exp, tile }) => {
           if (!tile) return null;
           const p = shift(hexToPixel(tile.q, tile.r, SIZE));
-          const color = exp.kind === 'mission' ? COL_ATK : COL_EXP;
+          const color = exp.status === 'returning' ? '#66cc88' : exp.kind === 'mission' ? COL_ATK : COL_EXP;
           const isActive = popExpId === exp.id;
           return (
             <g key={exp.id} className="exp-marker"
@@ -2420,7 +2420,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
 function WorkshopSelector({ value, onChange, weaponLevel, wallLevel }: { value: WorkshopObjective; onChange: (o: WorkshopObjective) => void; weaponLevel: number; wallLevel: number }) {
   const opts: Array<{ id: WorkshopObjective; icon: string; label: string; color: string; desc: string; research?: number }> = [
     { id: 'weapon',   icon: '⚔️', label: 'Orožje',   color: '#cc4433', desc: '6 delavec-mesecev za 1 orožje (−1 material). Napredek se ohrani ob preklopu.', research: weaponLevel },
-    { id: 'wall',     icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: '12 delavec-mesecev za 1 obzidje (−4 materiala). +20 % obrambe. Ohrani napredek.', research: wallLevel },
+    { id: 'wall',     icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: '12 delavec-mesecev za 1 obzidje (−4 materiala). +2 % obrambe. Ohrani napredek.', research: wallLevel },
     { id: 'artifact', icon: '💎', label: 'Artefakt', color: '#ffd84a', desc: '360 delavec-mesecev (30 let z 1 delavcem) za 1 artefakt (−20 materiala). Ohrani napredek.' },
   ];
   const sel = opts.find(o => o.id === value);
@@ -3027,7 +3027,9 @@ export default function App() {
   // Nastavi absolutno vrednost (slider) — omeji na trenutno + proste, ne more presegati skupne razpoložljive populacije.
   function setRole(which: 'd' | 'f' | 'w' | 'r', value: number) {
     const cur = { d: defenders, f: foragers, w: workers, r: researchers }[which];
-    const maxAllowed = cur + freePeople;
+    let maxAllowed = cur + freePeople;
+    // Branilci so oboroženi → ne več kot je orožja na voljo (trenutni branilci + prosto orožje)
+    if (which === 'd') maxAllowed = Math.min(maxAllowed, defenders + weaponsLeft);
     const next = Math.max(0, Math.min(maxAllowed, value));
     if (which === 'd') setDefenders(next);
     else if (which === 'f') setForagers(next);
@@ -3259,7 +3261,7 @@ export default function App() {
                   <div className="def-big-num">{defenders}<span className="def-cap"> / {weaponCap}</span></div>
                   <div className="def-slider-row">
                     <button className="pa-btn" disabled={defenders <= 0} onClick={() => bumpRole('d', -1)}>−</button>
-                    <input type="range" min={0} max={availablePop} value={defenders}
+                    <input type="range" min={0} max={Math.min(availablePop, defenders + weaponsLeft)} value={defenders}
                       onChange={e => setRole('d', +e.target.value)} className="def-slider" />
                     <button className="pa-btn" disabled={freePeople <= 0 || weaponsLeft <= 0} onClick={() => bumpRole('d', 1)}>+</button>
                   </div>
@@ -3303,7 +3305,7 @@ export default function App() {
                 <div className="def-card">
                   <div className="def-card-title">🏰 OBZIDJE</div>
                   <div className="def-wall-lvl">STOPNJA {wallLvl}</div>
-                  <div className="def-stat-note">+{wallLvl * 20}% k obrambi</div>
+                  <div className="def-stat-note">+{wallLvl * 2}% k obrambi</div>
                   <div className="def-seg">{Array.from({ length: 12 }).map((_, i) => <span key={i} className={`def-seg-cell ${i < wallProg ? 'fill' : ''}`} />)}</div>
                   <button className="def-upgrade-btn" onClick={() => { setWorkshopObj('wall'); setTab('workshop'); }}>🧱 GRADI OBZIDJE</button>
                 </div>
@@ -3709,21 +3711,19 @@ export default function App() {
                   <div key={e.id} className="exp-card">
                     <div className="exp-head">
                       <span className="exp-kind" style={{ color }}>{kindLabel} · {e.assigned} ljudi</span>
-                      <span className="dim small">→ ({target?.q},{target?.r})</span>
+                      <span className="dim small">→ {returning ? 'kamp' : `(${target?.q},${target?.r})`}</span>
                     </div>
-                    {!returning && (
-                      <div className="exp-progress">
-                        <div className="ep-track">
-                          <div className="ep-fill" style={{ width: `${(done / total) * 100}%`, background: color }} />
-                        </div>
-                        <span className="dim small">mesec {done} / {total}</span>
+                    <div className="exp-progress">
+                      <div className="ep-track">
+                        <div className="ep-fill" style={{ width: `${(done / total) * 100}%`, background: color }} />
                       </div>
-                    )}
+                      <span className="dim small">polje {done} / {total}</span>
+                    </div>
                     <div className="exp-events dim small">
                       {returning
-                        ? `↩ vrača se v kamp — še ${e.returnRemaining ?? 0} mesec(ev)`
+                        ? (remaining === 0 ? 'prihod v kamp ta mesec' : `↩ še ${remaining} polj(e) do kampa`)
                         : remaining === 0 ? 'prihod ta mesec' : `še ${remaining} mesec(ev) do cilja`}
-                      {!returning && e.encountersLog.length > 0 && ` · ${e.encountersLog.slice(-1)[0]}`}
+                      {e.encountersLog.length > 0 && ` · ${e.encountersLog.slice(-1)[0]}`}
                     </div>
                   </div>
                 );
@@ -3748,8 +3748,8 @@ export default function App() {
         <div className="bb-phases"><PhaseHeader game={game} /></div>
         <div className="bottom-actions">
           <button className="back-btn" onClick={() => setTab('food')}>← Nazaj na kamp</button>
-          <button className="exec-btn" onClick={handleRound} disabled={loading || over}>
-            {loading ? '⟳  Izvajam…' : over ? '⚠  Preveč ljudi razporejenih' : 'NASLEDNJI MESEC →'}
+          <button className="exec-btn" onClick={handleRound} disabled={loading || over || overArmed}>
+            {loading ? '⟳  Izvajam…' : over ? '⚠  Preveč ljudi razporejenih' : overArmed ? '⚠  Premalo orožja' : 'NASLEDNJI MESEC →'}
           </button>
         </div>
       </footer>
