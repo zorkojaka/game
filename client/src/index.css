@@ -1006,6 +1006,37 @@ input[type=range]::-moz-range-thumb {
   animation: impact-pulse 1s ease-out infinite;
 }
 .rec-scene-breach .rec-impact { left: 25%; bottom: 70px; border-color: rgba(204,51,51,.92); }
+.rec-area-symbol {
+  position: absolute; left: 16%; bottom: 108px; width: 100px; height: 70px;
+  filter: drop-shadow(0 0 18px rgba(204,51,51,.35));
+}
+.rec-area-symbol span { position: absolute; display: block; }
+.rec-food span {
+  bottom: 0; width: 18px; height: 54px; border-radius: 12px 12px 0 0;
+  background: linear-gradient(#bca44a, #5c4f20);
+  transform-origin: bottom center;
+}
+.rec-food span:nth-child(1) { left: 16px; transform: rotate(-14deg); }
+.rec-food span:nth-child(2) { left: 42px; height: 64px; }
+.rec-food span:nth-child(3) { left: 68px; transform: rotate(14deg); }
+.rec-workshop span {
+  border: 5px solid #8b8f86; border-radius: 50%; background: #1a1a1a;
+}
+.rec-workshop span:nth-child(1) { left: 12px; top: 8px; width: 42px; height: 42px; }
+.rec-workshop span:nth-child(2) { left: 48px; top: 24px; width: 34px; height: 34px; border-color: #a05b42; }
+.rec-research span {
+  width: 26px; height: 26px; border-radius: 50%; background: #122331; border: 2px solid #66aacc;
+  box-shadow: 0 0 18px rgba(102,170,204,.35);
+}
+.rec-research span:nth-child(1) { left: 8px; top: 30px; }
+.rec-research span:nth-child(2) { left: 38px; top: 4px; }
+.rec-research span:nth-child(3) { left: 70px; top: 34px; }
+.rec-defense span {
+  bottom: 0; width: 22px; background: #6d7563; border: 1px solid #a8b18f;
+}
+.rec-defense span:nth-child(1) { left: 16px; height: 42px; }
+.rec-defense span:nth-child(2) { left: 40px; height: 62px; }
+.rec-defense span:nth-child(3) { left: 64px; height: 42px; }
 .rec-fighters {
   position: absolute; bottom: 78px; display: flex; gap: 11px;
 }
@@ -1080,6 +1111,25 @@ input[type=range]::-moz-range-thumb {
 @keyframes impact-pulse { from { opacity: .9; transform: scale(.45); } to { opacity: 0; transform: scale(1.35); } }
 @keyframes gem-float { from { transform: translateY(8px) rotate(-2deg); } to { transform: translateY(-8px) rotate(2deg); } }
 @keyframes party-step { from { transform: translateX(-12px); } to { transform: translateX(12px); } }
+
+.map-marker.ai-core-marker {
+  animation: map-core-pulse 1.8s ease-in-out infinite alternate;
+}
+.map-marker.wp-marker {
+  animation: map-wp-pulse 1.4s ease-in-out infinite alternate;
+}
+.map-marker.camp-marker path:first-child,
+.map-marker.clan-marker path {
+  filter: drop-shadow(0 0 3px rgba(102,204,170,.25));
+}
+@keyframes map-core-pulse {
+  from { opacity: .65; }
+  to { opacity: 1; }
+}
+@keyframes map-wp-pulse {
+  from { opacity: .55; }
+  to { opacity: 1; }
+}
 
 @media (max-width: 640px) {
   .round-event-overlay { padding: 8px; align-items: end; }
