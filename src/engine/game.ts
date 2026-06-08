@@ -534,6 +534,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   // 6a. NAPAD (offensive combat — combatants gredo udariti AI)
   let population = state.population + legacyMissionReturn;
   let aiUnits = readAIUnits(state);
+  const aiUnitsBefore = { ...aiUnits };
   let aiRobots = totalAIRobots(aiUnits);
   const applyDestroy = (n: number) => { aiUnits = destroyAIUnits(aiUnits, n); aiRobots = totalAIRobots(aiUnits); };
   let aiKnowledge = state.aiKnowledge;
@@ -955,6 +956,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     round: state.round,
     phase: state.phase,
     assignment,
+    aiUnitsBefore,
+    aiUnitsAfter: { ...aiUnits },
     combat: combatLog,
     raid: raidLog,
     scout: scoutResult,

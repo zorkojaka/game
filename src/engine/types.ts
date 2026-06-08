@@ -289,6 +289,8 @@ export interface RoundLog {
   round: number;
   phase: AIPhase;
   assignment: Assignment;
+  aiUnitsBefore?: AIUnits;    // snapshot za vizualizacijo dogodkov v UI
+  aiUnitsAfter?: AIUnits;
   combat: CombatResult | null;
   raid: RaidResult | null;
   scout: ScoutResult | null;

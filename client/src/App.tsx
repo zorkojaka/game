@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
-import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan } from './types';
+import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan, AIUnits } from './types';
 import { tileId } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
-import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, researchMult } from '../../src/engine/constants';
+import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, researchMult, AI_UNIT_DEFS } from '../../src/engine/constants';
 import { missionSuccessProbability } from '../../src/engine/game';
 import { logicalWeaknessBonus } from '../../src/engine/combat';
 import { MAP_COLS, MAP_ROWS } from '../../src/engine/map';
@@ -1186,7 +1186,7 @@ interface RoundEventCardData {
   eyebrow: string;
   title: string;
   body: string;
-  stats: Array<{ label: string; value: string; tone?: 'good' | 'bad' | 'info' }>;
+  stats: RoundEventStat[];
 }
 
 const AREA_LABELS: Record<string, string> = {
@@ -1210,6 +1210,58 @@ const ROUND_EVENT_IMAGES = {
   weakpoint: '/assets/events/weakpoint-destroyed.png',
 } as const;
 
+type AIRobotType = keyof AIUnits;
+type RoundEventStat = { label: string; value: string; tone?: 'good' | 'bad' | 'info' };
+
+const ROBOT_UNIT_LABEL: Record<AIRobotType, string> = {
+  scouts: 'Izvidniki',
+  attackers: 'Napadalci',
+  peopleKillers: 'People-killerji',
+};
+
+const ROBOT_UNIT_SLUG: Record<AIRobotType, string> = {
+  scouts: 'scouts',
+  attackers: 'attackers',
+  peopleKillers: 'people-killers',
+};
+
+function dominantAIUnit(units?: AIUnits): AIRobotType {
+  const u = units ?? { scouts: 0, attackers: 0, peopleKillers: 0 };
+  const score: Record<AIRobotType, number> = {
+    scouts: (u.scouts ?? 0) * AI_UNIT_DEFS.scouts.attack,
+    attackers: (u.attackers ?? 0) * AI_UNIT_DEFS.attackers.attack,
+    peopleKillers: (u.peopleKillers ?? 0) * AI_UNIT_DEFS.peopleKillers.attack,
+  };
+  if (score.peopleKillers > 0 && score.peopleKillers >= score.attackers && score.peopleKillers >= score.scouts) return 'peopleKillers';
+  if (score.attackers > 0 && score.attackers >= score.scouts) return 'attackers';
+  return 'scouts';
+}
+
+function unitComposition(units?: AIUnits): string {
+  const u = units ?? { scouts: 0, attackers: 0, peopleKillers: 0 };
+  return `${u.scouts ?? 0}I / ${u.attackers ?? 0}N / ${u.peopleKillers ?? 0}PK`;
+}
+
+function phaseArrivalUnit(line: string): AIRobotType {
+  if (/people-killer/i.test(line)) return 'peopleKillers';
+  if (/napadal/i.test(line)) return 'attackers';
+  return 'scouts';
+}
+
+function unitEventImage(prefix: 'raid' | 'combat' | 'phase', unit: AIRobotType, suffix?: string): string {
+  const base = `/assets/events/${prefix}-${ROBOT_UNIT_SLUG[unit]}`;
+  return suffix ? `${base}-${suffix}.png` : `${base}.png`;
+}
+
+function signed(value: number): string {
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
+function pctSigned(value: number): string {
+  const n = Math.round(value * 100);
+  return n > 0 ? `+${n}%` : `${n}%`;
+}
+
 function defaultRoundEventImage(kind: RoundEventKind, tone: RoundEventCardData['tone']): string {
   if (kind === 'raid') return tone === 'good' ? ROUND_EVENT_IMAGES.raidDefense : ROUND_EVENT_IMAGES.raidAttack;
   if (kind === 'breach-food') return ROUND_EVENT_IMAGES.breachFood;
@@ -1223,6 +1275,44 @@ function defaultRoundEventImage(kind: RoundEventKind, tone: RoundEventCardData['
   return tone === 'bad' ? ROUND_EVENT_IMAGES.raidAttack : ROUND_EVENT_IMAGES.raidDefense;
 }
 
+function raidEventStats(log: RoundLog, unit: AIRobotType): RoundEventStat[] {
+  const r = log.raid;
+  if (!r) return [];
+  const losses = r.defendersLost + r.foragersLost + (r.workersLost ?? 0) + (r.researchersLost ?? 0);
+  const weaponLoss = (r.weaponsDestroyed ?? 0) + r.defendersLost;
+  const stats: RoundEventStat[] = [
+    { label: 'AI enote', value: ROBOT_UNIT_LABEL[unit], tone: 'info' },
+    { label: 'Sestava AI', value: unitComposition(log.aiUnitsBefore), tone: 'info' },
+    { label: 'Ljudje', value: signed(-losses), tone: losses > 0 ? 'bad' : 'good' },
+    { label: 'Roboti', value: signed(-r.aiRobotsDestroyed), tone: 'good' },
+    { label: 'Material', value: signed(r.aiRobotsDestroyed), tone: 'good' },
+    { label: 'Obramba', value: pct(r.successProbability), tone: 'info' },
+  ];
+  if (r.survivalDestroyed > 0) stats.push({ label: 'Hrana', value: signed(-r.survivalDestroyed), tone: 'bad' });
+  if (weaponLoss > 0) stats.push({ label: 'Orožje', value: signed(-weaponLoss), tone: 'bad' });
+  if (r.materialDestroyed > 0) stats.push({ label: 'Zaloge', value: signed(-r.materialDestroyed), tone: 'bad' });
+  if (r.wallsDestroyed > 0) stats.push({ label: 'Obzidje', value: signed(-r.wallsDestroyed), tone: 'bad' });
+  if (log.aiKnowledgeDelta > 0) stats.push({ label: 'AI ve o nas', value: pctSigned(log.aiKnowledgeDelta), tone: 'bad' });
+  return stats;
+}
+
+function combatEventStats(log: RoundLog, unit: AIRobotType): RoundEventStat[] {
+  const c = log.combat;
+  if (!c) return [];
+  const stats: RoundEventStat[] = [
+    { label: 'AI enote', value: ROBOT_UNIT_LABEL[unit], tone: 'info' },
+    { label: 'Sestava AI', value: unitComposition(log.aiUnitsBefore), tone: 'info' },
+    { label: 'Ljudje', value: signed(-c.humanLost), tone: c.humanLost > 0 ? 'bad' : 'good' },
+    { label: 'Orožje', value: signed(-c.humanLost + (c.spoils.combat ?? 0)), tone: (-c.humanLost + (c.spoils.combat ?? 0)) >= 0 ? 'good' : 'bad' },
+    { label: 'Roboti', value: signed(-c.aiRobotsDestroyed), tone: 'good' },
+    { label: 'Material', value: signed(c.aiRobotsDestroyed), tone: 'good' },
+    { label: 'Intel', value: signed(c.infoGained + (c.spoils.intelligence ?? 0)), tone: 'good' },
+    { label: 'Možnost', value: pct(c.successProbability), tone: 'info' },
+  ];
+  if (c.aiInfoGained > 0) stats.push({ label: 'AI ve o nas', value: pctSigned(c.aiInfoGained), tone: 'bad' });
+  return stats;
+}
+
 function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardData[] {
   if (!log) return [];
   const cards: RoundEventCardData[] = [];
@@ -1230,24 +1320,46 @@ function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardD
     cards.push({ ...card, image: card.image ?? defaultRoundEventImage(card.kind, card.tone) });
   };
 
+  if (log.phase === 'find' && log.round === 1 && game.totalRounds === 1) {
+    const unit: AIRobotType = 'scouts';
+    add({
+      id: `phase-scouts-${log.round}`,
+      kind: 'phase',
+      tone: 'warn',
+      image: unitEventImage('phase', unit),
+      eyebrow: 'AI eskalacija',
+      title: `${ROBOT_UNIT_LABEL[unit]} iščejo kamp`,
+      body: 'AI začne z izvidniškimi enotami mapirati območje in iskati človeške tabore.',
+      stats: [
+        { label: 'Nova enota', value: ROBOT_UNIT_LABEL[unit], tone: 'bad' },
+        { label: 'AI sestava', value: unitComposition(log.aiUnitsBefore ?? game.aiUnits), tone: 'info' },
+        { label: 'Faza', value: PHASE.find.full, tone: 'info' },
+      ],
+    });
+  }
+
   if (log.raid?.occurred && log.raid.outcome) {
     const r = log.raid;
-    const losses = r.defendersLost + r.foragersLost + (r.workersLost ?? 0) + (r.researchersLost ?? 0);
+    const outcome = r.outcome as NonNullable<typeof r.outcome>;
     const breached = r.breachedAreas ?? [];
+    const raidUnit = dominantAIUnit(log.aiUnitsBefore);
     add({
       id: `raid-${log.round}`,
       kind: 'raid',
-      tone: r.outcome === 'victory' ? 'good' : r.outcome === 'partial' ? 'warn' : 'bad',
+      tone: outcome === 'victory' ? 'good' : outcome === 'partial' ? 'warn' : 'bad',
+      image: unitEventImage('raid', raidUnit, outcome),
       eyebrow: 'AI napad na kamp',
-      title: r.outcome === 'victory' ? 'Obramba je zdržala' : r.outcome === 'partial' ? 'Kamp je delno prebit' : 'AI je razbil obrambo',
+      title: outcome === 'victory'
+        ? `${ROBOT_UNIT_LABEL[raidUnit]} ustavljeni`
+        : outcome === 'partial'
+          ? `${ROBOT_UNIT_LABEL[raidUnit]} delno prebijejo kamp`
+          : outcome === 'defeat'
+            ? `${ROBOT_UNIT_LABEL[raidUnit]} razbijejo obrambo`
+            : `${ROBOT_UNIT_LABEL[raidUnit]} opustošijo kamp`,
       body: breached.length > 0
         ? `Prebita območja: ${breached.map(a => AREA_LABELS[a] ?? a).join(', ')}.`
         : 'Napad je bil ustavljen pred notranjimi območji kampa.',
-      stats: [
-        { label: 'Padli ljudje', value: `${losses}`, tone: losses > 0 ? 'bad' : 'good' },
-        { label: 'Uničeni roboti', value: `${r.aiRobotsDestroyed}`, tone: 'good' },
-        { label: 'Obramba', value: pct(r.successProbability), tone: 'info' },
-      ],
+      stats: raidEventStats(log, raidUnit),
     });
     for (const area of breached) {
       const kind = (`breach-${area}` as RoundEventKind);
@@ -1277,18 +1389,16 @@ function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardD
   if (log.combat) {
     const c = log.combat;
     const won = c.outcome === 'victory' || c.outcome === 'partial';
+    const combatUnit = dominantAIUnit(log.aiUnitsBefore);
     add({
       id: `combat-${log.round}`,
       kind: won ? 'combat-win' : 'combat-loss',
       tone: won ? 'good' : 'bad',
+      image: unitEventImage('combat', combatUnit, won ? 'win' : 'loss'),
       eyebrow: 'Spopad z AI',
-      title: won ? 'Napad je uspel' : 'Napad je spodletel',
+      title: won ? `Napad na ${ROBOT_UNIT_LABEL[combatUnit].toLowerCase()} je uspel` : `${ROBOT_UNIT_LABEL[combatUnit]} odbijejo napad`,
       body: won ? 'Ekipa je prebila AI odpor in prinesla novo znanje.' : 'AI je odbil napad in povzročil izgube.',
-      stats: [
-        { label: 'Padli ljudje', value: `${c.humanLost}`, tone: c.humanLost > 0 ? 'bad' : 'good' },
-        { label: 'Uničeni roboti', value: `${c.aiRobotsDestroyed}`, tone: 'good' },
-        { label: 'Možnost', value: pct(c.successProbability), tone: 'info' },
-      ],
+      stats: combatEventStats(log, combatUnit),
     });
   }
 
@@ -1347,15 +1457,21 @@ function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardD
         body: line.replace(/^[^\s]+ /, ''),
         stats: [{ label: 'Izid', value: lost ? 'izgube' : 'uspeh', tone: lost ? 'bad' : 'good' }],
       });
-    } else if (/Nova faza|AI je pripeljal|people-killer/.test(line)) {
+    } else if (/AI je pripeljal/.test(line)) {
+      const unit = phaseArrivalUnit(line);
       add({
         id: `phase-${log.round}-${idx}`,
         kind: 'phase',
         tone: 'warn',
+        image: unitEventImage('phase', unit),
         eyebrow: 'AI eskalacija',
-        title: PHASE[log.phase].label,
+        title: `${ROBOT_UNIT_LABEL[unit]} vstopijo v vojno`,
         body: line.replace(/^[^\s]+ /, ''),
-        stats: [{ label: 'Faza', value: PHASE[log.phase].full, tone: 'info' }],
+        stats: [
+          { label: 'Nova enota', value: ROBOT_UNIT_LABEL[unit], tone: 'bad' },
+          { label: 'AI sestava', value: unitComposition(log.aiUnitsAfter ?? game.aiUnits), tone: 'info' },
+          { label: 'Faza', value: PHASE[game.phase].full, tone: 'info' },
+        ],
       });
     }
   });
