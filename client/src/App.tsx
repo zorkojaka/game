@@ -2972,41 +2972,49 @@ function StartScreen({ onNew, loading }: { onNew: () => void; loading: boolean }
 }
 
 /** Game over screen */
+function endScreenImage(status: GameState['status']): string {
+  if (status === 'victory') return '/assets/screens/end-victory.png';
+  if (status === 'defeat_extinction') return '/assets/screens/end-extinction.png';
+  return '/assets/screens/end-overwhelmed.png';
+}
+
 function GameOverScreen({ game, onNew, loading }: { game: GameState; onNew: () => void; loading: boolean }) {
   const won = game.status === 'victory';
   const exploited = game.aiWeakPoints.filter(w => w.exploited).length;
   const revealed  = game.aiTree.filter(n => n.visibility === 'revealed').length;
   const c = won ? '#22cc66' : '#cc3333';
   return (
-    <div className="gameover">
-      <div className="go-header" style={{ borderColor: c }}>
-        <div className="go-status" style={{ color: c }}>
-          {won ? '✓ ZMAGA' : '✗ LINIJA ZAKLJUČENA'}
-        </div>
-        <p className="go-reason dim">
-          {game.status === 'defeat_extinction'   && 'Populacija je padla na nič. Klan je izumrl.'}
-          {game.status === 'defeat_overwhelmed'  && 'AI je pridobil popolno sliko o klanu.'}
-          {won && 'Klan je ustavil AI. Človeštvo preživi.'}
-        </p>
-      </div>
-      <div className="go-stats">
-        {[
-          ['Trajanje',         `${game.totalRounds} / 36 rund`],
-          ['Zadnja faza',      PHASE[game.phase].full],
-          ['Preživeli',        `${game.population} / ${game.maxPopulation}`],
-          ['AI načrt odkrit',  `${revealed} / ${game.aiTree.length} vozlišč`],
-          ['Šibke točke',      `${exploited} / ${game.aiWeakPoints.length} uničenih`],
-          ['Replay seed',      `${game.rngSeed}`],
-        ].map(([k, v]) => (
-          <div key={k} className="go-stat">
-            <span className="go-k dim">{k}</span>
-            <span className="go-v">{v}</span>
+    <div className="gameover" style={{ '--go-image': `url(${endScreenImage(game.status)})` } as React.CSSProperties}>
+      <div className="gameover-inner">
+        <div className="go-header" style={{ borderColor: c }}>
+          <div className="go-status" style={{ color: c }}>
+            {won ? '✓ ZMAGA' : '✗ LINIJA ZAKLJUČENA'}
           </div>
-        ))}
+          <p className="go-reason dim">
+            {game.status === 'defeat_extinction'   && 'Populacija je padla na nič. Klan je izumrl.'}
+            {game.status === 'defeat_overwhelmed'  && 'AI je pridobil popolno sliko o klanu.'}
+            {won && 'Klan je ustavil AI. Človeštvo preživi.'}
+          </p>
+        </div>
+        <div className="go-stats">
+          {[
+            ['Trajanje',         `${game.totalRounds} / 36 rund`],
+            ['Zadnja faza',      PHASE[game.phase].full],
+            ['Preživeli',        `${game.population} / ${game.maxPopulation}`],
+            ['AI načrt odkrit',  `${revealed} / ${game.aiTree.length} vozlišč`],
+            ['Šibke točke',      `${exploited} / ${game.aiWeakPoints.length} uničenih`],
+            ['Replay seed',      `${game.rngSeed}`],
+          ].map(([k, v]) => (
+            <div key={k} className="go-stat">
+              <span className="go-k dim">{k}</span>
+              <span className="go-v">{v}</span>
+            </div>
+          ))}
+        </div>
+        <button className="start-btn go-btn" onClick={onNew} disabled={loading}>
+          {loading ? '⟳' : '↺  NOVA LINIJA'}
+        </button>
       </div>
-      <button className="start-btn go-btn" onClick={onNew} disabled={loading}>
-        {loading ? '⟳' : '↺  NOVA LINIJA'}
-      </button>
     </div>
   );
 }
@@ -3049,6 +3057,7 @@ function FitScale({ children, deps }: { children: React.ReactNode; deps?: unknow
 export default function App() {
   const [game,       setGame]       = useState<GameState | null>(null);
   const [loading,    setLoading]    = useState(false);
+  const [showStart,  setShowStart]  = useState(false);
   const [axis,       setAxis]       = useState<HumanAxis>('obzidje');
   const [combatants,   setCombatants]   = useState(0);
   const [defenders,    setDefenders]    = useState(15);
@@ -3211,9 +3220,19 @@ export default function App() {
     try {
       const g = await createGame();
       setGame(g);
+      setShowStart(false);
       localStorage.setItem(STORAGE_KEY, g.runId);
       setAxis('obzidje'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('robots'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setRoundCards([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
     } finally { setLoading(false); }
+  };
+
+  const openStartScreen = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setGame(null);
+    setShowStart(true);
+    setRoundCards([]);
+    setPhaseTrans(null);
+    setAppMenuOpen(false);
   };
 
   const handleRound = async () => {
@@ -3484,13 +3503,13 @@ export default function App() {
     setMissions(newMap);
   }
 
-  if (!game && !loading) return <StartScreen onNew={handleNew} loading={false} />;
+  if (showStart || (!game && !loading)) return <StartScreen onNew={handleNew} loading={loading} />;
   if (!game && loading)  return <StartScreen onNew={handleNew} loading={true}  />;
   if (!game) return null;
   if (game.status !== 'active') return (
     <>
       {roundCards.length > 0 && <RoundEventOverlay cards={roundCards} onClose={() => setRoundCards([])} />}
-      <GameOverScreen game={game} onNew={handleNew} loading={loading} />
+      <GameOverScreen game={game} onNew={openStartScreen} loading={loading} />
     </>
   );
 
@@ -3550,7 +3569,7 @@ export default function App() {
       {appMenuOpen && (
         <div className="app-menu-overlay" onClick={() => setAppMenuOpen(false)}>
           <div className="app-menu" onClick={e => e.stopPropagation()}>
-            <button onClick={() => { setAppMenuOpen(false); handleNew(); }} disabled={loading}>↺ Nova igra</button>
+            <button onClick={openStartScreen} disabled={loading}>↺ Nova igra</button>
             <button onClick={() => { setAppMenuOpen(false); setShowFeedback(true); }}>💡 Predlogi za izboljšave</button>
             <button onClick={() => { setAppMenuOpen(false); setShowRules(true); }}>📖 Pravila</button>
           </div>
