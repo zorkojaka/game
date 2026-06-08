@@ -1163,6 +1163,185 @@ interface EventEntry {
   ts: number;
 }
 
+type RoundEventKind =
+  | 'raid'
+  | 'breach-food'
+  | 'breach-workshop'
+  | 'breach-research'
+  | 'breach-defense'
+  | 'combat-win'
+  | 'combat-loss'
+  | 'research'
+  | 'artifact'
+  | 'expedition'
+  | 'weakpoint'
+  | 'phase';
+
+interface RoundEventCardData {
+  id: string;
+  kind: RoundEventKind;
+  tone: 'good' | 'bad' | 'warn' | 'info';
+  eyebrow: string;
+  title: string;
+  body: string;
+  stats: Array<{ label: string; value: string; tone?: 'good' | 'bad' | 'info' }>;
+}
+
+const AREA_LABELS: Record<string, string> = {
+  food: 'Prehrana',
+  workshop: 'Delavnice',
+  research: 'Raziskave',
+  defense: 'Obramba',
+};
+
+function aiNodeLabel(game: GameState, id: string): string {
+  return game.aiTree?.find(n => n.id === id)?.label ?? id;
+}
+
+function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardData[] {
+  if (!log) return [];
+  const cards: RoundEventCardData[] = [];
+  const add = (card: RoundEventCardData) => cards.push(card);
+
+  if (log.raid?.occurred && log.raid.outcome) {
+    const r = log.raid;
+    const losses = r.defendersLost + r.foragersLost + (r.workersLost ?? 0) + (r.researchersLost ?? 0);
+    const breached = r.breachedAreas ?? [];
+    add({
+      id: `raid-${log.round}`,
+      kind: 'raid',
+      tone: r.outcome === 'victory' ? 'good' : r.outcome === 'partial' ? 'warn' : 'bad',
+      eyebrow: 'AI napad na kamp',
+      title: r.outcome === 'victory' ? 'Obramba je zdržala' : r.outcome === 'partial' ? 'Kamp je delno prebit' : 'AI je razbil obrambo',
+      body: breached.length > 0
+        ? `Prebita območja: ${breached.map(a => AREA_LABELS[a] ?? a).join(', ')}.`
+        : 'Napad je bil ustavljen pred notranjimi območji kampa.',
+      stats: [
+        { label: 'Padli ljudje', value: `${losses}`, tone: losses > 0 ? 'bad' : 'good' },
+        { label: 'Uničeni roboti', value: `${r.aiRobotsDestroyed}`, tone: 'good' },
+        { label: 'Obramba', value: pct(r.successProbability), tone: 'info' },
+      ],
+    });
+    for (const area of breached) {
+      const kind = (`breach-${area}` as RoundEventKind);
+      const damage =
+        area === 'food' ? `${r.survivalDestroyed} hrane` :
+        area === 'workshop' ? `${(r.weaponsDestroyed ?? 0) + (r.materialDestroyed ?? 0)} zalog` :
+        area === 'research' ? `${r.researchersLost ?? 0} raziskovalcev` :
+        `${r.wallsDestroyed ?? 0} obzidja`;
+      add({
+        id: `breach-${area}-${log.round}`,
+        kind,
+        tone: 'bad',
+        eyebrow: 'Prebito območje',
+        title: AREA_LABELS[area] ?? area,
+        body: area === 'food'
+          ? 'AI je dosegel zaloge hrane.'
+          : area === 'workshop'
+            ? 'AI je vdrl med delavnice in skladišča.'
+            : area === 'research'
+              ? 'Raziskovalni del kampa je bil izpostavljen.'
+              : 'Obrambni perimeter je utrpel neposreden udarec.',
+        stats: [{ label: 'Škoda', value: damage, tone: 'bad' }],
+      });
+    }
+  }
+
+  if (log.combat) {
+    const c = log.combat;
+    const won = c.outcome === 'victory' || c.outcome === 'partial';
+    add({
+      id: `combat-${log.round}`,
+      kind: won ? 'combat-win' : 'combat-loss',
+      tone: won ? 'good' : 'bad',
+      eyebrow: 'Spopad z AI',
+      title: won ? 'Napad je uspel' : 'Napad je spodletel',
+      body: won ? 'Ekipa je prebila AI odpor in prinesla novo znanje.' : 'AI je odbil napad in povzročil izgube.',
+      stats: [
+        { label: 'Padli ljudje', value: `${c.humanLost}`, tone: c.humanLost > 0 ? 'bad' : 'good' },
+        { label: 'Uničeni roboti', value: `${c.aiRobotsDestroyed}`, tone: 'good' },
+        { label: 'Možnost', value: pct(c.successProbability), tone: 'info' },
+      ],
+    });
+  }
+
+  if (log.revealedNodes?.length) {
+    add({
+      id: `research-reveal-${log.round}`,
+      kind: 'research',
+      tone: 'good',
+      eyebrow: 'Raziskovalni preboj',
+      title: log.revealedNodes.length === 1 ? aiNodeLabel(game, log.revealedNodes[0]) : `${log.revealedNodes.length} AI vozlišč razkritih`,
+      body: 'Raziskave so odprle nov del AI načrtovalnega drevesa.',
+      stats: log.revealedNodes.slice(0, 3).map(id => ({ label: 'Razkrito', value: aiNodeLabel(game, id), tone: 'good' })),
+    });
+  }
+
+  const lines = log.narrative.split('\n').map(l => l.trim()).filter(Boolean);
+  lines.forEach((line, idx) => {
+    if (/ARTEFAKT IZDELAN|ARTEFAKT UPORABLJEN/.test(line)) {
+      add({
+        id: `artifact-${log.round}-${idx}`,
+        kind: 'artifact',
+        tone: 'good',
+        eyebrow: 'Artefakt',
+        title: /UPORABLJEN/.test(line) ? 'Artefakt sprožen' : 'Artefakt izdelan',
+        body: line.replace(/^[^\s]+ /, ''),
+        stats: [{ label: 'Status', value: /UPORABLJEN/.test(line) ? 'uporabljen' : 'izdelan', tone: 'good' }],
+      });
+    } else if (/ŠIBKA TOČKA UNIČENA/.test(line)) {
+      add({
+        id: `weakpoint-${log.round}-${idx}`,
+        kind: 'weakpoint',
+        tone: 'good',
+        eyebrow: 'AI šibka točka',
+        title: 'Šibka točka uničena',
+        body: line.replace(/^[^\s]+ /, ''),
+        stats: [{ label: 'Učinek', value: 'AI oslabljena', tone: 'good' }],
+      });
+    } else if (/Raziskava .*dokončana|Mehanska šibkost razkrita/.test(line)) {
+      add({
+        id: `research-${log.round}-${idx}`,
+        kind: 'research',
+        tone: 'good',
+        eyebrow: 'Tehnološki preboj',
+        title: /orožja/.test(line) ? 'Orožje nadgrajeno' : /obzidja/.test(line) ? 'Obramba nadgrajena' : 'Nova šibkost razkrita',
+        body: line.replace(/^[^\s]+ /, ''),
+        stats: [{ label: 'Napredek', value: 'odklenjeno', tone: 'good' }],
+      });
+    } else if (/Odprava se je vrnila|ZAVEZNIŠTVO|Napad uspešen|Napad odbit|Odprava izgubljena/.test(line)) {
+      const lost = /izgubljena|odbit/.test(line);
+      add({
+        id: `exp-${log.round}-${idx}`,
+        kind: 'expedition',
+        tone: lost ? 'bad' : 'good',
+        eyebrow: 'Odprava',
+        title: /ZAVEZNIŠTVO/.test(line) ? 'Zavezništvo sklenjeno' : lost ? 'Odprava pod pritiskom' : 'Odprava uspela',
+        body: line.replace(/^[^\s]+ /, ''),
+        stats: [{ label: 'Izid', value: lost ? 'izgube' : 'uspeh', tone: lost ? 'bad' : 'good' }],
+      });
+    } else if (/Nova faza|AI je pripeljal|people-killer/.test(line)) {
+      add({
+        id: `phase-${log.round}-${idx}`,
+        kind: 'phase',
+        tone: 'warn',
+        eyebrow: 'AI eskalacija',
+        title: PHASE[log.phase].label,
+        body: line.replace(/^[^\s]+ /, ''),
+        stats: [{ label: 'Faza', value: PHASE[log.phase].full, tone: 'info' }],
+      });
+    }
+  });
+
+  const seen = new Set<string>();
+  return cards.filter(card => {
+    const key = `${card.kind}:${card.title}:${card.body}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 7);
+}
+
 function LedgerChip({ item }: { item: LedgerItem }) {
   const positive = item.value > 0;
   const negative = item.value < 0;
@@ -1331,6 +1510,117 @@ function EventLog({ entries }: { entries: EventEntry[] }) {
             </Fragment>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function RoundEventScene({ kind }: { kind: RoundEventKind }) {
+  const isBreach = kind.startsWith('breach');
+  return (
+    <div className={`rec-scene rec-scene-${kind} ${isBreach ? 'rec-scene-breach' : ''}`} aria-hidden="true">
+      <div className="rec-sky" />
+      <div className="rec-terrain">
+        <span className="rec-hex h1" />
+        <span className="rec-hex h2" />
+        <span className="rec-hex h3" />
+      </div>
+      {(kind === 'raid' || isBreach) && (
+        <>
+          <div className="rec-camp">
+            <span className="rec-wall" />
+            <span className="rec-tent t1" />
+            <span className="rec-tent t2" />
+          </div>
+          <div className="rec-robots">
+            <span />
+            <span />
+            <span />
+          </div>
+          <span className="rec-impact" />
+        </>
+      )}
+      {(kind === 'combat-win' || kind === 'combat-loss' || kind === 'weakpoint') && (
+        <>
+          <div className="rec-fighters humans"><span /><span /><span /></div>
+          <div className="rec-fighters bots"><span /><span /><span /></div>
+          <span className="rec-blast" />
+        </>
+      )}
+      {kind === 'research' && (
+        <div className="rec-lab">
+          <span className="rec-node n1" />
+          <span className="rec-node n2" />
+          <span className="rec-node n3" />
+          <span className="rec-link l1" />
+          <span className="rec-link l2" />
+        </div>
+      )}
+      {kind === 'artifact' && (
+        <div className="rec-artifact">
+          <span className="rec-gem" />
+          <span className="rec-ring r1" />
+          <span className="rec-ring r2" />
+        </div>
+      )}
+      {kind === 'expedition' && (
+        <div className="rec-expedition">
+          <span className="rec-path-dot d1" />
+          <span className="rec-path-dot d2" />
+          <span className="rec-path-dot d3" />
+          <span className="rec-party" />
+        </div>
+      )}
+      {kind === 'phase' && (
+        <div className="rec-phase-core">
+          <span className="rec-core" />
+          <span className="rec-scan s1" />
+          <span className="rec-scan s2" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RoundEventOverlay({ cards, onClose }: { cards: RoundEventCardData[]; onClose: () => void }) {
+  const [idx, setIdx] = useState(0);
+  const card = cards[idx];
+  useEffect(() => setIdx(0), [cards]);
+  if (!card) return null;
+  const isLast = idx >= cards.length - 1;
+  const next = () => {
+    if (isLast) onClose();
+    else setIdx(i => i + 1);
+  };
+  return (
+    <div className="round-event-overlay" role="dialog" aria-modal="true" aria-label="Dogodki meseca">
+      <div className={`round-event-card tone-${card.tone}`}>
+        <div className="rec-top">
+          <span className="rec-count">DOGODEK {idx + 1}/{cards.length}</span>
+          <button className="rec-skip" onClick={onClose}>Preskoči</button>
+        </div>
+        <RoundEventScene kind={card.kind} />
+        <div className="rec-copy">
+          <div className="rec-eyebrow">{card.eyebrow}</div>
+          <h2>{card.title}</h2>
+          <p>{card.body}</p>
+        </div>
+        {card.stats.length > 0 && (
+          <div className="rec-stats">
+            {card.stats.map((s, i) => (
+              <div key={i} className={`rec-stat stat-${s.tone ?? 'info'}`}>
+                <span>{s.label}</span>
+                <b>{s.value}</b>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="rec-actions">
+          <div className="rec-dots">
+            {cards.map((_, i) => <span key={i} className={i === idx ? 'active' : ''} />)}
+          </div>
+          <button className="rec-next" onClick={next}>{isLast ? 'Nadaljuj' : 'Naslednji dogodek'}</button>
+        </div>
       </div>
     </div>
   );
@@ -2682,6 +2972,7 @@ export default function App() {
   const [odds,         setOdds]         = useState<OddsPreview | null>(null);
   const [justRevealed, setJustRevealed] = useState<Set<string>>(new Set());
   const [phaseTrans,   setPhaseTrans]   = useState<{ from: AIPhase; to: AIPhase; narrative: string } | null>(null);
+  const [roundCards,   setRoundCards]   = useState<RoundEventCardData[]>([]);
   const prevPhaseRef = useRef<AIPhase | null>(null);
 
   useEffect(() => {
@@ -2814,7 +3105,7 @@ export default function App() {
       const g = await createGame();
       setGame(g);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('obzidje'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('robots'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
+      setAxis('obzidje'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('robots'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setRoundCards([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
     } finally { setLoading(false); }
   };
 
@@ -2847,6 +3138,7 @@ export default function App() {
       const clan = state.mapTiles?.find((t: HexTile) => t.isClanCamp);
       setDraftPath(clan ? [{ q: clan.q, r: clan.r }] : []);
       setGame(state);
+      setRoundCards(roundEventCards(state.lastRoundLog, state));
       setResearchObj(normalizeResearchObjective(
         safeResearchObj,
         state.robotsResearchLevel ?? 0,
@@ -3056,7 +3348,12 @@ export default function App() {
   if (!game && !loading) return <StartScreen onNew={handleNew} loading={false} />;
   if (!game && loading)  return <StartScreen onNew={handleNew} loading={true}  />;
   if (!game) return null;
-  if (game.status !== 'active') return <GameOverScreen game={game} onNew={handleNew} loading={loading} />;
+  if (game.status !== 'active') return (
+    <>
+      {roundCards.length > 0 && <RoundEventOverlay cards={roundCards} onClose={() => setRoundCards([])} />}
+      <GameOverScreen game={game} onNew={handleNew} loading={loading} />
+    </>
+  );
 
   const rTier = RATIONS[rations];
   const foragerYield = Math.floor(foragers * 4 * rTier.strengthMult);
@@ -3100,6 +3397,7 @@ export default function App() {
 
   return (
     <div className={`app-shell mob-tab-${tab}`}>
+      {roundCards.length > 0 && <RoundEventOverlay cards={roundCards} onClose={() => setRoundCards([])} />}
       {phaseTrans && (
         <PhaseTransitionBanner
           fromPhase={phaseTrans.from}
