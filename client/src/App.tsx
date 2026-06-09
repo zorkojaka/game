@@ -3239,13 +3239,14 @@ function phaseTransitionUnit(toPhase: AIPhase): AIRobotType {
   return 'scouts';
 }
 
-function PhaseTransitionBanner({ fromPhase, toPhase, narrative, onClose }: {
-  fromPhase: keyof typeof PHASE; toPhase: keyof typeof PHASE; narrative: string; onClose: () => void;
+function PhaseTransitionBanner({ toPhase, narrative, onClose }: {
+  toPhase: keyof typeof PHASE; narrative: string; onClose: () => void;
 }) {
-  const from = PHASE[fromPhase];
   const to = PHASE[toPhase];
   const phaseLines = splitPhaseNarrative(narrative);
   const unit = phaseTransitionUnit(toPhase);
+  const order: Array<keyof typeof PHASE> = ['find', 'understand', 'eliminate'];
+  const curIdx = order.indexOf(toPhase);
   return (
     <div className="ptb-overlay" onClick={onClose}>
       <div className="ptb-card" style={{ borderColor: to.color, ['--ptb-color' as string]: to.color }} onClick={e => e.stopPropagation()}>
@@ -3257,22 +3258,22 @@ function PhaseTransitionBanner({ fromPhase, toPhase, narrative, onClose }: {
           <button className="ptb-close" onClick={onClose}>✕</button>
         </div>
 
-        <div className="ptb-gate">
-          <div className="ptb-node old">
-            <span className="ptb-node-kicker">prejšnja</span>
-            <span className="ptb-node-num">{from.num}</span>
-            <span className="ptb-node-label">{from.label}</span>
-          </div>
-          <div className="ptb-transfer" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
-          <div className="ptb-node next">
-            <span className="ptb-node-kicker">nova</span>
-            <span className="ptb-node-num">{to.num}</span>
-            <span className="ptb-node-label">{to.label}</span>
-          </div>
+        {/* Časovni trak faz AI — kje smo zdaj */}
+        <div className="ptb-timeline">
+          {order.map((key, i) => {
+            const ph = PHASE[key];
+            const st = i < curIdx ? 'past' : i === curIdx ? 'cur' : 'future';
+            return (
+              <Fragment key={key}>
+                {i > 0 && <div className={`ptb-tl-link${i <= curIdx ? ' on' : ''}`} />}
+                <div className={`ptb-tl-node ${st}`} style={{ ['--n' as string]: ph.color }}>
+                  <span className="ptb-tl-num">{ph.num}</span>
+                  <span className="ptb-tl-label">{ph.label}</span>
+                  {st === 'cur' && <span className="ptb-tl-here">SMO TUKAJ</span>}
+                </div>
+              </Fragment>
+            );
+          })}
         </div>
 
         <div className="ptb-unit" style={{ borderColor: to.color }}>
@@ -3456,6 +3457,7 @@ export default function App() {
   const [phaseTrans,   setPhaseTrans]   = useState<{ from: AIPhase; to: AIPhase; narrative: string } | null>(null);
   const [roundCards,   setRoundCards]   = useState<RoundEventCardData[]>([]);
   const prevPhaseRef = useRef<AIPhase | null>(null);
+  const prevRunIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const id = localStorage.getItem(STORAGE_KEY);
@@ -3470,10 +3472,15 @@ export default function App() {
     return () => clearTimeout(t);
   }, [game?.lastRoundLog]);
 
-  // Fazni prehod — ko se game.phase spremeni, pokaži banner
+  // Fazni prehod — banner SAMO ob napredovanju faze v ISTI igri (ne ob novi igri).
   useEffect(() => {
     if (!game) return;
-    if (prevPhaseRef.current && prevPhaseRef.current !== game.phase) {
+    const order: AIPhase[] = ['find', 'understand', 'eliminate'];
+    const sameRun = prevRunIdRef.current === game.runId;
+    const forward = prevPhaseRef.current
+      ? order.indexOf(game.phase) > order.indexOf(prevPhaseRef.current)
+      : false;
+    if (sameRun && prevPhaseRef.current && prevPhaseRef.current !== game.phase && forward) {
       setPhaseTrans({
         from: prevPhaseRef.current,
         to: game.phase,
@@ -3481,7 +3488,8 @@ export default function App() {
       });
     }
     prevPhaseRef.current = game.phase;
-  }, [game?.phase]);
+    prevRunIdRef.current = game.runId;
+  }, [game?.phase, game?.runId]);
 
   // Pot vedno začni iz klanovega kampa
   useEffect(() => {
@@ -3948,7 +3956,6 @@ export default function App() {
       {roundCards.length > 0 && <RoundEventOverlay cards={roundCards} onClose={() => setRoundCards([])} />}
       {phaseTrans && (
         <PhaseTransitionBanner
-          fromPhase={phaseTrans.from}
           toPhase={phaseTrans.to}
           narrative={phaseTrans.narrative}
           onClose={() => setPhaseTrans(null)}

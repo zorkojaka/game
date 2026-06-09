@@ -1149,12 +1149,12 @@ input[type=range]::-moz-range-thumb {
 /* ─── Start screen ─────────────────────────────────────────────────────────── */
 .start {
   position: relative;
-  display: flex; align-items: center; justify-content: flex-start;
+  display: flex; align-items: center; justify-content: center;
   min-height: 100vh;
-  padding: 42px max(24px, 8vw);
+  padding: 42px max(24px, 6vw);
   overflow: hidden;
   background:
-    linear-gradient(90deg, rgba(3,5,6,.94) 0%, rgba(3,5,6,.82) 34%, rgba(3,5,6,.42) 68%, rgba(3,5,6,.76) 100%),
+    linear-gradient(90deg, rgba(3,5,6,.78) 0%, rgba(3,5,6,.5) 50%, rgba(3,5,6,.78) 100%),
     linear-gradient(0deg, rgba(3,5,6,.9), transparent 42%),
     url('/assets/screens/start-hero.png') center / cover no-repeat;
 }
@@ -2699,3 +2699,19 @@ input[type=range].cz-slider::-moz-range-track { height: 6px; border-radius: 3px;
 .loot-opt:hover { border-color: #3a536e; }
 .loot-opt.on { background: #1b2208; border-color: #ffd84a; color: #ffe98a; }
 .loot-opt.loot.on { background: #2a1f0a; border-color: #cc8800; color: #ffce6a; }
+
+/* ─── Fazni prehod: časovni trak (kje smo) ─── */
+.ptb-timeline { display: flex; align-items: stretch; justify-content: center; margin: .25rem 0 .5rem; }
+.ptb-tl-node {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: .55rem .3rem; border-radius: 10px; border: 1px solid #2a3340; background: #0d1218;
+  position: relative; transition: opacity .2s;
+}
+.ptb-tl-num { font-size: 1.25rem; font-weight: 800; color: var(--n); font-family: 'Courier New', monospace; line-height: 1; }
+.ptb-tl-label { font-size: .6rem; letter-spacing: .04em; color: #9fb0c4; text-transform: uppercase; text-align: center; line-height: 1.1; }
+.ptb-tl-node.past   { opacity: .42; }
+.ptb-tl-node.future { opacity: .4; }
+.ptb-tl-node.cur { border-color: var(--n); background: #141b12; box-shadow: 0 0 0 1px var(--n) inset; }
+.ptb-tl-here { font-size: .5rem; font-weight: 800; letter-spacing: .1em; color: var(--n); margin-top: 2px; }
+.ptb-tl-link { align-self: center; width: 16px; height: 2px; background: #2a3340; flex: 0 0 auto; }
+.ptb-tl-link.on { background: var(--ptb-color, #cc3333); }
