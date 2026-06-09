@@ -2652,10 +2652,7 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
           const wallShare = Math.max(0, Math.min(1, defenseContribution.walls));
           const peopleShare = Math.max(0, Math.min(1 - wallShare, defenseContribution.people));
           const wallT = 14;      // maksimalna širina varnosti = 100 %, zato ostane fiksna
-          const wallBase = '#2b302d';
-          const wallTop = '#aab6a8';
           const emptyFace = '#202823';
-          const wallShade = '#111513';
           // Zvezna barva: rdeča (0 %) → rumena (50 %) → zelena (100 %); vsak branilec malo premakne odtenek
           const repelColor = `hsl(${Math.round(rp * 120)}, 75%, 52%)`;
           const filledShare = Math.max(0, Math.min(1, wallShare + peopleShare));
@@ -2663,59 +2660,24 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
           const peopleWidth = filledShare * wallT;
           return (
             <g className="camp-wall" pointerEvents="none">
-              {/* 3D spodnji rob / senca */}
-              {segs.map((s, i) => (
-                <line key={`ws${i}`} x1={s[0][0] + 2.4} y1={s[0][1] + 4.2} x2={s[1][0] + 2.4} y2={s[1][1] + 4.2}
-                  stroke={wallShade} strokeWidth={wallT + 4} strokeLinecap="round" strokeOpacity="0.85" />
-              ))}
               {/* Prazna 100 % kapaciteta zidu */}
               {segs.map((s, i) => (
-                <line key={`wb${i}`} x1={s[0][0] + 1.1} y1={s[0][1] + 2.1} x2={s[1][0] + 1.1} y2={s[1][1] + 2.1}
-                  stroke={wallBase} strokeWidth={wallT + 2.5} strokeLinecap="round" />
-              ))}
-              {segs.map((s, i) => (
                 <line key={`wf${i}`} x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
-                  stroke={emptyFace} strokeWidth={wallT} strokeLinecap="round" strokeOpacity="0.86" />
+                  stroke={emptyFace} strokeWidth={wallT} strokeLinecap="butt" strokeOpacity="0.86" />
               ))}
               {/* Zapolnitev uporablja isti rob heksa; spreminja se samo debelina, ne pozicija ali dolžina */}
               {segs.map((s, i) => (
                 <Fragment key={`wp${i}`}>
                   {peopleWidth > 0 && (
                     <line x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
-                      stroke={repelColor} strokeWidth={peopleWidth} strokeLinecap="round" strokeOpacity="0.68" />
+                      stroke={repelColor} strokeWidth={Math.min(wallT, peopleWidth)} strokeLinecap="butt" strokeOpacity="0.68" />
                   )}
                   {shieldWidth > 0 && (
                     <line x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
-                      stroke={repelColor} strokeWidth={shieldWidth} strokeLinecap="round" strokeOpacity="0.94" />
+                      stroke={repelColor} strokeWidth={Math.min(wallT, shieldWidth)} strokeLinecap="butt" strokeOpacity="0.94" />
                   )}
                 </Fragment>
               ))}
-              {/* Svetel zgornji rob, da zid bere kot dvignjen 3D objekt */}
-              {segs.map((s, i) => (
-                <line key={`wh${i}`} x1={s[0][0] - 0.6} y1={s[0][1] - 1.1} x2={s[1][0] - 0.6} y2={s[1][1] - 1.1}
-                  stroke={wallTop} strokeWidth={Math.max(1.2, wallT * 0.22)} strokeLinecap="round" strokeOpacity="0.9" />
-              ))}
-              {/* Obrambna energija uporablja isti rob; debelina in barva kažeta verjetnost odbijanja */}
-              {segs.map((s, i) => (
-                <line key={`we${i}`} x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
-                  stroke={repelColor} strokeWidth={Math.max(0.6, rp * 3.4)} strokeLinecap="round" strokeOpacity={rp > 0 ? 0.88 : 0.25} />
-              ))}
-              {/* Posamezni kamniti bloki na zunanjih robovih */}
-              {segs.map((s, i) => {
-                const x1 = s[0][0], y1 = s[0][1], x2 = s[1][0], y2 = s[1][1];
-                const dx = x2 - x1, dy = y2 - y1;
-                const len = Math.max(1, Math.hypot(dx, dy));
-                const nx = -dy / len, ny = dx / len;
-                return [0.28, 0.5, 0.72].map((t, j) => {
-                  const x = x1 + dx * t;
-                  const y = y1 + dy * t;
-                  return (
-                    <line key={`wk${i}-${j}`} x1={x - nx * wallT * 0.24} y1={y - ny * wallT * 0.24}
-                      x2={x + nx * wallT * 0.24} y2={y + ny * wallT * 0.24}
-                      stroke="#1d231f" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.55" />
-                  );
-                });
-              })}
             </g>
           );
         })()}
