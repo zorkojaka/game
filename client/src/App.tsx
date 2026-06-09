@@ -2193,7 +2193,7 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
   draftPath: Array<{ q: number; r: number }>;
   draftReturn: Array<{ q: number; r: number }>;
   draftKind: 'scout' | 'attack';
-  plannedPaths: Array<{ path: Array<{ q: number; r: number }>; kind: 'scout' | 'mission' }>;
+  plannedPaths: Array<{ path: Array<{ q: number; r: number }>; returnPath?: Array<{ q: number; r: number }>; kind: 'scout' | 'mission' }>;
   onPathClick: (tile: { q: number; r: number }) => void;
   onWaypointMove: (kind: 'out' | 'ret', index: number, hexY: { q: number; r: number }, original: Array<{ q: number; r: number }>) => void;
   onWpSelect: (wpId: string) => void;
@@ -2264,6 +2264,33 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
   }
   const W = maxX - minX, H = maxY - minY;
   const shift = (p: { x: number; y: number }) => ({ x: p.x - minX, y: p.y - minY });
+
+  // Enoten, subtilen izris poti: tanke črte, zaobljeni konci, rahel zamik za odhod/povratek.
+  const PATH_OFF = 2.6;
+  const legPos = (h: { q: number; r: number }, dir: 'out' | 'ret') => {
+    const p = shift(hexToPixel(h.q, h.r, SIZE));
+    const d = dir === 'out' ? -PATH_OFF : PATH_OFF;
+    return { x: p.x + d, y: p.y + d };
+  };
+  function legLines(
+    pts: Array<{ q: number; r: number }>,
+    keyP: string,
+    dir: 'out' | 'ret',
+    opt: { color: string; w?: number; dash?: string; op?: number; doneTo?: number } = { color: '#fff' },
+  ) {
+    if (pts.length < 2) return null;
+    return pts.slice(0, -1).map((s, i) => {
+      const a = legPos(s, dir); const b = legPos(pts[i + 1], dir);
+      const done = opt.doneTo !== undefined && i < opt.doneTo;
+      return (
+        <line key={`${keyP}${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+          stroke={opt.color} strokeWidth={done ? (opt.w ?? 1.3) + 0.5 : (opt.w ?? 1.3)}
+          strokeLinecap="round"
+          strokeDasharray={done ? undefined : (opt.dash ?? '0.1 3.4')}
+          strokeOpacity={done ? 1 : (opt.op ?? 0.7)} />
+      );
+    });
+  }
 
   // Pretvori zaslonske koordinate kazalca v najbližji (ne-kampni) heks na mapi.
   function clientToHex(e: { clientX: number; clientY: number }): { q: number; r: number } | null {
@@ -2485,54 +2512,38 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
           );
         })}
 
-        {/* Aktivne odprave: prepotovana pot (polna) + preostala pot (črtkana) — odhod IN povratek */}
+        {/* Aktivne odprave: prepotovana pot (polna) + preostala (pikčasta) + povratek (turkizno) */}
         {expeditions.filter(e => e.status === 'traveling' || e.status === 'returning').map(e => {
-          const color = e.status === 'returning' ? '#66cc88' : e.kind === 'mission' ? COL_ATK : COL_EXP;
+          const isReturning = e.status === 'returning';
+          const color = e.kind === 'mission' ? COL_ATK : COL_EXP;
+          const legDir = isReturning ? 'ret' : 'out';
+          const legColor = isReturning ? COL_RET : color;
+          const t = e.path[e.path.length - 1];
+          const tp = legPos(t, legDir);
           return (
             <g key={`path_${e.id}`} className="path-lines" pointerEvents="none">
-              {e.path.slice(0, -1).map((s, i) => {
-                const a = shift(hexToPixel(s.q, s.r, SIZE));
-                const b = shift(hexToPixel(e.path[i + 1].q, e.path[i + 1].r, SIZE));
-                const isDone = i < e.currentIndex;
-                return (
-                  <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                    stroke={color}
-                    strokeWidth={isDone ? 3 : 2.2}
-                    strokeOpacity={isDone ? 1 : 0.7}
-                    strokeDasharray={isDone ? undefined : '4 3'} />
-                );
-              })}
-              {/* Označi cilj odprave */}
-              {e.path.length > 0 && (() => {
-                const t = e.path[e.path.length - 1];
-                const p = shift(hexToPixel(t.q, t.r, SIZE));
-                return (
-                  <g>
-                    <circle cx={p.x} cy={p.y - SIZE * 0.15} r="5" fill="none" stroke={color} strokeWidth="1.8" />
-                    <circle cx={p.x} cy={p.y - SIZE * 0.15} r="2" fill={color} />
-                  </g>
-                );
-              })()}
+              {/* trenutni leg (odhod ali povratek) — prepotovano polno, preostalo pikčasto */}
+              {legLines(e.path, `ap${e.id}`, legDir, { color: legColor, w: 1.3, doneTo: e.currentIndex })}
+              {/* med potovanjem tja: rahlo nakazana povratna pot */}
+              {!isReturning && e.returnPath && e.returnPath.length > 1 &&
+                legLines(e.returnPath, `ar${e.id}`, 'ret', { color: COL_RET, w: 1, op: 0.4, dash: '0.1 4' })}
+              {/* cilj */}
+              <circle cx={tp.x} cy={tp.y} r="2.4" fill={legColor} />
             </g>
           );
         })}
 
-        {/* Načrtovane (potrjene, a še ne sproženo) — odprava rumena, napad rdeč */}
+        {/* Načrtovane (potrjene, a še ne sproženo) — odhod (rumeno/rdeče) + povratek (turkizno) */}
         {plannedPaths.map((pp, pi) => {
           const pc = pp.kind === 'mission' ? COL_ATK : COL_EXP;
+          const t = pp.path[pp.path.length - 1];
+          const tp = t ? legPos(t, 'out') : null;
           return (
           <g key={`planned_${pi}`} className="path-lines" pointerEvents="none">
-            {pp.path.slice(0, -1).map((s, i) => {
-              const a = shift(hexToPixel(s.q, s.r, SIZE));
-              const b = shift(hexToPixel(pp.path[i + 1].q, pp.path[i + 1].r, SIZE));
-              return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                stroke={pc} strokeWidth="1.8" strokeDasharray="2 3" strokeOpacity="0.7" />;
-            })}
-            {pp.path.length > 0 && (() => {
-              const t = pp.path[pp.path.length - 1];
-              const p = shift(hexToPixel(t.q, t.r, SIZE));
-              return <circle cx={p.x} cy={p.y} r="3.5" fill={pc} fillOpacity="0.7" />;
-            })()}
+            {pp.returnPath && pp.returnPath.length > 1 &&
+              legLines(pp.returnPath, `pr${pi}`, 'ret', { color: COL_RET, w: 1, op: 0.5, dash: '0.1 3.6' })}
+            {legLines(pp.path, `pp${pi}`, 'out', { color: pc, w: 1.2, op: 0.6, dash: '0.1 3' })}
+            {tp && <circle cx={tp.x} cy={tp.y} r="2.4" fill={pc} fillOpacity="0.75" />}
           </g>
           );
         })}
@@ -2540,56 +2551,41 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
         {/* Draft path — ODHODNA (offset gor-levo, draftColor) + POVRATNA (offset dol-desno, turkizna).
             Točke se ne prekrivajo; vmesne točke je mogoče povleči za preoblikovanje poti. */}
         {(() => {
-          const OFF = 3.6;
-          const outPos = (h: { q: number; r: number }) => { const p = shift(hexToPixel(h.q, h.r, SIZE)); return { x: p.x - OFF, y: p.y - OFF }; };
-          const retPos = (h: { q: number; r: number }) => { const p = shift(hexToPixel(h.q, h.r, SIZE)); return { x: p.x + OFF, y: p.y + OFF }; };
           return (
             <g className="draft-path">
-              {/* povratna pot (nariše se pod odhodno) */}
-              {draftReturn.length > 1 && (
-                <g pointerEvents="none">
-                  {draftReturn.slice(0, -1).map((s, i) => {
-                    const a = retPos(s); const b = retPos(draftReturn[i + 1]);
-                    return <line key={`rl${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                      stroke={COL_RET} strokeWidth="2.2" strokeDasharray="2 3" strokeOpacity="0.9" />;
-                  })}
-                </g>
-              )}
-              {/* odhodna pot */}
-              {draftPath.length > 1 && (
-                <g pointerEvents="none">
-                  {draftPath.slice(0, -1).map((s, i) => {
-                    const a = outPos(s); const b = outPos(draftPath[i + 1]);
-                    return <line key={`ol${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                      stroke={draftColor} strokeWidth="2.6" strokeDasharray="4 3" />;
-                  })}
-                </g>
-              )}
+              {/* povratna pot (turkizna, pikčasta, zamik dol-desno) */}
+              <g pointerEvents="none">
+                {legLines(draftReturn, 'dr', 'ret', { color: COL_RET, w: 1.2, op: 0.85, dash: '0.1 3.2' })}
+              </g>
+              {/* odhodna pot (tanka, pikčasta, zamik gor-levo) */}
+              <g pointerEvents="none">
+                {legLines(draftPath, 'do', 'out', { color: draftColor, w: 1.4, op: 0.95, dash: '0.1 3' })}
+              </g>
               {/* povratne točke (vmesne, povlecljive) */}
               {draftReturn.slice(1, -1).map((h, idx) => {
-                const i = idx + 1; const p = retPos(h);
+                const i = idx + 1; const p = legPos(h, 'ret');
                 return (
                   <g key={`rd${i}`} style={{ cursor: 'grab', touchAction: 'none' }}
                      onPointerDown={(e) => startDotDrag(e, 'ret', i, draftReturn)}>
                     <title>Povratna točka — povleci za spremembo poti nazaj</title>
-                    <circle cx={p.x} cy={p.y} r="7" fill="transparent" />
-                    <circle cx={p.x} cy={p.y} r="3" fill="#0a1418" stroke={COL_RET} strokeWidth="1.6" />
+                    <circle cx={p.x} cy={p.y} r="6.5" fill="transparent" />
+                    <circle cx={p.x} cy={p.y} r="2.3" fill="#0a1418" stroke={COL_RET} strokeWidth="1.2" />
                   </g>
                 );
               })}
               {/* odhodne točke (vmesne, povlecljive) + cilj (oznaka) */}
               {draftPath.slice(1).map((h, idx) => {
-                const i = idx + 1; const p = outPos(h);
+                const i = idx + 1; const p = legPos(h, 'out');
                 const isTarget = i === draftPath.length - 1;
                 if (isTarget) {
-                  return <circle key={`od${i}`} cx={p.x} cy={p.y} r="3.4" fill={draftColor} pointerEvents="none" />;
+                  return <circle key={`od${i}`} cx={p.x} cy={p.y} r="2.6" fill={draftColor} pointerEvents="none" />;
                 }
                 return (
                   <g key={`od${i}`} style={{ cursor: 'grab', touchAction: 'none' }}
                      onPointerDown={(e) => startDotDrag(e, 'out', i, draftPath)}>
                     <title>Točka poti — povleci za spremembo poti tja</title>
-                    <circle cx={p.x} cy={p.y} r="7" fill="transparent" />
-                    <circle cx={p.x} cy={p.y} r="3" fill="#1a1405" stroke={draftColor} strokeWidth="1.6" />
+                    <circle cx={p.x} cy={p.y} r="6.5" fill="transparent" />
+                    <circle cx={p.x} cy={p.y} r="2.3" fill="#1a1405" stroke={draftColor} strokeWidth="1.2" />
                   </g>
                 );
               })}
@@ -4440,7 +4436,7 @@ export default function App() {
           <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
             draftReturn={draftReturn}
             draftKind={draftKind}
-            plannedPaths={pendingExpeditions.map(e => ({ path: e.path, kind: e.kind }))}
+            plannedPaths={pendingExpeditions.map(e => ({ path: e.path, returnPath: e.returnPath, kind: e.kind }))}
             onPathClick={handlePathClick}
             onWaypointMove={onWaypointMove}
             onWpSelect={(id) => setTargetWP(targetWP === id ? '' : id)}
