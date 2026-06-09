@@ -1025,10 +1025,11 @@ function probColor(p: number): string {
 }
 
 function defenseContributionBreakdown(game: GameState, defenders: number, rations: number, intelBonus: number): { people: number; walls: number; missing: number } {
-  if (defenders <= 0) return { people: 0, walls: 0, missing: 1 };
+  const wallMult = researchMult(game.wallResearchLevel ?? 0);
+  const wallProtection = Math.max(0, Math.min(1, 0.02 * wallMult * (game.wallsBuilt ?? 0)));
+  if (defenders <= 0) return { people: 0, walls: wallProtection, missing: Math.max(0, 1 - wallProtection) };
   const tier = RATIONS_LEVELS[rations] ?? RATIONS_LEVELS[3];
   const weaponMult = researchMult(game.weaponResearchLevel ?? 0);
-  const wallMult = researchMult(game.wallResearchLevel ?? 0);
   const base = defenders * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult;
   const equip = Math.min(game.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT * weaponMult;
   const peopleStr = (base + equip) * (1 + intelBonus);
@@ -1040,10 +1041,9 @@ function defenseContributionBreakdown(game: GameState, defenders: number, ration
     (units.attackers ?? 0) * AI_UNIT_DEFS.attackers.attack * Math.max(0, 1 - (logical.attackers ? LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS : 0)) +
     (units.peopleKillers ?? 0) * AI_UNIT_DEFS.peopleKillers.attack * Math.max(0, 1 - (logical.peopleKillers ? LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS : 0));
   const aiStr = Math.max(1, raidAttack * (1 - game.clanActivity) * RAID_AI_FORCE_PCT);
-  const peopleP = peopleStr / (peopleStr + aiStr);
   const totalP = (peopleStr * wallBonus) / (peopleStr * wallBonus + aiStr);
-  const people = Math.max(0, Math.min(1, peopleP));
-  const walls = Math.max(0, Math.min(1 - people, totalP - peopleP));
+  const walls = Math.max(0, Math.min(totalP, wallProtection));
+  const people = Math.max(0, Math.min(1 - walls, totalP - walls));
   return { people, walls, missing: Math.max(0, 1 - people - walls) };
 }
 
@@ -2648,6 +2648,23 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
               if (!campZoneIds.has(nb)) segs.push([vtx(p.x, p.y, k), vtx(p.x, p.y, (k + 1) % 6)]);
             }
           }
+          const pointKey = (p: [number, number]) => `${p[0].toFixed(3)},${p[1].toFixed(3)}`;
+          const outlinePaths: string[] = [];
+          const remaining = [...segs];
+          while (remaining.length > 0) {
+            const first = remaining.shift()!;
+            const start = first[0];
+            let current = first[1];
+            const points: Array<[number, number]> = [start, current];
+            while (pointKey(current) !== pointKey(start) && remaining.length > 0) {
+              const idx = remaining.findIndex(s => pointKey(s[0]) === pointKey(current) || pointKey(s[1]) === pointKey(current));
+              if (idx < 0) break;
+              const [next] = remaining.splice(idx, 1);
+              current = pointKey(next[0]) === pointKey(current) ? next[1] : next[0];
+              points.push(current);
+            }
+            outlinePaths.push(`M ${points.map(p => `${p[0]} ${p[1]}`).join(' L ')} Z`);
+          }
           const rp = Math.max(0, Math.min(1, repelProbability));
           const wallShare = Math.max(0, Math.min(1, defenseContribution.walls));
           const peopleShare = Math.max(0, Math.min(1 - wallShare, defenseContribution.people));
@@ -2661,20 +2678,20 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
           return (
             <g className="camp-wall" pointerEvents="none">
               {/* Prazna 100 % kapaciteta zidu */}
-              {segs.map((s, i) => (
-                <line key={`wf${i}`} x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
-                  stroke={emptyFace} strokeWidth={wallT} strokeLinecap="butt" strokeOpacity="0.86" />
+              {outlinePaths.map((d, i) => (
+                <path key={`wf${i}`} d={d} fill="none"
+                  stroke={emptyFace} strokeWidth={wallT} strokeLinecap="butt" strokeLinejoin="round" strokeOpacity="0.86" />
               ))}
               {/* Zapolnitev uporablja isti rob heksa; spreminja se samo debelina, ne pozicija ali dolžina */}
-              {segs.map((s, i) => (
+              {outlinePaths.map((d, i) => (
                 <Fragment key={`wp${i}`}>
                   {peopleWidth > 0 && (
-                    <line x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
-                      stroke={repelColor} strokeWidth={Math.min(wallT, peopleWidth)} strokeLinecap="butt" strokeOpacity="0.68" />
+                    <path d={d} fill="none"
+                      stroke={repelColor} strokeWidth={Math.min(wallT, peopleWidth)} strokeLinecap="butt" strokeLinejoin="round" strokeOpacity="0.68" />
                   )}
                   {shieldWidth > 0 && (
-                    <line x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
-                      stroke={repelColor} strokeWidth={Math.min(wallT, shieldWidth)} strokeLinecap="butt" strokeOpacity="0.94" />
+                    <path d={d} fill="none"
+                      stroke={repelColor} strokeWidth={Math.min(wallT, shieldWidth)} strokeLinecap="butt" strokeLinejoin="round" strokeOpacity="0.94" />
                   )}
                 </Fragment>
               ))}
