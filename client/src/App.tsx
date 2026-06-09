@@ -2871,36 +2871,32 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
             } else if (z.adj === 'w') {
               bdx = 0; bdy = 1;               // naravnost navzdol
             }
-            const hasSeg = btns.some(b => b.segments);
-            const pushOut = hasSeg ? 1.06 : 1.02;
+            const pushOut = 1.05;
             const baseX = p.x + bdx * SIZE * pushOut;
             const baseY = p.y + bdy * SIZE * pushOut;
             const lpx = -bdy, lpy = bdx;
-            const sp = hasSeg ? 22 : 15;
+            const sp = 21;  // enotni razmik za vse gumbe (segmentirane in navadne)
             return (
               <g key={`ctrl_${z.q}_${z.r}`}>
                 {btns.map((b, i) => {
                   const off = (i - (btns.length - 1) / 2) * sp;
                   const bxp = baseX + lpx * off, byp = baseY + lpy * off;
                   const locked = b.locked ?? false;
+                  // Enotna velikost vseh gumbov; izbrani je večji od neizbranih.
+                  const rIn = b.active ? 9.5 : 8;
                   return (
                     <g key={i} style={{ cursor: locked ? 'default' : 'pointer', opacity: locked ? 0.45 : b.active ? 1 : 0.78 }}
                        onClick={(e) => { e.stopPropagation(); if (!locked) b.onClick(); }}>
                       <title>{b.title}</title>
-                      {/* Aktivni gumb dobi rahel sij za boljšo opaznost */}
-                      {b.active && (
-                        <circle cx={bxp} cy={byp} r={b.segments ? 13 : 11}
-                          fill={z.color} opacity="0.15" />
-                      )}
-                      {/* Ikona z integriranim okvirom: brez ločenega obroba, če ima segmente */}
-                      <circle cx={bxp} cy={byp} r={b.segments ? 8 : 7.5}
+                      {/* Ikona z okvirom (brez soja); segmenti narišejo svoj obroč */}
+                      <circle cx={bxp} cy={byp} r={rIn}
                         fill={b.active ? '#0d1612' : '#0a0a0a'}
                         stroke={b.segments ? 'none' : z.color}
-                        strokeWidth={b.active ? 2.5 : 1} />
+                        strokeWidth={b.active ? 2.5 : 1.5} />
                       {/* Segmenti / lok kot obroba ikone — done = polno, next-month napoved = svetlo */}
                       {b.segments && (() => {
                         const { done, next, total } = b.segments;
-                        const R = 9.5;
+                        const R = rIn + 1.5;
                         // Pri velikih total (npr. artefakt 360) prikažemo zvezna loka, ne 360 segmentov.
                         if (total > 24) {
                           const doneFrac = Math.max(0, Math.min(1, done / total));
@@ -2949,7 +2945,7 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
                         return <g pointerEvents="none">{arcs}</g>;
                       })()}
                       <text x={bxp} y={byp} textAnchor="middle" dominantBaseline="central"
-                        fontSize="10" style={{ pointerEvents: 'none' }}>{b.label}</text>
+                        fontSize={b.active ? 11 : 10} style={{ pointerEvents: 'none' }}>{b.label}</text>
                       {b.sub && (
                         <text x={bxp} y={byp + 12} textAnchor="middle" dominantBaseline="central"
                           fontSize="6.5" fill={z.color} fontWeight="bold"
