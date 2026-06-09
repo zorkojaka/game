@@ -2,7 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus } from './combat.js';
 import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp } from './expedition.js';
-import { isCampHex, collapseCampRuns } from './map.js';
+import { isCampHex, collapseCampRuns, researchPerVisit } from './map.js';
 import { hexLabel } from './types.js';
 import { createRNG } from './rng.js';
 import type { PlayerAction, GameState } from './types.js';
@@ -409,5 +409,22 @@ describe('raid — žrtve omejene na cono, odprave varne', () => {
     // odprava obstaja in ima dodeljene ljudi; raid na kamp je ne sme prizadeti
     expect(exp0.assigned).toBeGreaterThan(0);
     expect(exp0.assigned).toBeLessThanOrEqual(8);
+  });
+});
+
+describe('researchPerVisit — raziskava je linearna (delitev ni boljša)', () => {
+  it('ena skupina N = vsota manjših skupin (aditivno)', () => {
+    // 4 skupaj == 2 + 2 (na istem polju, dva obiska)
+    expect(researchPerVisit(4)).toBeCloseTo(researchPerVisit(2) + researchPerVisit(2), 6);
+    // 6 skupaj == 3 + 3 == 2 + 2 + 2
+    expect(researchPerVisit(6)).toBeCloseTo(researchPerVisit(3) + researchPerVisit(3), 6);
+    expect(researchPerVisit(6)).toBeCloseTo(3 * researchPerVisit(2), 6);
+  });
+  it('brez fiksnega bonusa na skupino: 0 ljudi → 0 raziskave', () => {
+    expect(researchPerVisit(0)).toBe(0);
+  });
+  it('narašča z ljudmi in je omejeno na 1.0', () => {
+    expect(researchPerVisit(1)).toBeLessThan(researchPerVisit(4));
+    expect(researchPerVisit(100)).toBe(1);
   });
 });

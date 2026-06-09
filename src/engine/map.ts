@@ -9,6 +9,7 @@ import type { HexTile, Visibility, OtherClan } from './types.js';
 import { tileId } from './types.js';
 import { rngInt, createRNG } from './rng.js';
 import type { RNGState } from './rng.js';
+import { SCOUT_RESEARCH_PER_PERSON } from './constants.js';
 
 export const MAP_COLS = 6;
 export const MAP_ROWS = 5;
@@ -190,10 +191,12 @@ export function tileEncounterMultiplier(progress: number, distanceFromCamp: numb
 }
 
 // ─── Razkrivanje skozi obisk ─────────────────────────────────────────────
-/** Koliko researchProgress doda en obisk z N izvidniki. */
+/** Koliko researchProgress doda en obisk z N izvidniki.
+ *  LINEARNO glede na število ljudi (brez fiksnega bonusa na skupino), da delitev
+ *  na manjše skupine ne prinese več raziskave kot ena skupina iste velikosti.
+ *  Npr. 4 skupaj = 0.50 = dvakrat 2 (0.25 + 0.25). Polje se ob obisku klampa na 1.0. */
 export function researchPerVisit(assigned: number): number {
-  // Bazno 0.30 + 0.025 na osebo, cap 0.55. Z 5 osebami: 0.42. Z 15: 0.55.
-  return Math.min(0.55, 0.30 + 0.025 * assigned);
+  return Math.min(1, SCOUT_RESEARCH_PER_PERSON * Math.max(0, assigned));
 }
 
 // ─── Stare funkcije (backward compat) ────────────────────────────────────
