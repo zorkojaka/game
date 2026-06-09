@@ -2402,7 +2402,7 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
           if (t.isClanCamp) {
             fill = '#0a2018'; stroke = '#22aa88'; label = '⌂'; labelColor = '#66ccaa';
           } else if (t.isAICore) {
-            fill = '#220606'; stroke = '#cc2222'; label = '☣'; labelColor = '#cc3333';
+            fill = '#220606'; stroke = '#cc2222'; label = ''; labelColor = '#cc3333';
           } else if (clanVisible) {
             label = '';
             if (clan!.allied) { labelColor = '#33cc88'; stroke = '#33cc88'; fill = '#0a1c14'; }
