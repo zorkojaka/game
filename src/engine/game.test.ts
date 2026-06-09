@@ -319,3 +319,21 @@ describe('legacy missions disabled', () => {
     expect(r.population).toBeGreaterThan(70);
   });
 });
+
+describe('odprave — izbrana povratna pot', () => {
+  it('returnPath iz vhoda se prenese na ustvarjeno odpravo', () => {
+    const g = newGame(123);
+    const camp = g.mapTiles!.find(t => t.isClanCamp)!;
+    // sosednji heks kampa kot cilj
+    const target = { q: camp.q + 1, r: camp.r - 1 };
+    const path = [{ q: camp.q, r: camp.r }, target];
+    const returnPath = [target, { q: camp.q, r: camp.r }];
+    const r = processRound(g, action({
+      foragers: 10,
+      newExpeditions: [{ kind: 'scout', path, returnPath, assigned: 5, rations: 3 }],
+    }));
+    const exp = (r.expeditions ?? []).find(e => e.kind === 'scout');
+    expect(exp).toBeTruthy();
+    expect(exp!.returnPath).toEqual(returnPath);
+  });
+});
