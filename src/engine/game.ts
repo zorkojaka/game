@@ -526,13 +526,13 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     }
   }
 
-  // 5. Šibke točke — odkrijemo, če smo dovolj razkrili sosednje vozlišče
-  // ALI če smo razkrili heks na mapi, ki skriva to šibko točko
+  // 5. Šibke točke — odkrijejo se IZKLJUČNO z raziskovanjem mape (ko najdemo heks,
+  //    ki skriva šibko točko; isti prag 0.50 kot ◆ oznaka na mapi). Ne razkrijejo se
+  //    več samo z napredkom v AI drevesu.
   const aiWeakPoints = state.aiWeakPoints.map(wp => {
     if (wp.discovered) return wp;
-    const relatedRevealed = aiTree.some(n => n.phase === wp.phase && n.visibility === 'revealed');
-    const mapRevealed = mapTiles.some(t => t.hidesWeakPointId === wp.id && t.visibility === 'revealed');
-    return (relatedRevealed || mapRevealed) ? { ...wp, discovered: true } : wp;
+    const mapRevealed = mapTiles.some(t => t.hidesWeakPointId === wp.id && t.researchProgress >= 0.50);
+    return mapRevealed ? { ...wp, discovered: true } : wp;
   });
 
   // 6a. NAPAD (offensive combat — combatants gredo udariti AI)
@@ -748,8 +748,15 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         if (arrTile?.otherClanId) {
           const ci = otherClans.findIndex(c => c.id === arrTile.otherClanId);
           if (ci >= 0 && !otherClans[ci].allied) {
-            otherClans[ci] = { ...otherClans[ci], discovered: true, allied: true };
-            expeditionEvents.push(`🤝 ZAVEZNIŠTVO: ${otherClans[ci].label} se nam je pridružil — odslej sodelujemo!`);
+            if (otherClans[ci].discovered) {
+              // klan je bil že odkrit (videli smo ga na mapi) → zdaj zavezništvo
+              otherClans[ci] = { ...otherClans[ci], allied: true };
+              expeditionEvents.push(`🤝 ZAVEZNIŠTVO: ${otherClans[ci].label} se nam je pridružil — odslej sodelujemo!`);
+            } else {
+              // prvič ga vidimo → samo razkrijemo na mapi; zavezništvo zahteva nov obisk
+              otherClans[ci] = { ...otherClans[ci], discovered: true };
+              expeditionEvents.push(`📍 ODKRIT KLAN: ${otherClans[ci].label} na ${hexLabel(otherClans[ci])}. Pošlji odpravo še enkrat za zavezništvo.`);
+            }
           }
         }
         let survivors = r.exp.assigned;

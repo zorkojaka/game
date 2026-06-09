@@ -308,8 +308,8 @@ function ClanStatus({ game, inMissions, food }: {
         <BigStat icon="🍞" label="Hrana/Voda" value={r.survival}      color="#cc8800"
           note={`(→ ${food.nextMonth})`}
           noteColor={food.nextMonth <= 0 ? '#cc2222' : food.nextMonth >= r.survival ? '#22cc88' : '#cc8800'} />
-        <BigStat icon="⚔"  label="Orožje"     value={r.combat}        color="#cc4433" />
-        <BigStat icon="⚙"  label="Material"   value={r.material ?? 0} color="#88aabb" />
+        <BigStat icon="⚔️"  label="Orožje"     value={r.combat}        color="#cc4433" />
+        <BigStat icon="🔨"  label="Material"   value={r.material ?? 0} color="#88aabb" />
         <BigStat icon="👁"  label="Intel"      value={r.intelligence}  color="#3388cc" />
         {(r.artifacts ?? 0) > 0 && (
           <BigStat icon="💎" label="Artefakti" value={r.artifacts}     color="#ffd84a" />
@@ -2401,7 +2401,8 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
           let label = '';
 
           const clan = t.otherClanId ? otherClans.find(c => c.id === t.otherClanId) : undefined;
-          const clanVisible = clan && t.researchProgress >= 0.50;
+          // Klan se prikaže, ko je ODKRIT (z raziskovanjem ali ob obisku) — ne le po raziskanosti heksa.
+          const clanVisible = !!clan && (clan.discovered || t.researchProgress >= 0.50);
           const clanMeta = clanVisible ? clanSpecialtyMeta(clan!.specialty) : undefined;
           const clanLabelLines = clanVisible ? splitMapLabel(clan!.label, 15) : [];
 
@@ -3081,7 +3082,7 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
                 <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftLoot(!draftLoot); }}>
                   <title>{draftLoot ? 'Lootanje: nabira material (raziskava ×0.25)' : 'Raziskovanje: odkriva polja'}</title>
                   <circle cx={cx + 16} cy={cy + 30} r={9} fill={draftLoot ? '#2a1f0a' : '#0a1a0a'} stroke={draftLoot ? '#cc8800' : '#ffd84a'} strokeWidth="1.5" />
-                  <text x={cx + 16} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>{draftLoot ? '⚙' : '🔭'}</text>
+                  <text x={cx + 16} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>{draftLoot ? '🔨' : '🔭'}</text>
                 </g>
               )}
             </g>
@@ -4005,10 +4006,10 @@ export default function App() {
               <div className="tr-group tr-main">
                 <BigStat icon="🍞" label="Hrana"      value={game.resources.survival} color="#cc8800"
                   note={fmt(foodDelta) || '±0'} noteColor={col(foodDelta)} />
-                <BigStat icon="⚔"  label="Orožje"     value={game.resources.combat}   color="#cc4433"
+                <BigStat icon="⚔️"  label="Orožje"     value={game.resources.combat}   color="#cc4433"
                   note={fmt(weaponDelta) || (workshopObj === 'weapon' && workers > 0 ? `${game.weaponWorkshopProgress ?? 0}/6 dm` : '')}
                   noteColor={col(weaponDelta)} />
-                <BigStat icon="⚙"  label="Material"   value={game.resources.material ?? 0} color="#88aabb"
+                <BigStat icon="🔨"  label="Material"   value={game.resources.material ?? 0} color="#88aabb"
                   note={fmt(materialDelta)} noteColor={col(materialDelta)} />
                 <BigStat icon="👁"  label="Intel"      value={game.resources.intelligence} color="#3388cc"
                   note={fmt(intelDelta)} noteColor={col(intelDelta)} />
@@ -4357,11 +4358,11 @@ export default function App() {
                       🔭 Raziskovanje
                     </button>
                     <button type="button" className={`loot-opt loot${draftLoot ? ' on' : ''}`} onClick={() => setDraftLoot(true)} title="Lootanje — nabirajo material (raziskava ×0.25, večja možnost orožja/artefakta).">
-                      ⚙ Lootanje
+                      🔨 Lootanje
                     </button>
                   </div>
                   <div className="def-stat-note">{draftLoot
-                    ? <>⚙ <b style={{ color: '#cc8800' }}>Lootanje</b>: raziskava ×0.25, material pogost, orožje redko, artefakt zelo redko.</>
+                    ? <>🔨 <b style={{ color: '#cc8800' }}>Lootanje</b>: raziskava ×0.25, material pogost, orožje redko, artefakt zelo redko.</>
                     : <>🔭 <b style={{ color: '#ffd84a' }}>Raziskovanje</b>: polno odkrivanje polj.</>}</div>
                   <div className="def-stat-note">🍞 vzamejo <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane · moč ×{draftRTier.strengthMult}</div>
                   <button className="def-upgrade-btn" disabled={!canConfirmDraft} onClick={confirmDraftExpedition}>✓ Potrdi odpravo</button>
