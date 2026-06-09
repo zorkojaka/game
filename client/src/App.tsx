@@ -2123,6 +2123,19 @@ function terrainPatternId(t: HexTile): string {
   return ['terrain-forest', 'terrain-rock', 'terrain-field', 'terrain-ruins'][n];
 }
 
+function terrainImageHref(t: HexTile): string {
+  if (t.isClanCamp) return '/assets/map/terrain-camp.png';
+  if (t.isAICore) return '/assets/map/terrain-ai-core.png';
+  if (t.researchProgress < 0.25) return '/assets/map/terrain-fog.png';
+  const n = Math.abs((t.q * 17 + t.r * 31) % 4);
+  return [
+    '/assets/map/terrain-forest.png',
+    '/assets/map/terrain-rock.png',
+    '/assets/map/terrain-field.png',
+    '/assets/map/terrain-ruins.png',
+  ][n];
+}
+
 /** Heks barvanje glede na researchProgress. */
 function hexColorByProgress(p: number): { fill: string; stroke: string; labelColor: string } {
   if (p < 0.25)      return { fill: 'url(#hatch-red)',     stroke: '#3a1818', labelColor: '#5a2020' };
@@ -2327,6 +2340,8 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           const canSelectWp = !!(wpVisible && wp && !wp.exploited && !canClickDraw);
           const isWpSelected = wp && wp.id === selectedWpId;
           if (isWpSelected) stroke = '#ffd84a';
+          const clipId = `hexclip-${t.q}-${t.r}`;
+          const textureOpacity = t.researchProgress < 0.25 ? 0.34 : t.researchProgress < 0.50 ? 0.45 : 0.72;
 
           const handleClick = canClickDraw
             ? () => onPathClick({ q: t.q, r: t.r })
@@ -2338,8 +2353,22 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             <g key={id}
                className={`hex-tile ${(canClickDraw || canSelectWp) ? 'clickable' : ''} ${isInDraft ? 'in-draft' : ''} ${isWpSelected ? 'wp-selected' : ''}`}
                onClick={handleClick}>
-              <path d={hexPath(p.x, p.y, SIZE)} fill={fill} stroke={stroke}
+              <clipPath id={clipId}>
+                <path d={hexPath(p.x, p.y, SIZE * 0.96)} />
+              </clipPath>
+              <path className="hex-base" d={hexPath(p.x, p.y, SIZE)} fill={fill} stroke={stroke}
                 strokeWidth={isInDraft || isWpSelected ? 2.5 : 1} />
+              <image
+                href={terrainImageHref(t)}
+                x={p.x - SIZE * 1.12}
+                y={p.y - SIZE * 1.12}
+                width={SIZE * 2.24}
+                height={SIZE * 2.24}
+                preserveAspectRatio="xMidYMid slice"
+                opacity={textureOpacity}
+                clipPath={`url(#${clipId})`}
+                style={{ pointerEvents: 'none' }}
+              />
               <path d={hexPath(p.x, p.y, SIZE * 0.94)} fill={`url(#${terrainPatternId(t)})`} opacity={t.researchProgress < 0.5 ? 0.42 : 0.6}
                 style={{ pointerEvents: 'none' }} />
               {t.isClanCamp && (
@@ -2532,6 +2561,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
         {/* KAMP — 4 hex zoni z +/- gumbi (tanke notranje obrobe) */}
         {CAMP_ZONES.map(z => {
           const p = shift(hexToPixel(z.q, z.r, SIZE));
+          const clipId = `campclip-${z.q}-${z.r}`;
           const zoneInfo =
             z.adj === 'f' ? 'Prehrana — nabiralci zbirajo hrano za kamp.' :
             z.adj === 'w' ? 'Delavnice — delavci izdelujejo orožje ali gradijo obzidje (porabijo material).' :
@@ -2541,7 +2571,22 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             <g key={`camp_${z.q}_${z.r}`} className="camp-zone">
               <title>{zoneInfo}</title>
               {/* ozadje + tanka notranja obroba */}
+              <clipPath id={clipId}>
+                <path d={hexPath(p.x, p.y, SIZE * 0.96)} />
+              </clipPath>
               <path d={hexPath(p.x, p.y, SIZE)} fill="#0a1a14" stroke="#1a4a3a" strokeWidth="0.8" />
+              <image
+                href="/assets/map/terrain-camp.png"
+                x={p.x - SIZE * 1.12}
+                y={p.y - SIZE * 1.12}
+                width={SIZE * 2.24}
+                height={SIZE * 2.24}
+                preserveAspectRatio="xMidYMid slice"
+                opacity="0.64"
+                clipPath={`url(#${clipId})`}
+                style={{ pointerEvents: 'none' }}
+              />
+              <path d={hexPath(p.x, p.y, SIZE * 0.94)} fill={z.color} opacity="0.16" style={{ pointerEvents: 'none' }} />
               {/* ikona + oznaka */}
               <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="16">{z.icon}</text>
               {/* OBRAMBA: število obzidij vpisano v ščit (del ikone) */}
