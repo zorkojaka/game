@@ -116,6 +116,15 @@ export function tileId(t: { q: number; r: number }): string {
   return `${t.q},${t.r}`;
 }
 
+/**
+ * Človeku berljiva oznaka polja: črka stolpca (A…) + številka vrste (1…).
+ * Npr. {q:0,r:4} → "A5", {q:2,r:3} → "C4". Uporablja se na mapi in v dogodkih.
+ */
+export function hexLabel(t: { q: number; r: number }): string {
+  const col = String.fromCharCode(65 + t.q);  // 0→A, 1→B, …
+  return `${col}${t.r + 1}`;
+}
+
 export type WorkshopObjective = 'weapon' | 'wall' | 'artifact';
 export type ResearchObjective = 'robots' | 'weapon' | 'wall';
 

@@ -3,6 +3,7 @@ import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, 
 import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus } from './combat.js';
 import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp } from './expedition.js';
 import { isCampHex, collapseCampRuns } from './map.js';
+import { hexLabel } from './types.js';
 import { createRNG } from './rng.js';
 import type { PlayerAction, GameState } from './types.js';
 
@@ -356,5 +357,18 @@ describe('collapseCampRuns — kamp grozd kot eno polje', () => {
     const p = collapseCampRuns([{ q: 3, r: 4 }, { q: 2, r: 4 }, { q: 1, r: 4 }, { q: 0, r: 4 }]);
     expect(p).toEqual([{ q: 3, r: 4 }, { q: 2, r: 4 }, { q: 1, r: 4 }]);
     expect(isCampHex(p[p.length - 1])).toBe(true);
+  });
+});
+
+describe('hexLabel — človeku berljiva oznaka polja', () => {
+  it('stolpec = črka, vrsta = številka (1-based)', () => {
+    expect(hexLabel({ q: 0, r: 4 })).toBe('A5');
+    expect(hexLabel({ q: 2, r: 3 })).toBe('C4');
+    expect(hexLabel({ q: 5, r: 0 })).toBe('F1');
+  });
+  it('oznake so unikatne za vsa polja mreže', () => {
+    const seen = new Set<string>();
+    for (let q = 0; q < 6; q++) for (let r = 0; r < 5; r++) seen.add(hexLabel({ q, r }));
+    expect(seen.size).toBe(30);
   });
 });

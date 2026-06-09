@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan, AIUnits } from './types';
-import { tileId } from './types';
+import { tileId, hexLabel } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
 import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, researchMult, AI_UNIT_DEFS } from '../../src/engine/constants';
@@ -1797,13 +1797,13 @@ function AlliesPanel({ clans }: { clans: OtherClan[] }) {
           <div key={c.id} className="def-card" style={{ borderLeft: `3px solid ${color}` }}>
             <div className="def-ally-head">
               <span style={{ color, fontWeight: 700 }}>{c.discovered ? `⛺ ${c.label}` : '⛺ ??? neznan klan'}</span>
-              <span className="dim small">{c.discovered ? `(${c.q},${c.r})` : '?'}</span>
+              <span className="dim small">{c.discovered ? hexLabel(c) : '?'}</span>
             </div>
             <div className="def-stat-note" style={{ fontSize: '.68rem' }}>
               {c.allied
                 ? `🤝 Zaveznik — ${s.icon} ${s.gift}; dviguje aktivnost klanov.`
                 : c.discovered
-                  ? `Specialnost: ${s.icon} ${s.label}. Pošlji odpravo na (${c.q},${c.r}) za zavezništvo.`
+                  ? `Specialnost: ${s.icon} ${s.label}. Pošlji odpravo na ${hexLabel(c)} za zavezništvo.`
                   : 'Neznana lokacija — razišči mapo, da ga najdeš.'}
             </div>
           </div>
@@ -2367,6 +2367,7 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
           const wpLabelLines = wpVisible && wp ? splitMapLabel(wp.label, 15) : [];
 
           let { fill, stroke, labelColor } = hexColorByProgress(t.researchProgress);
+          const code = hexLabel(t);   // oznaka polja, npr. "C4"
           let label = '';
 
           const clan = t.otherClanId ? otherClans.find(c => c.id === t.otherClanId) : undefined;
@@ -2383,9 +2384,9 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
             if (clan!.allied) { labelColor = '#33cc88'; stroke = '#33cc88'; fill = '#0a1c14'; }
             else { labelColor = '#c0a050'; stroke = '#a08540'; fill = '#181408'; }
           } else if (t.researchProgress < 0.25) {
-            label = '?';
+            label = code;  // oznaka polja namesto pikice (zamegljeno)
           } else if (t.researchProgress < 0.50) {
-            label = '·';
+            label = code;
           } else {
             // raziskan
             if (wpVisible) {
@@ -2395,6 +2396,8 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
               } else {
                 labelColor = '#cc8800'; stroke = '#cc8800';
               }
+            } else {
+              label = code;  // raziskano prazno polje → prikaži oznako
             }
           }
 
@@ -2436,12 +2439,21 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
                 style={{ pointerEvents: 'none' }}
               />
               {label && (
-                <text x={p.x} y={p.y + 4} textAnchor="middle"
-                  fontSize={t.isClanCamp || t.isAICore || wpVisible ? 22 : 18}
+                <text x={p.x} y={p.y + (label === code ? 3 : 4)} textAnchor="middle"
+                  fontSize={t.isClanCamp || t.isAICore || wpVisible ? 22 : label === code ? 12 : 18}
                   fill={labelColor} fontFamily="'Courier New', monospace"
-                  fontWeight={t.isClanCamp || t.isAICore || wpVisible ? 'bold' : 'normal'}
-                  opacity={t.isAICore ? 0.58 : 1}>
+                  fontWeight={t.isClanCamp || t.isAICore || wpVisible ? 'bold' : label === code ? 'bold' : 'normal'}
+                  opacity={t.isAICore ? 0.58 : label === code ? (t.researchProgress < 0.25 ? 0.4 : 0.62) : 1}
+                  letterSpacing={label === code ? '0.5' : undefined}>
                   {label}
+                </text>
+              )}
+              {/* Oznaka polja v kotu za posebna polja (jedro/šibka točka/klan) — za sklic v dogodkih */}
+              {label !== code && !t.isClanCamp && (
+                <text x={p.x - SIZE * 0.62} y={p.y - SIZE * 0.62} textAnchor="middle"
+                  fontSize="7" fill="#6a7a8c" fontFamily="'Courier New', monospace" fontWeight="bold"
+                  opacity="0.75" style={{ pointerEvents: 'none' }}>
+                  {code}
                 </text>
               )}
               {/* WP ime pod diamond ikono — ko je razkrita */}
@@ -3034,8 +3046,8 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
               )}
             </div>
             <div className="ep-row"><span className="dim small">Ljudi:</span><b>{exp.assigned}</b></div>
-            <div className="ep-row"><span className="dim small">Lokacija:</span><b>({tile.q},{tile.r})</b></div>
-            <div className="ep-row"><span className="dim small">Cilj:</span><b>({target.q},{target.r})</b></div>
+            <div className="ep-row"><span className="dim small">Lokacija:</span><b>{hexLabel(tile)}</b></div>
+            <div className="ep-row"><span className="dim small">Cilj:</span><b>{hexLabel(target)}</b></div>
             <div className="ep-row"><span className="dim small">Napredek:</span>
               <b>{exp.currentIndex} / {exp.path.length - 1} korakov</b>
             </div>
@@ -4305,7 +4317,7 @@ export default function App() {
               const tile = game.mapTiles?.find(t => t.q === last.q && t.r === last.r);
               const wp = tile?.hidesWeakPointId ? game.aiWeakPoints.find(w => w.id === tile.hidesWeakPointId) : undefined;
               const wpDisc = !!wp?.discovered;
-              const targetLabel = wpDisc ? `◆ ${wp!.label}` : tile?.isAICore ? '☣ AI jedro' : `(${last.q},${last.r}) — splošni napad`;
+              const targetLabel = wpDisc ? `◆ ${wp!.label}` : tile?.isAICore ? '☣ AI jedro' : `${hexLabel(last)} — splošni napad`;
               const aiUnits = game.aiUnits ?? { scouts: game.aiRobots ?? 0, attackers: 0, peopleKillers: 0 };
               const stealthBonus = draftStealth ? 1.2 : 1;
               const winP = wpDisc
@@ -4372,7 +4384,7 @@ export default function App() {
                         {!known && !dead && <span className="wp-chip-status locked">🔒</span>}
                       </div>
                       <div className="wp-chip-label">{known || dead ? wp.label : '??? neodkrita'}</div>
-                      {known && tile && <div className="wp-chip-sub">({tile.q},{tile.r}){sel ? ' · cilj napada' : ''}</div>}
+                      {known && tile && <div className="wp-chip-sub">{hexLabel(tile)}{sel ? ' · cilj napada' : ''}</div>}
                       {dead && <div className="wp-chip-sub">uničena</div>}
                       {!known && !dead && <div className="wp-chip-sub dim">razišči heks (≥ 50 %)</div>}
                       {known && hasArt && (
@@ -4518,7 +4530,7 @@ export default function App() {
                   <div key={e.id} className="exp-card">
                     <div className="exp-head">
                       <span className="exp-kind" style={{ color }}>{kindLabel} · {e.assigned} ljudi</span>
-                      <span className="dim small">→ {returning ? 'kamp' : `(${target?.q},${target?.r})`}</span>
+                      <span className="dim small">→ {returning ? 'kamp' : (target ? hexLabel(target) : '?')}</span>
                     </div>
                     <div className="exp-progress">
                       <div className="ep-track">

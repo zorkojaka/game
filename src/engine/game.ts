@@ -9,6 +9,7 @@ import { revealTreeByInsight, revealNodeRetroactive } from './fog.js';
 import { generateMap, generateOtherClans, randomizePlacements, isCampHex } from './map.js';
 import { tickExpedition, roundTripMonths, pathToCamp } from './expedition.js';
 import type { Expedition } from './types.js';
+import { hexLabel } from './types.js';
 import { calcAISurveillanceGain, generateAITree, generateAIWeakPoints, DEFAULT_GENOME } from './ai-brain.js';
 import {
   INITIAL_POPULATION, INITIAL_SURVIVAL, INITIAL_COMBAT, INITIAL_INTELLIGENCE, INITIAL_MATERIAL,
@@ -779,18 +780,18 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
               carried.material += destroyed;  // plen nosijo s seboj, dostavijo ob vrnitvi
               const lost = Math.round(survivors * (1 - p) * 0.3);
               survivors = Math.max(0, survivors - lost);
-              expeditionEvents.push(`⚔ Napad uspešen na (${target.q},${target.r}): ${destroyed} robotov uničenih, ${lost} padlih, ${survivors} se vrača.`);
+              expeditionEvents.push(`⚔ Napad uspešen na ${hexLabel(target)}: ${destroyed} robotov uničenih, ${lost} padlih, ${survivors} se vrača.`);
             } else {
               const destroyed = Math.min(aiRobots, Math.round(survivors * 0.5));
               applyDestroy(destroyed);
               carried.material += destroyed;  // plen nosijo s seboj, dostavijo ob vrnitvi
               const lost = Math.round(survivors * 0.6);
               survivors = Math.max(0, survivors - lost);
-              expeditionEvents.push(`⚔ Napad odbit na (${target.q},${target.r}): ${destroyed} robotov, a ${lost} padlih, ${survivors} se vrača.`);
+              expeditionEvents.push(`⚔ Napad odbit na ${hexLabel(target)}: ${destroyed} robotov, a ${lost} padlih, ${survivors} se vrača.`);
             }
           }
         } else {
-          expeditionEvents.push(`✓ Izvidniška odprava dospela na (${target.q},${target.r}).`);
+          expeditionEvents.push(`✓ Izvidniška odprava dospela na ${hexLabel(target)}.`);
         }
         // POVRATEK — preživeli krenejo nazaj. Če je igralec izbral lastno povratno pot (in se začne na cilju
         // ter konča v kampu), jo upoštevamo; sicer izračunamo najkrajšo. Med potjo raziskujejo polja.
@@ -858,7 +859,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       const tile = mapTiles.find(t => t.q === c.q && t.r === c.r);
       if (tile && tile.researchProgress >= 0.50) {
         otherClans[i] = { ...c, discovered: true };
-        expeditionEvents.push(`📍 ODKRIT KLAN: ${c.label} na (${c.q},${c.r}). Pošlji odpravo do njih za zavezništvo.`);
+        expeditionEvents.push(`📍 ODKRIT KLAN: ${c.label} na ${hexLabel(c)}. Pošlji odpravo do njih za zavezništvo.`);
       }
     }
   }
