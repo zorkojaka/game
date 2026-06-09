@@ -2143,6 +2143,23 @@ function campZoneImage(adj: 'd' | 'f' | 'w' | 'r'): string {
   return '/assets/map/camp-defense.png';
 }
 
+function splitMapLabel(text: string, maxChars = 14): string[] {
+  const lines: string[] = [];
+  for (const word of text.split(/\s+/)) {
+    const last = lines[lines.length - 1];
+    if (last && `${last} ${word}`.length <= maxChars) lines[lines.length - 1] = `${last} ${word}`;
+    else lines.push(word);
+  }
+  return lines;
+}
+
+function clanSpecialtyMeta(specialty: OtherClan['specialty']): { label: string; gift: string; color: string } {
+  if (specialty === 'food') return { label: 'HRANA', gift: '+8 hrane/m', color: '#8fbf45' };
+  if (specialty === 'material') return { label: 'MATERIAL', gift: '+4 mat./m', color: '#c58b45' };
+  if (specialty === 'weapons') return { label: 'OROŽJE', gift: '+2 orož./m', color: '#d46850' };
+  return { label: 'LJUDJE', gift: '+1 oseba/m', color: '#6fcaa0' };
+}
+
 /** Heks barvanje glede na researchProgress. */
 function hexColorByProgress(p: number): { fill: string; stroke: string; labelColor: string } {
   if (p < 0.25)      return { fill: '#1a0808',             stroke: '#3a1818', labelColor: '#5a2020' };
@@ -2260,12 +2277,15 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           const p = shift(hexToPixel(t.q, t.r, SIZE));
           const wp = t.hidesWeakPointId ? wpById[t.hidesWeakPointId] : undefined;
           const wpVisible = wp && t.researchProgress >= 0.50;
+          const wpLabelLines = wpVisible && wp ? splitMapLabel(wp.label, 15) : [];
 
           let { fill, stroke, labelColor } = hexColorByProgress(t.researchProgress);
           let label = '';
 
           const clan = t.otherClanId ? otherClans.find(c => c.id === t.otherClanId) : undefined;
           const clanVisible = clan && t.researchProgress >= 0.50;
+          const clanMeta = clanVisible ? clanSpecialtyMeta(clan!.specialty) : undefined;
+          const clanLabelLines = clanVisible ? splitMapLabel(clan!.label, 15) : [];
 
           if (t.isClanCamp) {
             fill = '#0a2018'; stroke = '#22aa88'; label = '⌂'; labelColor = '#66ccaa';
@@ -2348,13 +2368,29 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               )}
               {/* WP ime pod diamond ikono — ko je razkrita */}
               {wpVisible && wp && (
-                <text x={p.x} y={p.y + SIZE * 0.55} textAnchor="middle"
-                  fontSize="7.5"
+                <text x={p.x} y={p.y + SIZE * 0.18} textAnchor="middle"
+                  fontSize="6.7"
                   fill={wp.exploited ? '#22cc66' : isWpSelected ? '#ffd84a' : '#cc8800'}
                   fontFamily="'Courier New', monospace" fontWeight="bold"
+                  stroke="#050706" strokeWidth="2.2" paintOrder="stroke"
                   textDecoration={wp.exploited ? 'line-through' : undefined}
                   style={{ pointerEvents: 'none' }}>
-                  {wp.label.split(' ').slice(0, 2).join(' ').slice(0, 14)}
+                  {wpLabelLines.map((line, i) => (
+                    <tspan key={line} x={p.x} dy={i === 0 ? 0 : 8}>{line}</tspan>
+                  ))}
+                </text>
+              )}
+              {clanVisible && clan && clanMeta && (
+                <text x={p.x} y={p.y + SIZE * 0.04} textAnchor="middle"
+                  fontSize="6.6"
+                  fill={clan.allied ? '#33cc88' : clanMeta.color}
+                  fontFamily="'Courier New', monospace" fontWeight="bold"
+                  stroke="#050706" strokeWidth="2.2" paintOrder="stroke"
+                  style={{ pointerEvents: 'none' }}>
+                  {clanLabelLines.map((line, i) => (
+                    <tspan key={line} x={p.x} dy={i === 0 ? 0 : 8}>{line}</tspan>
+                  ))}
+                  <tspan x={p.x} dy="9">{clanMeta.gift}</tspan>
                 </text>
               )}
               {/* UNIČENO badge nad ikono ko je wp exploited */}
