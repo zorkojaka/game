@@ -1242,12 +1242,6 @@ function unitComposition(units?: AIUnits): string {
   return `${u.scouts ?? 0}I / ${u.attackers ?? 0}N / ${u.peopleKillers ?? 0}PK`;
 }
 
-function phaseArrivalUnit(line: string): AIRobotType {
-  if (/people-killer/i.test(line)) return 'peopleKillers';
-  if (/napadal/i.test(line)) return 'attackers';
-  return 'scouts';
-}
-
 function unitEventImage(prefix: 'raid' | 'combat' | 'phase', unit: AIRobotType, suffix?: string): string {
   const base = `/assets/events/${prefix}-${ROBOT_UNIT_SLUG[unit]}`;
   return suffix ? `${base}-${suffix}.png` : `${base}.png`;
@@ -1361,29 +1355,6 @@ function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardD
         : 'Napad je bil ustavljen pred notranjimi območji kampa.',
       stats: raidEventStats(log, raidUnit),
     });
-    for (const area of breached) {
-      const kind = (`breach-${area}` as RoundEventKind);
-      const damage =
-        area === 'food' ? `${r.survivalDestroyed} hrane` :
-        area === 'workshop' ? `${(r.weaponsDestroyed ?? 0) + (r.materialDestroyed ?? 0)} zalog` :
-        area === 'research' ? `${r.researchersLost ?? 0} raziskovalcev` :
-        `${r.wallsDestroyed ?? 0} obzidja`;
-      add({
-        id: `breach-${area}-${log.round}`,
-        kind,
-        tone: 'bad',
-        eyebrow: 'Prebito območje',
-        title: AREA_LABELS[area] ?? area,
-        body: area === 'food'
-          ? 'AI je dosegel zaloge hrane.'
-          : area === 'workshop'
-            ? 'AI je vdrl med delavnice in skladišča.'
-            : area === 'research'
-              ? 'Raziskovalni del kampa je bil izpostavljen.'
-              : 'Obrambni perimeter je utrpel neposreden udarec.',
-        stats: [{ label: 'Škoda', value: damage, tone: 'bad' }],
-      });
-    }
   }
 
   if (log.combat) {
@@ -1456,22 +1427,6 @@ function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardD
         title: /ZAVEZNIŠTVO/.test(line) ? 'Zavezništvo sklenjeno' : lost ? 'Odprava pod pritiskom' : 'Odprava uspela',
         body: line.replace(/^[^\s]+ /, ''),
         stats: [{ label: 'Izid', value: lost ? 'izgube' : 'uspeh', tone: lost ? 'bad' : 'good' }],
-      });
-    } else if (/AI je pripeljal/.test(line)) {
-      const unit = phaseArrivalUnit(line);
-      add({
-        id: `phase-${log.round}-${idx}`,
-        kind: 'phase',
-        tone: 'warn',
-        image: unitEventImage('phase', unit),
-        eyebrow: 'AI eskalacija',
-        title: `${ROBOT_UNIT_LABEL[unit]} vstopijo v vojno`,
-        body: line.replace(/^[^\s]+ /, ''),
-        stats: [
-          { label: 'Nova enota', value: ROBOT_UNIT_LABEL[unit], tone: 'bad' },
-          { label: 'AI sestava', value: unitComposition(log.aiUnitsAfter ?? game.aiUnits), tone: 'info' },
-          { label: 'Faza', value: PHASE[game.phase].full, tone: 'info' },
-        ],
       });
     }
   });
