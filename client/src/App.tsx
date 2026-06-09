@@ -2117,6 +2117,7 @@ function arcPath(cx: number, cy: number, r: number, fraction: number): string {
 
 function terrainImageHref(t: HexTile): string {
   if (t.isClanCamp) return '/assets/map/terrain-camp.png';
+  if (t.otherClanId && t.researchProgress >= 0.50) return '/assets/map/terrain-camp.png';
   if (t.isAICore) return '/assets/map/terrain-ai-core.png';
   if (t.researchProgress < 0.25) return '/assets/map/terrain-fog.png';
   const n = Math.abs((t.q * 17 + t.r * 31) % 4);
@@ -2126,6 +2127,20 @@ function terrainImageHref(t: HexTile): string {
     '/assets/map/terrain-field.png',
     '/assets/map/terrain-ruins.png',
   ][n];
+}
+
+function campZoneImage(adj: 'd' | 'f' | 'w' | 'r'): string {
+  if (adj === 'f') return '/assets/map/camp-food.png';
+  if (adj === 'w') return '/assets/map/camp-workshop.png';
+  if (adj === 'r') return '/assets/map/camp-research.png';
+  return '/assets/map/camp-defense.png';
+}
+
+function clanSpecialtyMeta(specialty: OtherClan['specialty']): { label: string; icon: string; color: string } {
+  if (specialty === 'food') return { label: 'HRANA', icon: '▰', color: '#8fbf45' };
+  if (specialty === 'material') return { label: 'MATERIAL', icon: '◆', color: '#c58b45' };
+  if (specialty === 'weapons') return { label: 'OROŽJE', icon: '⚔', color: '#d46850' };
+  return { label: 'LJUDJE', icon: '●', color: '#6fcaa0' };
 }
 
 /** Heks barvanje glede na researchProgress. */
@@ -2257,7 +2272,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           } else if (t.isAICore) {
             fill = '#220606'; stroke = '#cc2222'; label = '☣'; labelColor = '#cc3333';
           } else if (clanVisible) {
-            label = '⛺';
+            label = '';
             if (clan!.allied) { labelColor = '#33cc88'; stroke = '#33cc88'; fill = '#0a1c14'; }
             else { labelColor = '#c0a050'; stroke = '#a08540'; fill = '#181408'; }
           } else if (t.researchProgress < 0.25) {
@@ -2326,8 +2341,25 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               )}
               {clanVisible && (
                 <g className="map-marker clan-marker" style={{ pointerEvents: 'none' }}>
-                  <path d={`M${p.x - 9} ${p.y + 8} L${p.x} ${p.y - 10} L${p.x + 9} ${p.y + 8} Z`} fill={clan!.allied ? '#123d2d' : '#332910'} stroke={clan!.allied ? '#33cc88' : '#c0a050'} strokeWidth="1" />
-                  <circle cx={p.x + 10} cy={p.y - 10} r="3" fill={clan!.allied ? '#33cc88' : '#c0a050'} />
+                  {(() => {
+                    const meta = clanSpecialtyMeta(clan!.specialty);
+                    const base = clan!.allied ? '#123d2d' : '#332910';
+                    const outline = clan!.allied ? '#33cc88' : meta.color;
+                    return (
+                      <>
+                        <path d={`M${p.x - 18} ${p.y + 11} H${p.x + 18}`} stroke={outline} strokeWidth="2.3" strokeLinecap="round" opacity="0.9" />
+                        <path d={`M${p.x - 15} ${p.y + 10} L${p.x - 7} ${p.y - 8} L${p.x + 1} ${p.y + 10} Z`} fill={base} stroke={outline} strokeWidth="1.2" />
+                        <path d={`M${p.x - 2} ${p.y + 10} L${p.x + 9} ${p.y - 12} L${p.x + 20} ${p.y + 10} Z`} fill={base} stroke={outline} strokeWidth="1.2" />
+                        <path d={`M${p.x + 14} ${p.y - 10} V${p.y + 8}`} stroke={outline} strokeWidth="1.2" />
+                        <path d={`M${p.x + 14} ${p.y - 10} L${p.x + 24} ${p.y - 6} L${p.x + 14} ${p.y - 3} Z`} fill={meta.color} opacity="0.9" />
+                        <circle cx={p.x} cy={p.y - 12} r="8" fill="#080b0c" stroke={meta.color} strokeWidth="1.2" opacity="0.96" />
+                        <text x={p.x} y={p.y - 9} textAnchor="middle" fontSize="9" fill={meta.color} fontWeight="bold" fontFamily="'Courier New', monospace">{meta.icon}</text>
+                        <text x={p.x} y={p.y + SIZE * 0.53} textAnchor="middle" fontSize="6.5" fill={meta.color} fontWeight="bold" fontFamily="'Courier New', monospace" letterSpacing="0.7">
+                          {meta.label}
+                        </text>
+                      </>
+                    );
+                  })()}
                 </g>
               )}
               {label && (
@@ -2512,7 +2544,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
               </clipPath>
               <path d={hexPath(p.x, p.y, SIZE)} fill="#0a1a14" stroke="#1a4a3a" strokeWidth="0.8" />
               <image
-                href="/assets/map/terrain-camp.png"
+                href={campZoneImage(z.adj)}
                 x={p.x - SIZE * 1.12}
                 y={p.y - SIZE * 1.12}
                 width={SIZE * 2.24}
