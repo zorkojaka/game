@@ -2867,7 +2867,7 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
                   const bxp = baseX + lpx * off, byp = baseY + lpy * off;
                   const locked = b.locked ?? false;
                   return (
-                    <g key={i} style={{ cursor: locked ? 'default' : 'pointer', opacity: locked ? 0.35 : b.active ? 1 : 0.45 }}
+                    <g key={i} style={{ cursor: locked ? 'default' : 'pointer', opacity: locked ? 0.45 : b.active ? 1 : 0.78 }}
                        onClick={(e) => { e.stopPropagation(); if (!locked) b.onClick(); }}>
                       <title>{b.title}</title>
                       {/* Aktivni gumb dobi rahel sij za boljšo opaznost */}
@@ -3053,7 +3053,7 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
               <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftStealth(!draftStealth); }}>
                 <title>{draftStealth ? 'Skrivanje vklopljeno' : 'Skrivanje izklopljeno'}</title>
                 <circle cx={cx + 16} cy={cy + 30} r={9} fill={draftStealth ? '#1a1a2e' : '#0a0a0a'} stroke={draftStealth ? '#8888ff' : '#555'} strokeWidth="1.5" />
-                <text x={cx + 16} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none', opacity: draftStealth ? 1 : 0.35 }}>🌙</text>
+                <text x={cx + 16} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none', opacity: draftStealth ? 1 : 0.65 }}>🌙</text>
               </g>
             </g>
           );
