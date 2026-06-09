@@ -2443,10 +2443,10 @@ input[type=range].cz-slider::-moz-range-track { height: 6px; border-radius: 3px;
 .info-body .def-how-row { font-size: .8rem; }
 
 /* ─── Šibke točke v zavihku Napad (grafične) ─── */
-.wp-attack-card { padding-bottom: .55rem; }
+.wp-attack-card { padding-bottom: .55rem; margin-top: .7rem; }
 .wp-attack-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: .45rem;
   margin: .35rem 0 .15rem;
 }
@@ -2461,6 +2461,34 @@ input[type=range].cz-slider::-moz-range-track { height: 6px; border-radius: 3px;
   user-select: none;
 }
 .wp-chip-icon { font-size: 1.15rem; line-height: 1; }
+.wp-chip-art {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  max-height: 82px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #080b0d;
+  border: 1px solid #25303a;
+}
+.wp-chip-art img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.wp-chip-status {
+  position: absolute;
+  right: 4px; top: 4px;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: #050706;
+  border: 1px solid currentColor;
+  font-size: .7rem;
+  font-weight: 800;
+}
+.wp-chip-status.done { color: #33cc88; }
+.wp-chip-status.locked { color: #9aa3ad; }
 .wp-chip-label { font-size: .72rem; font-weight: 700; color: #cfe3ff; line-height: 1.05; }
 .wp-chip-sub { font-size: .62rem; color: #7c8a9c; }
 .wp-chip-sub.dim { opacity: .7; }
@@ -2469,12 +2497,13 @@ input[type=range].cz-slider::-moz-range-track { height: 6px; border-radius: 3px;
 .wp-chip.locked .wp-chip-label { color: #6b7686; }
 
 .wp-chip.known { cursor: pointer; border-color: #6a5a1e; background: #1b1709; }
-.wp-chip.known .wp-chip-icon { color: #ffd84a; }
+.wp-chip.known .wp-chip-art { border-color: #8a6f1e; }
 .wp-chip.known:hover { border-color: #cc9a2a; transform: translateY(-1px); }
 .wp-chip.known.selected { border-color: #ffd84a; background: #2a2208; box-shadow: 0 0 0 1px #ffd84a55 inset; }
+.wp-chip.known.selected .wp-chip-art { border-color: #ffd84a; }
 
 .wp-chip.dead { opacity: .8; border-color: #1e4a32; background: #0c1a12; }
-.wp-chip.dead .wp-chip-icon { color: #33cc88; }
+.wp-chip.dead .wp-chip-art { border-color: #287048; filter: grayscale(.35); }
 .wp-chip.dead .wp-chip-label { color: #5fae84; text-decoration: line-through; }
 
 .wp-art-btn {

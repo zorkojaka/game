@@ -2136,6 +2136,10 @@ function weakPointImageHref(id: string): string {
   return '/assets/map/wp-power.png';
 }
 
+function expeditionImageHref(kind: Expedition['kind']): string {
+  return kind === 'mission' ? '/assets/map/exp-attackers.png' : '/assets/map/exp-scouts.png';
+}
+
 function campZoneImage(adj: 'd' | 'f' | 'w' | 'r'): string {
   if (adj === 'f') return '/assets/map/camp-food.png';
   if (adj === 'w') return '/assets/map/camp-workshop.png';
@@ -2808,15 +2812,27 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           const p = shift(hexToPixel(tile.q, tile.r, SIZE));
           const color = exp.status === 'returning' ? '#66cc88' : exp.kind === 'mission' ? COL_ATK : COL_EXP;
           const isActive = popExpId === exp.id;
+          const markerSize = isActive ? SIZE * 1.54 : SIZE * 1.36;
           return (
             <g key={exp.id} className="exp-marker"
+               style={{ pointerEvents: 'auto' }}
                onMouseEnter={() => setHoveredExpId(exp.id)}
                onMouseLeave={() => setHoveredExpId(null)}
                onClick={(e) => { e.stopPropagation(); setSelectedExpId(selectedExpId === exp.id ? null : exp.id); }}>
-              <circle cx={p.x} cy={p.y + SIZE * 0.45} r={isActive ? 14 : 11}
-                fill={color} stroke={isActive ? '#fff' : '#000'} strokeWidth="1.5" />
-              <text x={p.x} y={p.y + SIZE * 0.45 + 4} textAnchor="middle"
-                fontSize="10" fill="#000" fontWeight="bold" fontFamily="'Courier New', monospace"
+              <image
+                href={expeditionImageHref(exp.kind)}
+                x={p.x - markerSize / 2}
+                y={p.y + SIZE * 0.02 - markerSize / 2}
+                width={markerSize}
+                height={markerSize}
+                preserveAspectRatio="xMidYMid meet"
+                opacity={exp.status === 'returning' ? 0.9 : 1}
+                style={{ pointerEvents: 'none' }}
+              />
+              <circle cx={p.x + SIZE * 0.38} cy={p.y + SIZE * 0.43} r="8"
+                fill="#050706" stroke={color} strokeWidth="1.5" opacity="0.95" />
+              <text x={p.x + SIZE * 0.38} y={p.y + SIZE * 0.43 + 3} textAnchor="middle"
+                fontSize="8" fill={color} fontWeight="bold" fontFamily="'Courier New', monospace"
                 style={{ pointerEvents: 'none' }}>
                 {exp.assigned}
               </text>
@@ -4139,43 +4155,6 @@ export default function App() {
             </div>
             <div className="pb-instr dim small">Nariši pot do AI jedra (☣) ali šibke točke (◆). Odpravo nastaviš tudi na zadnjem heksu. Spopad ob prihodu, preživeli se vrnejo.</div>
 
-            {/* GRAFIČNE ŠIBKE TOČKE — skrite dokler niso odkrite; klik nariše napadalno pot */}
-            <div className="def-card wp-attack-card">
-              <div className="def-card-title">ŠIBKE TOČKE AI</div>
-              <div className="wp-attack-grid">
-                {game.aiWeakPoints.map(wp => {
-                  const dead = wp.exploited;
-                  const known = wp.discovered && !dead;
-                  const sel = targetWP === wp.id && known;
-                  const tile = game.mapTiles?.find(t => t.hidesWeakPointId === wp.id);
-                  const cls = dead ? 'dead' : known ? (sel ? 'known selected' : 'known') : 'locked';
-                  const hasArt = (game.resources.artifacts ?? 0) > 0;
-                  return (
-                    <div key={wp.id} className={`wp-chip ${cls}`}
-                      onClick={() => { if (known && tile) selectWeakPointAttack(wp); }}>
-                      <div className="wp-chip-icon">{dead ? '✓' : known ? '◆' : '🔒'}</div>
-                      <div className="wp-chip-label">{known || dead ? wp.label : '??? neodkrita'}</div>
-                      {known && tile && <div className="wp-chip-sub">({tile.q},{tile.r}){sel ? ' · cilj napada' : ''}</div>}
-                      {dead && <div className="wp-chip-sub">uničena</div>}
-                      {!known && !dead && <div className="wp-chip-sub dim">razišči heks (≥ 50 %)</div>}
-                      {known && hasArt && (
-                        <button className={`wp-art-btn${artifactTargetWp === wp.id ? ' on' : ''}`}
-                          onClick={(e) => { e.stopPropagation(); setArtifactTargetWp(artifactTargetWp === wp.id ? '' : wp.id); }}>
-                          💎 {artifactTargetWp === wp.id ? '✓ uniči ob izvedbi' : `uniči z artefaktom`}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {(game.resources.artifacts ?? 0) > 0 && (
-                <div className="def-stat-note">💎 Imaš <b style={{ color: '#ffd84a' }}>{game.resources.artifacts}</b> artefakt(ov) — izberi odkrito šibko točko in jo uniči brez napada (sproži se ob potezi).</div>
-              )}
-              {!game.aiWeakPoints.some(w => w.discovered || w.exploited) && (
-                <div className="def-stat-note dim">Nobena šibka točka še ni odkrita. Pošlji izvidnike, da raziščejo hekse.</div>
-              )}
-            </div>
-
             {draftPath.length < 2 ? (
               <div className="map-hint">Pot je prazna. Klikni sosednji heks ⌂ klana za začetek poti do cilja.</div>
             ) : (() => {
@@ -4226,6 +4205,46 @@ export default function App() {
                 </>
               );
             })()}
+            {/* GRAFIČNE ŠIBKE TOČKE — skrite dokler niso odkrite; klik nariše napadalno pot */}
+            <div className="def-card wp-attack-card">
+              <div className="def-card-title">ŠIBKE TOČKE AI</div>
+              <div className="wp-attack-grid">
+                {game.aiWeakPoints.map(wp => {
+                  const dead = wp.exploited;
+                  const known = wp.discovered && !dead;
+                  const sel = targetWP === wp.id && known;
+                  const tile = game.mapTiles?.find(t => t.hidesWeakPointId === wp.id);
+                  const cls = dead ? 'dead' : known ? (sel ? 'known selected' : 'known') : 'locked';
+                  const hasArt = (game.resources.artifacts ?? 0) > 0;
+                  return (
+                    <div key={wp.id} className={`wp-chip ${cls}`}
+                      onClick={() => { if (known && tile) selectWeakPointAttack(wp); }}>
+                      <div className="wp-chip-art">
+                        <img src={weakPointImageHref(wp.id)} alt="" />
+                        {dead && <span className="wp-chip-status done">✓</span>}
+                        {!known && !dead && <span className="wp-chip-status locked">🔒</span>}
+                      </div>
+                      <div className="wp-chip-label">{known || dead ? wp.label : '??? neodkrita'}</div>
+                      {known && tile && <div className="wp-chip-sub">({tile.q},{tile.r}){sel ? ' · cilj napada' : ''}</div>}
+                      {dead && <div className="wp-chip-sub">uničena</div>}
+                      {!known && !dead && <div className="wp-chip-sub dim">razišči heks (≥ 50 %)</div>}
+                      {known && hasArt && (
+                        <button className={`wp-art-btn${artifactTargetWp === wp.id ? ' on' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); setArtifactTargetWp(artifactTargetWp === wp.id ? '' : wp.id); }}>
+                          💎 {artifactTargetWp === wp.id ? '✓ uniči ob izvedbi' : `uniči z artefaktom`}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {(game.resources.artifacts ?? 0) > 0 && (
+                <div className="def-stat-note">💎 Imaš <b style={{ color: '#ffd84a' }}>{game.resources.artifacts}</b> artefakt(ov) — izberi odkrito šibko točko in jo uniči brez napada (sproži se ob potezi).</div>
+              )}
+              {!game.aiWeakPoints.some(w => w.discovered || w.exploited) && (
+                <div className="def-stat-note dim">Nobena šibka točka še ni odkrita. Pošlji izvidnike, da raziščejo hekse.</div>
+              )}
+            </div>
             {pendingExpeditions.filter(e => e.kind === 'mission').length > 0 && (
               <div className="pending-exps">
                 <div className="dim small" style={{ marginBottom: 4 }}>Potrjeni napadi (sproži ob izvedbi meseca):</div>
