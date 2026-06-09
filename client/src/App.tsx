@@ -2118,6 +2118,7 @@ function arcPath(cx: number, cy: number, r: number, fraction: number): string {
 function terrainImageHref(t: HexTile): string {
   if (t.isClanCamp) return '/assets/map/terrain-camp.png';
   if (t.otherClanId && t.researchProgress >= 0.50) return '/assets/map/terrain-camp.png';
+  if (t.hidesWeakPointId && t.researchProgress >= 0.50) return weakPointImageHref(t.hidesWeakPointId);
   if (t.isAICore) return '/assets/map/terrain-ai-core.png';
   if (t.researchProgress < 0.25) return '/assets/map/terrain-fog.png';
   const n = Math.abs((t.q * 17 + t.r * 31) % 4);
@@ -2129,18 +2130,17 @@ function terrainImageHref(t: HexTile): string {
   ][n];
 }
 
+function weakPointImageHref(id: string): string {
+  if (id === 'wp_core') return '/assets/map/wp-core.png';
+  if (id === 'wp_comm') return '/assets/map/wp-comm.png';
+  return '/assets/map/wp-power.png';
+}
+
 function campZoneImage(adj: 'd' | 'f' | 'w' | 'r'): string {
   if (adj === 'f') return '/assets/map/camp-food.png';
   if (adj === 'w') return '/assets/map/camp-workshop.png';
   if (adj === 'r') return '/assets/map/camp-research.png';
   return '/assets/map/camp-defense.png';
-}
-
-function clanSpecialtyMeta(specialty: OtherClan['specialty']): { label: string; icon: string; color: string } {
-  if (specialty === 'food') return { label: 'HRANA', icon: '▰', color: '#8fbf45' };
-  if (specialty === 'material') return { label: 'MATERIAL', icon: '◆', color: '#c58b45' };
-  if (specialty === 'weapons') return { label: 'OROŽJE', icon: '⚔', color: '#d46850' };
-  return { label: 'LJUDJE', icon: '●', color: '#6fcaa0' };
 }
 
 /** Heks barvanje glede na researchProgress. */
@@ -2281,7 +2281,6 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
             label = '·';
           } else {
             // raziskan
-            label = wpVisible ? '◆' : '';
             if (wpVisible) {
               if (wp?.exploited) {
                 label = '✓'; labelColor = '#22cc66'; stroke = '#22cc66';
@@ -2337,29 +2336,6 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                 <g className="map-marker ai-core-marker" style={{ pointerEvents: 'none' }}>
                   <circle cx={p.x} cy={p.y} r={SIZE * 0.42} fill="none" stroke="#cc3333" strokeWidth="1.4" opacity="0.85" />
                   <circle cx={p.x} cy={p.y} r={SIZE * 0.25} fill="none" stroke="#ff5555" strokeWidth="1" opacity="0.75" />
-                </g>
-              )}
-              {clanVisible && (
-                <g className="map-marker clan-marker" style={{ pointerEvents: 'none' }}>
-                  {(() => {
-                    const meta = clanSpecialtyMeta(clan!.specialty);
-                    const base = clan!.allied ? '#123d2d' : '#332910';
-                    const outline = clan!.allied ? '#33cc88' : meta.color;
-                    return (
-                      <>
-                        <path d={`M${p.x - 18} ${p.y + 11} H${p.x + 18}`} stroke={outline} strokeWidth="2.3" strokeLinecap="round" opacity="0.9" />
-                        <path d={`M${p.x - 15} ${p.y + 10} L${p.x - 7} ${p.y - 8} L${p.x + 1} ${p.y + 10} Z`} fill={base} stroke={outline} strokeWidth="1.2" />
-                        <path d={`M${p.x - 2} ${p.y + 10} L${p.x + 9} ${p.y - 12} L${p.x + 20} ${p.y + 10} Z`} fill={base} stroke={outline} strokeWidth="1.2" />
-                        <path d={`M${p.x + 14} ${p.y - 10} V${p.y + 8}`} stroke={outline} strokeWidth="1.2" />
-                        <path d={`M${p.x + 14} ${p.y - 10} L${p.x + 24} ${p.y - 6} L${p.x + 14} ${p.y - 3} Z`} fill={meta.color} opacity="0.9" />
-                        <circle cx={p.x} cy={p.y - 12} r="8" fill="#080b0c" stroke={meta.color} strokeWidth="1.2" opacity="0.96" />
-                        <text x={p.x} y={p.y - 9} textAnchor="middle" fontSize="9" fill={meta.color} fontWeight="bold" fontFamily="'Courier New', monospace">{meta.icon}</text>
-                        <text x={p.x} y={p.y + SIZE * 0.53} textAnchor="middle" fontSize="6.5" fill={meta.color} fontWeight="bold" fontFamily="'Courier New', monospace" letterSpacing="0.7">
-                          {meta.label}
-                        </text>
-                      </>
-                    );
-                  })()}
                 </g>
               )}
               {label && (
@@ -2554,7 +2530,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                 clipPath={`url(#${clipId})`}
                 style={{ pointerEvents: 'none' }}
               />
-              <path d={hexPath(p.x, p.y, SIZE * 0.94)} fill={z.color} opacity="0.16" style={{ pointerEvents: 'none' }} />
+              <path d={hexPath(p.x, p.y, SIZE * 0.94)} fill={z.color} opacity="0.07" style={{ pointerEvents: 'none' }} />
               {/* ikona + oznaka */}
               <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="16">{z.icon}</text>
               {/* OBRAMBA: število obzidij vpisano v ščit (del ikone) */}
