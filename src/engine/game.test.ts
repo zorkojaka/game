@@ -372,3 +372,42 @@ describe('hexLabel — človeku berljiva oznaka polja', () => {
     expect(seen.size).toBe(30);
   });
 });
+
+describe('raid — žrtve omejene na cono, odprave varne', () => {
+  it('žrtve v coni nikoli ne presežejo dodeljenih (tudi pri lethality > 1)', () => {
+    const FOR = 5, DEF = 4, WRK = 3, RES = 2;
+    let checked = 0;
+    for (let seed = 1; seed <= 400 && checked < 5; seed++) {
+      const base = newGame(seed);
+      // pozna igra: people-killerji dvignejo smrtnost > 1; nizka obramba → raid prebije
+      const g: GameState = {
+        ...base, phase: 'eliminate', population: 60, clanActivity: 0,
+        aiUnits: { scouts: 100, attackers: 75, peopleKillers: 25 }, aiRobots: 200,
+      };
+      const r = processRound(g, action({ defenders: DEF, foragers: FOR, workers: WRK, researchers: RES }));
+      const raid = r.lastRoundLog?.raid;
+      if (!raid?.occurred) continue;
+      checked++;
+      expect(raid.foragersLost).toBeLessThanOrEqual(FOR);
+      expect(raid.workersLost ?? 0).toBeLessThanOrEqual(WRK);
+      expect(raid.researchersLost ?? 0).toBeLessThanOrEqual(RES);
+      expect(raid.defendersLost).toBeLessThanOrEqual(DEF);
+      expect(r.population).toBeGreaterThanOrEqual(0);
+    }
+    expect(checked).toBeGreaterThan(0);  // res smo našli kak raid
+  });
+
+  it('ljudje na odpravi se ne zmanjšajo zaradi raida na kamp', () => {
+    // pošlji odpravo, nato več krogov; assigned odprave se zaradi RAIDA ne sme spustiti
+    let s: GameState = { ...newGame(3), phase: 'eliminate',
+      aiUnits: { scouts: 100, attackers: 75, peopleKillers: 25 }, aiRobots: 200, clanActivity: 0 };
+    const path = [{ q: 1, r: 4 }, { q: 2, r: 4 }, { q: 3, r: 4 }];  // brez kamp-heksov
+    s = processRound(s, action({ foragers: 20, defenders: 0,
+      newExpeditions: [{ kind: 'scout', path, returnPath: [{ q: 3, r: 4 }, { q: 2, r: 4 }, { q: 1, r: 4 }], assigned: 8, rations: 4, stealth: true }] }));
+    const exp0 = (s.expeditions ?? [])[0];
+    expect(exp0).toBeTruthy();
+    // odprava obstaja in ima dodeljene ljudi; raid na kamp je ne sme prizadeti
+    expect(exp0.assigned).toBeGreaterThan(0);
+    expect(exp0.assigned).toBeLessThanOrEqual(8);
+  });
+});

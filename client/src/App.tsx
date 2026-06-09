@@ -3660,6 +3660,15 @@ export default function App() {
       const clan = state.mapTiles?.find((t: HexTile) => t.isClanCamp);
       setDraftPath(clan ? [{ q: clan.q, r: clan.r }] : []);
       setDraftReturn([]);
+      // Žrtve raida zmanjšajo ljudi NATANKO v conah, kjer so padli (obramba/prehrana/delavnice/raziskave).
+      // Ljudje na odpravah so varni — niso v nobeni coni in jih raid ne more pobiti.
+      const raid = state.lastRoundLog?.raid;
+      if (raid?.occurred) {
+        if (raid.defendersLost)   setDefenders(d => Math.max(0, d - raid.defendersLost));
+        if (raid.foragersLost)    setForagers(f => Math.max(0, f - raid.foragersLost));
+        if (raid.workersLost)     setWorkers(w => Math.max(0, w - (raid.workersLost ?? 0)));
+        if (raid.researchersLost) setResearchers(r => Math.max(0, r - (raid.researchersLost ?? 0)));
+      }
       setGame(state);
       setRoundCards(roundEventCards(state.lastRoundLog, state));
       setResearchObj(normalizeResearchObjective(
