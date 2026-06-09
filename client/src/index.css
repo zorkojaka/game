@@ -2682,3 +2682,8 @@ input[type=range].cz-slider::-moz-range-track { height: 6px; border-radius: 3px;
 }
 .wp-art-btn:hover { border-color: #ffd84a; }
 .wp-art-btn.on { background: #ffd84a; color: #1a1405; border-color: #ffd84a; }
+
+/* Med vlečenjem točke poti — onemogoči izbiro besedila, pokaži grabbing kazalec */
+.hex-map.dragging { cursor: grabbing; user-select: none; }
+.hex-map.dragging .hex-tile { cursor: grabbing !important; }
+.draft-path circle { transition: none; }

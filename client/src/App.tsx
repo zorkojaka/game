@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan, AIUnits } from './types';
 import { tileId } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
@@ -2131,17 +2132,70 @@ const PATH_NEIGHBOR_DIRS = [
   { q: +1, r:  0 }, { q: +1, r: -1 }, { q:  0, r: -1 },
   { q: -1, r:  0 }, { q: -1, r: +1 }, { q:  0, r: +1 },
 ];
-function areNeighbors(a: { q: number; r: number }, b: { q: number; r: number }): boolean {
-  return PATH_NEIGHBOR_DIRS.some(d => a.q + d.q === b.q && a.r + d.r === b.r);
+type Hex = { q: number; r: number };
+function hexDistAxial(a: Hex, b: Hex): number {
+  const as_ = -a.q - a.r, bs_ = -b.q - b.r;
+  return (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(as_ - bs_)) / 2;
+}
+/** Pohlepna najkrajša pot med dvema heksoma (vključno z obema). Vsak korak izbere soseda najbliže cilju. */
+function greedyHexPath(from: Hex, to: Hex): Hex[] {
+  const path: Hex[] = [{ q: from.q, r: from.r }];
+  let cur = { q: from.q, r: from.r };
+  let guard = 0;
+  while (!(cur.q === to.q && cur.r === to.r) && guard++ < 80) {
+    let best: Hex | undefined; let bestD = Infinity;
+    for (const d of PATH_NEIGHBOR_DIRS) {
+      const n = { q: cur.q + d.q, r: cur.r + d.r };
+      if (n.q < 0 || n.q >= MAP_COLS || n.r < 0 || n.r >= MAP_ROWS) continue;
+      const dist = hexDistAxial(n, to);
+      if (dist < bestD) { bestD = dist; best = n; }
+    }
+    if (!best) break;
+    cur = best;
+    path.push(cur);
+  }
+  return path;
+}
+/** Odstrani zaporedne podvojene hekse iz poti. */
+function dedupPath(path: Hex[]): Hex[] {
+  const out: Hex[] = [];
+  for (const h of path) {
+    const last = out[out.length - 1];
+    if (!last || last.q !== h.q || last.r !== h.r) out.push(h);
+  }
+  return out;
+}
+/**
+ * Vstavi/prestavi vmesno točko: pot ostane fiksna do prejšnje točke, gre skozi novi heks Y,
+ * nato po najkrajši poti naprej. Vrne preoblikovano celotno pot (start … end).
+ * `index` je položaj povlečene točke v ORIGINALNI poti.
+ */
+function respliceWaypoint(original: Hex[], index: number, y: Hex): Hex[] {
+  if (index <= 0 || index >= original.length) return original;
+  const prev = original[index - 1];
+  const next = original[index + 1];  // lahko undefined, če je to zadnja (končna) točka
+  if (next) {
+    const stitched = [
+      ...original.slice(0, index),            // start … prev
+      ...greedyHexPath(prev, y).slice(1),     // … y
+      ...greedyHexPath(y, next).slice(1),     // … next
+      ...original.slice(index + 2),           // … end
+    ];
+    return dedupPath(stitched);
+  }
+  // povlekli smo končno točko (cilj/kamp) → premaknemo konec
+  return dedupPath([...original.slice(0, index), ...greedyHexPath(prev, y).slice(1)]);
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, research, pop, draftPeople, draftRations, draftStealth, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
+function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, research, pop, draftPeople, draftRations, draftStealth, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
+  draftReturn: Array<{ q: number; r: number }>;
   draftKind: 'scout' | 'attack';
   plannedPaths: Array<{ path: Array<{ q: number; r: number }>; kind: 'scout' | 'mission' }>;
   onPathClick: (tile: { q: number; r: number }) => void;
+  onWaypointMove: (kind: 'out' | 'ret', index: number, hexY: { q: number; r: number }, original: Array<{ q: number; r: number }>) => void;
   onWpSelect: (wpId: string) => void;
   selectedWpId: string;
   expeditions: Expedition[];
@@ -2173,11 +2227,15 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const dragRef = useRef<{ kind: 'out' | 'ret'; index: number; original: Array<{ q: number; r: number }> } | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const popExpId = selectedExpId ?? hoveredExpId;
   const SIZE = 36;
   // Barve poti: odprava (izvid) = rumena, napad = rdeča
   const COL_EXP = '#ffd84a';
   const COL_ATK = '#cc3333';
+  const COL_RET = '#39b6c9';  // povratna pot — turkizna, da se loči od odhodne
   const draftColor = draftKind === 'attack' ? COL_ATK : COL_EXP;
   // Kamp = 3 hexagoni (zoni). Vsak je svoje območje.
   const CAMP_ZONES = [
@@ -2207,6 +2265,47 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
   const W = maxX - minX, H = maxY - minY;
   const shift = (p: { x: number; y: number }) => ({ x: p.x - minX, y: p.y - minY });
 
+  // Pretvori zaslonske koordinate kazalca v najbližji (ne-kampni) heks na mapi.
+  function clientToHex(e: { clientX: number; clientY: number }): { q: number; r: number } | null {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    const loc = pt.matrixTransform(ctm.inverse());
+    let best: HexTile | null = null; let bestD = Infinity;
+    for (const t of tiles) {
+      if (t.isClanCamp || campZoneIds.has(`${t.q},${t.r}`)) continue;
+      const c = shift(hexToPixel(t.q, t.r, SIZE));
+      const d = (c.x - loc.x) ** 2 + (c.y - loc.y) ** 2;
+      if (d < bestD) { bestD = d; best = t; }
+    }
+    if (best && bestD <= (SIZE * 1.25) ** 2) return { q: best.q, r: best.r };
+    return null;
+  }
+  function startDotDrag(e: ReactPointerEvent, kind: 'out' | 'ret', index: number, original: Array<{ q: number; r: number }>) {
+    e.stopPropagation();
+    // Zajemi kazalec na SVG korenu (preživi remount točke med preoblikovanjem poti).
+    svgRef.current?.setPointerCapture?.(e.pointerId);
+    dragRef.current = { kind, index, original };
+    setDragActive(true);
+  }
+  function moveDotDrag(e: ReactPointerEvent) {
+    if (!dragRef.current) return;
+    const h = clientToHex(e);
+    if (!h) return;
+    const d = dragRef.current;
+    if (d.original[d.index] && d.original[d.index].q === h.q && d.original[d.index].r === h.r) return;
+    onWaypointMove(d.kind, d.index, h, d.original);
+  }
+  function endDotDrag(e: ReactPointerEvent) {
+    if (!dragRef.current) return;
+    try { svgRef.current?.releasePointerCapture?.(e.pointerId); } catch { /* noop */ }
+    dragRef.current = null;
+    setDragActive(false);
+  }
+
   const wpById: Record<string, AIWeakPoint> = {};
   for (const w of wps) wpById[w.id] = w;
 
@@ -2219,7 +2318,7 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
     .map(e => ({ exp: e, tile: e.path[e.currentIndex] }));
 
   return (
-    <div className="hex-map">
+    <div className={`hex-map${dragActive ? ' dragging' : ''}`}>
       {info && (
         <div className="map-info-pop" onClick={() => setInfo(null)}>
           <div className="map-info-box" onClick={e => e.stopPropagation()}>
@@ -2228,7 +2327,8 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           </div>
         </div>
       )}
-      <svg viewBox={`0 0 ${W} ${H}`} className="hex-svg">
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="hex-svg"
+        onPointerMove={moveDotDrag} onPointerUp={endDotDrag} onPointerCancel={endDotDrag}>
 
         {tiles.map(t => {
           const id = tileId(t);
@@ -2271,14 +2371,10 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           }
 
           const isInDraft = inDraft(t);
-          const isLast = lastStep && lastStep.q === t.q && lastStep.r === t.r;
           if (isInDraft) stroke = draftColor;
 
-          const canClickDraw = drawingMode && !t.isClanCamp && !campZoneIds.has(id) && (
-            (lastStep && areNeighbors(lastStep, t)) ||
-            (draftPath.length <= 1 && CAMP_ZONES.some(z => areNeighbors(z, t))) ||  // izhod iz katerekoli kamp zone
-            isLast
-          );
+          // Klik na KATERIKOLI heks izven kampa → samodejno nariše najkrajšo pot (tja in nazaj).
+          const canClickDraw = drawingMode && !t.isClanCamp && !campZoneIds.has(id);
           const canSelectWp = !!(wpVisible && wp && !wp.exploited && !canClickDraw);
           const isWpSelected = wp && wp.id === selectedWpId;
           if (isWpSelected) stroke = '#ffd84a';
@@ -2441,17 +2537,65 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
           );
         })}
 
-        {/* Draft path (igralec gradi novo pot) — rumena za odpravo, rdeča za napad */}
-        {draftPath.length > 1 && (
-          <g className="path-lines" pointerEvents="none">
-            {draftPath.slice(0, -1).map((s, i) => {
-              const a = shift(hexToPixel(s.q, s.r, SIZE));
-              const b = shift(hexToPixel(draftPath[i + 1].q, draftPath[i + 1].r, SIZE));
-              return <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                stroke={draftColor} strokeWidth="2.6" strokeDasharray="4 3" />;
-            })}
-          </g>
-        )}
+        {/* Draft path — ODHODNA (offset gor-levo, draftColor) + POVRATNA (offset dol-desno, turkizna).
+            Točke se ne prekrivajo; vmesne točke je mogoče povleči za preoblikovanje poti. */}
+        {(() => {
+          const OFF = 3.6;
+          const outPos = (h: { q: number; r: number }) => { const p = shift(hexToPixel(h.q, h.r, SIZE)); return { x: p.x - OFF, y: p.y - OFF }; };
+          const retPos = (h: { q: number; r: number }) => { const p = shift(hexToPixel(h.q, h.r, SIZE)); return { x: p.x + OFF, y: p.y + OFF }; };
+          return (
+            <g className="draft-path">
+              {/* povratna pot (nariše se pod odhodno) */}
+              {draftReturn.length > 1 && (
+                <g pointerEvents="none">
+                  {draftReturn.slice(0, -1).map((s, i) => {
+                    const a = retPos(s); const b = retPos(draftReturn[i + 1]);
+                    return <line key={`rl${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                      stroke={COL_RET} strokeWidth="2.2" strokeDasharray="2 3" strokeOpacity="0.9" />;
+                  })}
+                </g>
+              )}
+              {/* odhodna pot */}
+              {draftPath.length > 1 && (
+                <g pointerEvents="none">
+                  {draftPath.slice(0, -1).map((s, i) => {
+                    const a = outPos(s); const b = outPos(draftPath[i + 1]);
+                    return <line key={`ol${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                      stroke={draftColor} strokeWidth="2.6" strokeDasharray="4 3" />;
+                  })}
+                </g>
+              )}
+              {/* povratne točke (vmesne, povlecljive) */}
+              {draftReturn.slice(1, -1).map((h, idx) => {
+                const i = idx + 1; const p = retPos(h);
+                return (
+                  <g key={`rd${i}`} style={{ cursor: 'grab', touchAction: 'none' }}
+                     onPointerDown={(e) => startDotDrag(e, 'ret', i, draftReturn)}>
+                    <title>Povratna točka — povleci za spremembo poti nazaj</title>
+                    <circle cx={p.x} cy={p.y} r="7" fill="transparent" />
+                    <circle cx={p.x} cy={p.y} r="3" fill="#0a1418" stroke={COL_RET} strokeWidth="1.6" />
+                  </g>
+                );
+              })}
+              {/* odhodne točke (vmesne, povlecljive) + cilj (oznaka) */}
+              {draftPath.slice(1).map((h, idx) => {
+                const i = idx + 1; const p = outPos(h);
+                const isTarget = i === draftPath.length - 1;
+                if (isTarget) {
+                  return <circle key={`od${i}`} cx={p.x} cy={p.y} r="3.4" fill={draftColor} pointerEvents="none" />;
+                }
+                return (
+                  <g key={`od${i}`} style={{ cursor: 'grab', touchAction: 'none' }}
+                     onPointerDown={(e) => startDotDrag(e, 'out', i, draftPath)}>
+                    <title>Točka poti — povleci za spremembo poti tja</title>
+                    <circle cx={p.x} cy={p.y} r="7" fill="transparent" />
+                    <circle cx={p.x} cy={p.y} r="3" fill="#1a1405" stroke={draftColor} strokeWidth="1.6" />
+                  </g>
+                );
+              })}
+            </g>
+          );
+        })()}
 
         {/* KAMP — obrambna linija okoli grozda, polna glede na verjetnost odbijanja */}
         {(() => {
@@ -3219,6 +3363,7 @@ export default function App() {
   const [leftOpen,     setLeftOpen]     = useState(() => typeof window !== 'undefined' ? window.innerWidth > 820 : true);   // panel: na telefonu privzeto zaprt (karta vidna)
   const [rightOpen,    setRightOpen]    = useState(true);   // desni dnevnik odprt/zaprt
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
+  const [draftReturn,  setDraftReturn]  = useState<Array<{ q: number; r: number }>>([]);
   const [draftPeople,  setDraftPeople]  = useState(5);
   const [draftRations, setDraftRations] = useState(3);  // ločeni obroki za odpravo
   const [draftKind,    setDraftKind]    = useState<'scout' | 'attack'>('scout');
@@ -3367,7 +3512,7 @@ export default function App() {
       setGame(g);
       setShowStart(false);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('obzidje'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('robots'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setRoundCards([]); setDraftPath([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
+      setAxis('obzidje'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('robots'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setRoundCards([]); setDraftPath([]); setDraftReturn([]); setDraftPeople(5); setDraftRations(3); setPendingExpeditions([]); setArtifactTargetWp('');
     } finally { setLoading(false); }
   };
 
@@ -3408,6 +3553,7 @@ export default function App() {
       setArtifactTargetWp('');
       const clan = state.mapTiles?.find((t: HexTile) => t.isClanCamp);
       setDraftPath(clan ? [{ q: clan.q, r: clan.r }] : []);
+      setDraftReturn([]);
       setGame(state);
       setRoundCards(roundEventCards(state.lastRoundLog, state));
       setResearchObj(normalizeResearchObjective(
@@ -3465,48 +3611,55 @@ export default function App() {
     setScoutTargets(next);
   }
 
+  /** Nastavi cilj: samodejno nariši najkrajšo pot tja (kamp→cilj) in nazaj (cilj→kamp). */
+  function setDestination(tile: { q: number; r: number }) {
+    const clan = game?.mapTiles?.find(t => t.isClanCamp);
+    if (!clan) return;
+    if (tile.q === clan.q && tile.r === clan.r) return;  // klik na kamp → ignoriraj
+    const out = greedyHexPath({ q: clan.q, r: clan.r }, tile);
+    setDraftPath(out);
+    setDraftReturn(greedyHexPath(tile, { q: clan.q, r: clan.r }));
+  }
+
   function handlePathClick(tile: { q: number; r: number }) {
     const last = draftPath[draftPath.length - 1];
-    if (!last) return;
-    // Če je klik na zadnjega heksa, odznači (razen kamp)
-    if (last.q === tile.q && last.r === tile.r) {
-      if (draftPath.length > 1) setDraftPath(draftPath.slice(0, -1));
+    // Klik na trenutni cilj → počisti pot (nazaj na kamp).
+    if (last && last.q === tile.q && last.r === tile.r) {
+      const clan = game?.mapTiles?.find(t => t.isClanCamp);
+      setDraftPath(clan ? [{ q: clan.q, r: clan.r }] : []);
+      setDraftReturn([]);
       return;
     }
-    // Sicer dodaj sosednjega
-    setDraftPath([...draftPath, tile]);
+    setDestination(tile);
   }
 
-  /** Pohlepna najkrajša pot od kampa do ciljnega heksa (vključno z obema). */
-  function pathFromCampTo(target: { q: number; r: number }): Array<{ q: number; r: number }> {
+  /** Povleci vmesno točko poti na nov heks → preoblikuj ustrezno pot (odhodno ali povratno). */
+  function onWaypointMove(kind: 'out' | 'ret', index: number, hexY: { q: number; r: number }, original: Array<{ q: number; r: number }>) {
     const clan = game?.mapTiles?.find(t => t.isClanCamp);
-    if (!clan) return [];
-    const path: Array<{ q: number; r: number }> = [{ q: clan.q, r: clan.r }];
-    let cur = { q: clan.q, r: clan.r };
-    let guard = 0;
-    while (!(cur.q === target.q && cur.r === target.r) && guard++ < 64) {
-      let best: { q: number; r: number } | undefined;
-      let bestD = Infinity;
-      for (const d of PATH_NEIGHBOR_DIRS) {
-        const n = { q: cur.q + d.q, r: cur.r + d.r };
-        if (n.q < 0 || n.q >= MAP_COLS || n.r < 0 || n.r >= MAP_ROWS) continue;
-        const dist = hexDistFE(n, target);
-        if (dist < bestD) { bestD = dist; best = n; }
+    if (!clan) return;
+    if (hexY.q === clan.q && hexY.r === clan.r) return;  // ne spuščaj točke v kamp
+    const next = respliceWaypoint(original, index, hexY);
+    if (next.length < 2) return;
+    if (kind === 'out') {
+      setDraftPath(next);
+      // povratek se začne na novem cilju; ohrani ga skladnega (privzeto najkrajši nazaj)
+      const newTarget = next[next.length - 1];
+      const retStart = draftReturn[0];
+      if (!retStart || retStart.q !== newTarget.q || retStart.r !== newTarget.r) {
+        setDraftReturn(greedyHexPath(newTarget, { q: clan.q, r: clan.r }));
       }
-      if (!best) break;
-      cur = best;
-      path.push(cur);
+    } else {
+      setDraftReturn(next);
     }
-    return path;
   }
 
-  /** Izberi odkrito šibko točko v zavihku Napad → samodejno nariše napadalno pot do nje. */
+  /** Izberi odkrito šibko točko v zavihku Napad → samodejno nariše napadalno pot do nje (tja in nazaj). */
   function selectWeakPointAttack(wp: AIWeakPoint) {
     const tile = game?.mapTiles?.find(t => t.hidesWeakPointId === wp.id);
     if (!tile) return;
     setDraftKind('attack');
     setTargetWP(wp.id);
-    setDraftPath(pathFromCampTo({ q: tile.q, r: tile.r }));
+    setDestination({ q: tile.q, r: tile.r });
   }
 
   // Statistike za draft pot (mesecev + tveganje)
@@ -3515,15 +3668,17 @@ export default function App() {
   const draftPathMonths = draftStealth
     ? Math.ceil(draftPathTiles * 1.5)        // skrivanje: +50 % trajanja
     : Math.max(0, Math.ceil(draftPathTiles / TILES_PER_MONTH_FE));
-  // Povratek: če zadnji heks meji na kamp → neposredno (0–1 m), sicer nazaj po isti poti.
+  // Povratek = dolžina izbrane povratne poti (cilj → kamp).
   const draftReturnMonths = (() => {
     if (draftPath.length < 2) return 0;
-    const oneWay = Math.max(0, draftPath.length - 1);
+    if (draftReturn.length >= 2) {
+      const steps = draftReturn.length - 1;
+      return draftStealth ? Math.ceil(steps * 1.5) : steps;
+    }
+    // rezerva: če povratna pot (še) ni nastavljena
     const clan = game?.mapTiles?.find(t => t.isClanCamp);
-    if (!clan) return oneWay;
     const last = draftPath[draftPath.length - 1];
-    const home = hexDistFE({ q: last.q, r: last.r }, { q: clan.q, r: clan.r });
-    return Math.min(oneWay, home);  // naravnost domov, nikoli dlje od retrace
+    return clan ? hexDistFE({ q: last.q, r: last.r }, { q: clan.q, r: clan.r }) : draftPath.length - 1;
   })();
   const draftTotalMonths = draftPathMonths + draftReturnMonths;
   function tileEncounterMultFE(p: number, distFromCamp: number): number {
@@ -3591,7 +3746,9 @@ export default function App() {
     return {
       kind: kind === 'attack' ? 'mission' : 'scout',
       weakPointId: wpId,
-      path: draftPath, assigned: draftPeople, rations: draftRations,
+      path: draftPath,
+      returnPath: draftReturn.length >= 2 ? draftReturn : undefined,
+      assigned: draftPeople, rations: draftRations,
       stealth: draftStealth,
     };
   }
@@ -3600,6 +3757,7 @@ export default function App() {
     setPendingExpeditions([...pendingExpeditions, buildDraftInput(kind)]);
     const clan = game?.mapTiles?.find(t => t.isClanCamp);
     if (clan) setDraftPath([{ q: clan.q, r: clan.r }]);
+    setDraftReturn([]);
     setDraftPeople(5);
   }
   function confirmDraftExpedition() { confirmDraft('scout'); }
@@ -4280,9 +4438,11 @@ export default function App() {
             </span>
           </div>
           <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
+            draftReturn={draftReturn}
             draftKind={draftKind}
             plannedPaths={pendingExpeditions.map(e => ({ path: e.path, kind: e.kind }))}
             onPathClick={handlePathClick}
+            onWaypointMove={onWaypointMove}
             onWpSelect={(id) => setTargetWP(targetWP === id ? '' : id)}
             selectedWpId={targetWP}
             expeditions={game.expeditions ?? []}

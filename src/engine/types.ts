@@ -90,6 +90,7 @@ export interface Expedition {
   monthsElapsed: number;
   encountersLog: string[];        // kratki opisi srečanj/dogodkov med potjo
   stealth?: boolean;              // način skrivanja: trajanje +50 %, srečanja ×0.5, boj +20 %
+  returnPath?: Array<{ q: number; r: number }>;  // izbrana povratna pot (cilj → kamp); če manjka, se izračuna najkrajša
   returnRemaining?: number;       // ko je status 'returning': mesecev do vrnitve v kamp
   carried?: { material: number; weapons: number; artifacts: number };  // najdbe/plen, ki jih nosijo (dostavljeno šele ob vrnitvi)
 }
@@ -98,6 +99,7 @@ export interface NewExpeditionInput {
   kind: ExpeditionKind;
   weakPointId?: string;
   path: Array<{ q: number; r: number }>;
+  returnPath?: Array<{ q: number; r: number }>;  // izbrana povratna pot (cilj → kamp); neobvezno
   assigned: number;
   rations: number;
   stealth?: boolean;

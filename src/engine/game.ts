@@ -689,6 +689,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       monthsElapsed: 0,
       encountersLog: [],
       stealth: inp.stealth,
+      returnPath: inp.returnPath,
     });
   }
 
@@ -791,9 +792,15 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         } else {
           expeditionEvents.push(`✓ Izvidniška odprava dospela na (${target.q},${target.r}).`);
         }
-        // POVRATEK — preživeli krenejo nazaj po NOVI (najkrajši) poti proti kampu in raziskujejo polja
+        // POVRATEK — preživeli krenejo nazaj. Če je igralec izbral lastno povratno pot (in se začne na cilju
+        // ter konča v kampu), jo upoštevamo; sicer izračunamo najkrajšo. Med potjo raziskujejo polja.
         survivors = Math.max(0, survivors);
-        const retPath = pathToCamp(target);
+        const camp = pathToCamp(target)[pathToCamp(target).length - 1];
+        const chosenRet = r.exp.returnPath;
+        const retValid = !!chosenRet && chosenRet.length >= 2
+          && chosenRet[0].q === target.q && chosenRet[0].r === target.r
+          && chosenRet[chosenRet.length - 1].q === camp.q && chosenRet[chosenRet.length - 1].r === camp.r;
+        const retPath = retValid ? chosenRet! : pathToCamp(target);
         if (survivors <= 0) {
           // vsi padli na cilju → nošeni plen je izgubljen
           const cs = carriedStr(carried);
