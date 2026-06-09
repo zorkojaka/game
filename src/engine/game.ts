@@ -694,6 +694,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       monthsElapsed: 0,
       encountersLog: [],
       stealth: inp.stealth,
+      lootMode: inp.lootMode,
       returnPath: inp.returnPath,
     });
   }

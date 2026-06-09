@@ -115,6 +115,13 @@ export const FIND_MATERIAL_CHANCE = 0.12;  // mala možnost — 12 %
 export const FIND_WEAPON_CHANCE   = 0.025; // zelo redko — 2.5 %
 export const FIND_ARTIFACT_CHANCE = 0.005; // minimalna — 0.5 %
 
+// Način LOOTANJE (samo izvidniki): raziskava pade na četrtino, najdbe pogostejše.
+// Material postane pogost, orožje redko, artefakt še vedno zelo redko.
+export const LOOT_RESEARCH_FACTOR = 0.25;  // raziskava ×0.25
+export const LOOT_MATERIAL_MULT   = 4;     // material pogost
+export const LOOT_WEAPON_MULT     = 3;     // orožje redko
+export const LOOT_ARTIFACT_MULT   = 2;     // artefakt še vedno zelo redko
+
 export interface ExpeditionFinds { material: number; weapons: number; artifacts: number; }
 
 /** Premakni eno odpravo za en mesec. Vrne posodobljeno + nova stanja heksov + RNG. */
@@ -153,7 +160,9 @@ export function tickExpedition(
 
     curIdx++;
 
-    const addProg = researchPerVisit(assignedNow);
+    // Lootanje: raziskava pade na četrtino (čas porabijo za pobiranje, ne za raziskavo)
+    const loot = !!exp.lootMode;
+    const addProg = researchPerVisit(assignedNow) * (loot ? LOOT_RESEARCH_FACTOR : 1);
     const newProg = Math.min(1, tile.researchProgress + addProg);
     newTiles[tIdx] = { ...tile, researchProgress: newProg, visibility: visibilityFromProgress(newProg) };
 
@@ -176,17 +185,21 @@ export function tickExpedition(
 
     // Najdbe — samo na poljih, ki še niso bila popolnoma raziskana
     if (wasUnresearched) {
+      // V načinu lootanja so verjetnosti najdb večje (material pogost, orožje redko, artefakt zelo redko).
+      const aC = FIND_ARTIFACT_CHANCE * (loot ? LOOT_ARTIFACT_MULT : 1);
+      const wC = FIND_WEAPON_CHANCE   * (loot ? LOOT_WEAPON_MULT   : 1);
+      const mC = FIND_MATERIAL_CHANCE * (loot ? LOOT_MATERIAL_MULT : 1);
       const [findRoll, rngF] = rngNext(rng); rng = rngF;
       // Sestavi prag po prioriteti: prva najdba ki preseže prag
-      if (findRoll < FIND_ARTIFACT_CHANCE) {
+      if (findRoll < aC) {
         finds.artifacts += 1;
         events.push(`💎 Artefakt najden na ${hexLabel(tile)}!`);
-      } else if (findRoll < FIND_ARTIFACT_CHANCE + FIND_WEAPON_CHANCE) {
+      } else if (findRoll < aC + wC) {
         const [w, rngW] = rngInt(rng, 1, 3); rng = rngW;
         finds.weapons += w;
         events.push(`⚔ ${w} orožja najdenega na ${hexLabel(tile)}.`);
-      } else if (findRoll < FIND_ARTIFACT_CHANCE + FIND_WEAPON_CHANCE + FIND_MATERIAL_CHANCE) {
-        const [m, rngM] = rngInt(rng, 1, 4); rng = rngM;
+      } else if (findRoll < aC + wC + mC) {
+        const [m, rngM] = rngInt(rng, loot ? 2 : 1, loot ? 6 : 4); rng = rngM;
         finds.material += m;
         events.push(`⚙ ${m} materiala najdenega na ${hexLabel(tile)}.`);
       }

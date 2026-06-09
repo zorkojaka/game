@@ -2,7 +2,8 @@ import { describe, it, expect } from '@jest/globals';
 import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus } from './combat.js';
 import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp } from './expedition.js';
-import { isCampHex, collapseCampRuns, researchPerVisit } from './map.js';
+import { isCampHex, collapseCampRuns, researchPerVisit, generateMap } from './map.js';
+import { tickExpedition } from './expedition.js';
 import { hexLabel } from './types.js';
 import { createRNG } from './rng.js';
 import type { PlayerAction, GameState } from './types.js';
@@ -426,5 +427,37 @@ describe('researchPerVisit — raziskava je linearna (delitev ni boljša)', () =
   it('narašča z ljudmi in je omejeno na 1.0', () => {
     expect(researchPerVisit(1)).toBeLessThan(researchPerVisit(4));
     expect(researchPerVisit(100)).toBe(1);
+  });
+});
+
+describe('izvidniki — način lootanja', () => {
+  const mkExp = (over: Partial<import('./types.js').Expedition> = {}) => ({
+    id: 't', kind: 'scout' as const, path: [{ q: 0, r: 4 }, { q: 1, r: 2 }],
+    currentIndex: 0, assigned: 4, rations: 3, status: 'traveling' as const,
+    monthsElapsed: 0, encountersLog: [] as string[], ...over,
+  });
+  const idxOf = (tiles: ReturnType<typeof generateMap>, q: number, r: number) =>
+    tiles.findIndex(t => t.q === q && t.r === r);
+
+  it('lootanje zniža raziskavo polja na četrtino', () => {
+    const tiles = generateMap();
+    const i = idxOf(tiles, 1, 2);
+    const before = tiles[i].researchProgress;
+    const rNorm = tickExpedition(mkExp(), tiles, 0, createRNG(5), 0);
+    const rLoot = tickExpedition(mkExp({ lootMode: true }), tiles, 0, createRNG(5), 0);
+    const dNorm = rNorm.tiles[i].researchProgress - before;
+    const dLoot = rLoot.tiles[i].researchProgress - before;
+    expect(dNorm).toBeGreaterThan(0);
+    expect(dLoot).toBeCloseTo(dNorm * 0.25, 6);
+  });
+
+  it('lootanje nabere bistveno več materiala kot raziskovanje (čez več poskusov)', () => {
+    let matNorm = 0, matLoot = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      const tiles = generateMap();
+      matNorm += tickExpedition(mkExp(), tiles, 0, createRNG(seed), 0).finds.material;
+      matLoot += tickExpedition(mkExp({ lootMode: true }), tiles, 0, createRNG(seed), 0).finds.material;
+    }
+    expect(matLoot).toBeGreaterThan(matNorm);
   });
 });

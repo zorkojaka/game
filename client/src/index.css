@@ -2687,3 +2687,15 @@ input[type=range].cz-slider::-moz-range-track { height: 6px; border-radius: 3px;
 .hex-map.dragging { cursor: grabbing; user-select: none; }
 .hex-map.dragging .hex-tile { cursor: grabbing !important; }
 .draft-path circle { transition: none; }
+
+/* ─── Izvidniki: preklop raziskovanje ↔ lootanje ─── */
+.loot-toggle-row { display: flex; gap: 6px; margin-top: .5rem; }
+.loot-opt {
+  flex: 1; padding: .42rem .3rem;
+  background: #0a1a0a; border: 1px solid #2a3a2a; border-radius: 8px;
+  color: #8aa48a; font-family: var(--font); font-size: .72rem; font-weight: 700;
+  cursor: pointer; transition: background .12s, border-color .12s, color .12s;
+}
+.loot-opt:hover { border-color: #3a536e; }
+.loot-opt.on { background: #1b2208; border-color: #ffd84a; color: #ffe98a; }
+.loot-opt.loot.on { background: #2a1f0a; border-color: #cc8800; color: #ffce6a; }
