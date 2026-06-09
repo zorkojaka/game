@@ -2156,6 +2156,11 @@ const PATH_NEIGHBOR_DIRS = [
   { q: -1, r:  0 }, { q: -1, r: +1 }, { q:  0, r: +1 },
 ];
 type Hex = { q: number; r: number };
+
+// Preslikava kamp-cone (vloge) → zavihek levega menija (za kontekstno preklapljanje).
+const ZONE_TAB: Record<'d' | 'f' | 'w' | 'r', 'defense' | 'food' | 'workshop' | 'research'> = {
+  d: 'defense', f: 'food', w: 'workshop', r: 'research',
+};
 function hexDistAxial(a: Hex, b: Hex): number {
   const as_ = -a.q - a.r, bs_ = -b.q - b.r;
   return (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(as_ - bs_)) / 2;
@@ -3700,6 +3705,8 @@ export default function App() {
     const out = greedyHexPath({ q: clan.q, r: clan.r }, tile);
     setDraftPath(out);
     setDraftReturn(greedyHexPath(tile, { q: clan.q, r: clan.r }));
+    // Če je levi meni odprt, pokaži panel poti (izvidniki/napad glede na tip).
+    if (leftOpen) setTab(draftKind === 'attack' ? 'attack' : 'map');
   }
 
   function handlePathClick(tile: { q: number; r: number }) {
@@ -4544,13 +4551,13 @@ export default function App() {
             wps={game.aiWeakPoints} otherClans={game.otherClans ?? []} drawingMode={true}
             camp={{ defenders, researchers, workers, foragers }}
             freePeople={freePeople}
-            onCampAdjust={(which, delta) => bumpRole(which, delta)}
-            onCampSet={(which, value) => setRole(which, value)}
+            onCampAdjust={(which, delta) => { bumpRole(which, delta); if (leftOpen) setTab(ZONE_TAB[which]); }}
+            onCampSet={(which, value) => { setRole(which, value); if (leftOpen) setTab(ZONE_TAB[which]); }}
             repelProbability={odds?.raidRepelProbability ?? 0}
             defenseContribution={defenseContributionBreakdown(game, defenders, rations, odds?.intelBonus ?? 0)}
-            rations={rations} onRations={setRations}
-            workshopObj={workshopObj} onWorkshop={setWorkshopObj}
-            researchObj={researchObj} onResearch={setResearchObj}
+            rations={rations} onRations={(n) => { setRations(n); if (leftOpen) setTab('food'); }}
+            workshopObj={workshopObj} onWorkshop={(o) => { setWorkshopObj(o); if (leftOpen) setTab('workshop'); }}
+            researchObj={researchObj} onResearch={(o) => { setResearchObj(o); if (leftOpen) setTab('research'); }}
             workshop={{ wallsBuilt: game.wallsBuilt ?? 0, weaponProgress: game.weaponWorkshopProgress ?? 0, wallProgress: game.wallProgress ?? 0, artifactProgress: game.artifactWorkshopProgress ?? 0, workers }}
             research={{ robotsLevel: game.robotsResearchLevel ?? 0, robotsProgress: game.robotsResearchProgress ?? 0, weaponLevel: game.weaponResearchLevel ?? 0, weaponProgress: game.weaponResearchProgress ?? 0, wallLevel: game.wallResearchLevel ?? 0, wallProgress: game.wallResearchProgress ?? 0, researchers }}
             pop={{ total: game.population, inCamp: Math.max(0, game.population - inMissions), away: inMissions, free: freePeople }}
