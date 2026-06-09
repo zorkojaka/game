@@ -3014,34 +3014,68 @@ function RationsMini({ value, onChange }: { value: number; onChange: (n: number)
 }
 
 /** Fazni prehod — banner ko AI preide v naslednjo fazo */
+function splitPhaseNarrative(narrative: string): { phaseLines: string[]; statusLines: string[] } {
+  const lines = narrative.split('\n').map(l => l.trim()).filter(Boolean);
+  const phaseLines = lines.filter(line => /AI je zaključil fazo|AI je pripeljal/.test(line));
+  const statusLines = lines.filter(line => !/AI je zaključil fazo|AI je pripeljal/.test(line));
+  return { phaseLines, statusLines };
+}
+
 function PhaseTransitionBanner({ fromPhase, toPhase, narrative, onClose }: {
   fromPhase: keyof typeof PHASE; toPhase: keyof typeof PHASE; narrative: string; onClose: () => void;
 }) {
   const from = PHASE[fromPhase];
   const to = PHASE[toPhase];
+  const { phaseLines, statusLines } = splitPhaseNarrative(narrative);
   return (
     <div className="ptb-overlay" onClick={onClose}>
-      <div className="ptb-card" style={{ borderColor: to.color }} onClick={e => e.stopPropagation()}>
+      <div className="ptb-card" style={{ borderColor: to.color, ['--ptb-color' as string]: to.color }} onClick={e => e.stopPropagation()}>
         <div className="ptb-head">
-          <span className="ptb-tag dim">FAZNI PREHOD</span>
+          <div>
+            <span className="ptb-tag dim">AI PROTOKOL</span>
+            <h2>Fazni prehod</h2>
+          </div>
           <button className="ptb-close" onClick={onClose}>✕</button>
         </div>
-        <div className="ptb-flow">
-          <div className="ptb-side">
-            <div className="ptb-num" style={{ color: from.color, borderColor: from.color }}>{from.num}</div>
-            <div className="ptb-label dim">{from.full}</div>
-            <div className="ptb-state dim small">ZAKLJUČENA</div>
+
+        <div className="ptb-gate">
+          <div className="ptb-node old">
+            <span className="ptb-node-kicker">prejšnja</span>
+            <span className="ptb-node-num">{from.num}</span>
+            <span className="ptb-node-label">{from.label}</span>
           </div>
-          <div className="ptb-arrow" style={{ color: to.color }}>►►</div>
-          <div className="ptb-side">
-            <div className="ptb-num" style={{ color: to.color, borderColor: to.color }}>{to.num}</div>
-            <div className="ptb-label" style={{ color: to.color }}>{to.full}</div>
-            <div className="ptb-state" style={{ color: to.color }}>SE ZAČNE</div>
+          <div className="ptb-transfer" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="ptb-node next">
+            <span className="ptb-node-kicker">nova</span>
+            <span className="ptb-node-num">{to.num}</span>
+            <span className="ptb-node-label">{to.label}</span>
           </div>
         </div>
-        <p className="ptb-narrative">{narrative}</p>
+
+        <div className="ptb-phase-copy" style={{ borderColor: to.color }}>
+          <div className="ptb-phase-title" style={{ color: to.color }}>{to.full}</div>
+          <div className="ptb-phase-lines">
+            {(phaseLines.length ? phaseLines : [`Nova faza se začne: ${to.full}.`]).map((line, i) => (
+              <div key={i}>{line.replace(/^[^\s]+\s+(?=AI\s)/, '')}</div>
+            ))}
+          </div>
+        </div>
+
+        {statusLines.length > 0 && (
+          <div className="ptb-status">
+            <div className="ptb-status-title">Status tega meseca</div>
+            <ul>
+              {statusLines.map((line, i) => <li key={i}>{line}</li>)}
+            </ul>
+          </div>
+        )}
+
         <button className="ptb-continue" style={{ borderColor: to.color, color: to.color }} onClick={onClose}>
-          Nadaljuj →
+          Nadaljuj
         </button>
       </div>
     </div>
@@ -4175,7 +4209,11 @@ export default function App() {
                     <div key={wp.id} className={`wp-chip ${cls}`}
                       onClick={() => { if (known && tile) selectWeakPointAttack(wp); }}>
                       <div className="wp-chip-art">
-                        <img src={weakPointImageHref(wp.id)} alt="" />
+                        {(known || dead) ? (
+                          <img src={weakPointImageHref(wp.id)} alt="" />
+                        ) : (
+                          <div className="wp-chip-unknown" aria-hidden="true">?</div>
+                        )}
                         {dead && <span className="wp-chip-status done">✓</span>}
                         {!known && !dead && <span className="wp-chip-status locked">🔒</span>}
                       </div>
