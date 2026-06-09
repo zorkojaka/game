@@ -2115,14 +2115,6 @@ function arcPath(cx: number, cy: number, r: number, fraction: number): string {
   return `M${sx} ${sy} A${r} ${r} 0 ${large} 1 ${ex} ${ey}`;
 }
 
-function terrainPatternId(t: HexTile): string {
-  if (t.isClanCamp) return 'terrain-camp';
-  if (t.isAICore) return 'terrain-ai';
-  if (t.researchProgress < 0.25) return 'terrain-fog';
-  const n = Math.abs((t.q * 17 + t.r * 31) % 4);
-  return ['terrain-forest', 'terrain-rock', 'terrain-field', 'terrain-ruins'][n];
-}
-
 function terrainImageHref(t: HexTile): string {
   if (t.isClanCamp) return '/assets/map/terrain-camp.png';
   if (t.isAICore) return '/assets/map/terrain-ai-core.png';
@@ -2138,8 +2130,8 @@ function terrainImageHref(t: HexTile): string {
 
 /** Heks barvanje glede na researchProgress. */
 function hexColorByProgress(p: number): { fill: string; stroke: string; labelColor: string } {
-  if (p < 0.25)      return { fill: 'url(#hatch-red)',     stroke: '#3a1818', labelColor: '#5a2020' };
-  if (p < 0.50)      return { fill: 'url(#hatch-redlt)',   stroke: '#5a2828', labelColor: '#7a3838' };
+  if (p < 0.25)      return { fill: '#1a0808',             stroke: '#3a1818', labelColor: '#5a2020' };
+  if (p < 0.50)      return { fill: '#1a1010',             stroke: '#5a2828', labelColor: '#7a3838' };
   if (p < 1.00)      return { fill: '#1a2024',             stroke: '#4a6080', labelColor: '#8aa4c0' };
   return                     { fill: '#0c1a30',            stroke: '#3377cc', labelColor: '#5aa0e0' };
 }
@@ -2246,49 +2238,6 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
         </div>
       )}
       <svg viewBox={`0 0 ${W} ${H}`} className="hex-svg">
-        <defs>
-          <pattern id="hatch-red" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-            <rect width="6" height="6" fill="#1a0808" />
-            <line x1="0" y1="0" x2="0" y2="6" stroke="#3a1818" strokeWidth="2" />
-          </pattern>
-          <pattern id="hatch-redlt" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-            <rect width="6" height="6" fill="#1a1010" />
-            <line x1="0" y1="0" x2="0" y2="6" stroke="#553030" strokeWidth="1.5" />
-          </pattern>
-          <pattern id="terrain-forest" patternUnits="userSpaceOnUse" width="18" height="18">
-            <rect width="18" height="18" fill="transparent" />
-            <path d="M4 14 L8 4 L12 14 Z M10 16 L14 7 L17 16 Z" fill="#24412d" opacity="0.65" />
-          </pattern>
-          <pattern id="terrain-rock" patternUnits="userSpaceOnUse" width="18" height="18">
-            <rect width="18" height="18" fill="transparent" />
-            <path d="M2 12 L7 5 L13 10 L10 15 Z M11 4 L17 8 L15 14 L9 11 Z" fill="#4c4c45" opacity="0.45" />
-          </pattern>
-          <pattern id="terrain-field" patternUnits="userSpaceOnUse" width="16" height="16">
-            <rect width="16" height="16" fill="transparent" />
-            <path d="M2 15 C5 9 5 6 3 2 M7 15 C10 9 10 6 8 2 M12 15 C15 9 15 6 13 2" stroke="#6a6634" strokeWidth="1.3" opacity="0.55" fill="none" />
-          </pattern>
-          <pattern id="terrain-ruins" patternUnits="userSpaceOnUse" width="18" height="18">
-            <rect width="18" height="18" fill="transparent" />
-            <rect x="2" y="9" width="5" height="6" fill="#505654" opacity="0.5" />
-            <rect x="10" y="5" width="6" height="10" fill="#394044" opacity="0.45" />
-            <path d="M2 5 L8 2 M11 16 L17 12" stroke="#6c6c66" strokeWidth="1" opacity="0.55" />
-          </pattern>
-          <pattern id="terrain-fog" patternUnits="userSpaceOnUse" width="18" height="18">
-            <rect width="18" height="18" fill="transparent" />
-            <path d="M-2 6 C3 3 7 9 12 6 S20 6 22 3 M-3 13 C3 10 8 16 14 12 S20 12 23 10" stroke="#6b3333" strokeWidth="1.2" opacity="0.5" fill="none" />
-          </pattern>
-          <pattern id="terrain-camp" patternUnits="userSpaceOnUse" width="20" height="20">
-            <rect width="20" height="20" fill="transparent" />
-            <path d="M3 16 L7 7 L11 16 Z M11 16 L15 8 L18 16 Z" fill="#38644d" opacity="0.75" />
-            <path d="M2 18 H18" stroke="#6a765c" strokeWidth="2" opacity="0.65" />
-          </pattern>
-          <pattern id="terrain-ai" patternUnits="userSpaceOnUse" width="20" height="20">
-            <rect width="20" height="20" fill="transparent" />
-            <circle cx="10" cy="10" r="5" fill="none" stroke="#cc3333" strokeWidth="1.4" opacity="0.65" />
-            <path d="M10 1 V19 M1 10 H19" stroke="#7a2222" strokeWidth="1" opacity="0.55" />
-          </pattern>
-        </defs>
-
 
         {tiles.map(t => {
           const id = tileId(t);
@@ -2369,14 +2318,6 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                 clipPath={`url(#${clipId})`}
                 style={{ pointerEvents: 'none' }}
               />
-              <path d={hexPath(p.x, p.y, SIZE * 0.94)} fill={`url(#${terrainPatternId(t)})`} opacity={t.researchProgress < 0.5 ? 0.42 : 0.6}
-                style={{ pointerEvents: 'none' }} />
-              {t.isClanCamp && (
-                <g className="map-marker camp-marker" style={{ pointerEvents: 'none' }}>
-                  <path d={`M${p.x - 12} ${p.y + 9} L${p.x} ${p.y - 12} L${p.x + 12} ${p.y + 9} Z`} fill="#163a2b" stroke="#66ccaa" strokeWidth="1.2" />
-                  <path d={`M${p.x - 14} ${p.y + 12} H${p.x + 14}`} stroke="#8aa080" strokeWidth="2.2" />
-                </g>
-              )}
               {t.isAICore && (
                 <g className="map-marker ai-core-marker" style={{ pointerEvents: 'none' }}>
                   <circle cx={p.x} cy={p.y} r={SIZE * 0.42} fill="none" stroke="#cc3333" strokeWidth="1.4" opacity="0.85" />
@@ -2387,11 +2328,6 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                 <g className="map-marker clan-marker" style={{ pointerEvents: 'none' }}>
                   <path d={`M${p.x - 9} ${p.y + 8} L${p.x} ${p.y - 10} L${p.x + 9} ${p.y + 8} Z`} fill={clan!.allied ? '#123d2d' : '#332910'} stroke={clan!.allied ? '#33cc88' : '#c0a050'} strokeWidth="1" />
                   <circle cx={p.x + 10} cy={p.y - 10} r="3" fill={clan!.allied ? '#33cc88' : '#c0a050'} />
-                </g>
-              )}
-              {wpVisible && wp && !wp.exploited && (
-                <g className="map-marker wp-marker" style={{ pointerEvents: 'none' }}>
-                  <path d={`M${p.x} ${p.y - 15} L${p.x + 12} ${p.y} L${p.x} ${p.y + 15} L${p.x - 12} ${p.y} Z`} fill="none" stroke="#cc8800" strokeWidth="1.2" opacity="0.9" />
                 </g>
               )}
               {label && (

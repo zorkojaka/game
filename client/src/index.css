@@ -1131,10 +1131,6 @@ input[type=range]::-moz-range-thumb {
 .map-marker.ai-core-marker {
   animation: map-core-pulse 1.8s ease-in-out infinite alternate;
 }
-.map-marker.wp-marker {
-  animation: map-wp-pulse 1.4s ease-in-out infinite alternate;
-}
-.map-marker.camp-marker path:first-child,
 .map-marker.clan-marker path {
   filter: drop-shadow(0 0 3px rgba(102,204,170,.25));
 }
@@ -1142,11 +1138,6 @@ input[type=range]::-moz-range-thumb {
   from { opacity: .65; }
   to { opacity: 1; }
 }
-@keyframes map-wp-pulse {
-  from { opacity: .55; }
-  to { opacity: 1; }
-}
-
 @media (max-width: 640px) {
   .round-event-overlay { padding: 8px; align-items: end; }
   .round-event-card { width: 100%; max-height: 96vh; }
