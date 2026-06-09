@@ -2613,22 +2613,56 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
             }
           }
           const rp = Math.max(0, Math.min(1, repelProbability));
-          const MAX_T = 12;                       // največja debelina obzidja (100 %)
-          const wallT = Math.max(1, rp * MAX_T);  // dejanska debelina = sorazmerna z verjetnostjo
+          const MAX_T = 13;                       // največja debelina obzidja (100 %)
+          const wallT = Math.max(5, 5 + rp * (MAX_T - 5));  // 3D zid naj ostane viden tudi pri nizki obrambi
+          const wallBase = '#2b302d';
+          const wallFace = '#68736b';
+          const wallTop = '#aab6a8';
+          const wallShade = '#111513';
           // Zvezna barva: rdeča (0 %) → rumena (50 %) → zelena (100 %); vsak branilec malo premakne odtenek
           const repelColor = `hsl(${Math.round(rp * 120)}, 75%, 52%)`;
           return (
             <g className="camp-wall" pointerEvents="none">
-              {/* Oznaka NAJVEČJE možne debeline (prosojno, v barvi verjetnosti) */}
+              {/* 3D spodnji rob / senca */}
               {segs.map((s, i) => (
-                <line key={`wm${i}`} x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
-                  stroke={repelColor} strokeWidth={MAX_T} strokeLinecap="round" strokeOpacity={0.18} />
+                <line key={`ws${i}`} x1={s[0][0] + 2.4} y1={s[0][1] + 4.2} x2={s[1][0] + 2.4} y2={s[1][1] + 4.2}
+                  stroke={wallShade} strokeWidth={wallT + 5} strokeLinecap="round" strokeOpacity="0.85" />
               ))}
-              {/* Dejanska debelina obzidja — raste do max pri 100 %, v barvi verjetnosti */}
+              {/* Kamnita masa zidu */}
+              {segs.map((s, i) => (
+                <line key={`wb${i}`} x1={s[0][0] + 1.1} y1={s[0][1] + 2.1} x2={s[1][0] + 1.1} y2={s[1][1] + 2.1}
+                  stroke={wallBase} strokeWidth={wallT + 3} strokeLinecap="round" />
+              ))}
               {segs.map((s, i) => (
                 <line key={`wf${i}`} x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
-                  stroke={repelColor} strokeWidth={wallT} strokeLinecap="round" />
+                  stroke={wallFace} strokeWidth={wallT} strokeLinecap="round" />
               ))}
+              {/* Svetel zgornji rob, da zid bere kot dvignjen 3D objekt */}
+              {segs.map((s, i) => (
+                <line key={`wh${i}`} x1={s[0][0] - 0.6} y1={s[0][1] - 1.1} x2={s[1][0] - 0.6} y2={s[1][1] - 1.1}
+                  stroke={wallTop} strokeWidth={Math.max(1.2, wallT * 0.22)} strokeLinecap="round" strokeOpacity="0.9" />
+              ))}
+              {/* Obrambna energija ostane indikator verjetnosti odbijanja */}
+              {segs.map((s, i) => (
+                <line key={`we${i}`} x1={s[0][0]} y1={s[0][1] - 2.4} x2={s[1][0]} y2={s[1][1] - 2.4}
+                  stroke={repelColor} strokeWidth={Math.max(1.1, wallT * 0.16)} strokeLinecap="round" strokeOpacity={0.72} />
+              ))}
+              {/* Posamezni kamniti bloki na zunanjih robovih */}
+              {segs.map((s, i) => {
+                const x1 = s[0][0], y1 = s[0][1], x2 = s[1][0], y2 = s[1][1];
+                const dx = x2 - x1, dy = y2 - y1;
+                const len = Math.max(1, Math.hypot(dx, dy));
+                const nx = -dy / len, ny = dx / len;
+                return [0.28, 0.5, 0.72].map((t, j) => {
+                  const x = x1 + dx * t;
+                  const y = y1 + dy * t;
+                  return (
+                    <line key={`wk${i}-${j}`} x1={x - nx * wallT * 0.22} y1={y - ny * wallT * 0.22}
+                      x2={x + nx * wallT * 0.22} y2={y + ny * wallT * 0.22}
+                      stroke="#1d231f" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.55" />
+                  );
+                });
+              })}
             </g>
           );
         })()}
