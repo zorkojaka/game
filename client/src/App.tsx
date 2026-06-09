@@ -2311,17 +2311,12 @@ function HexMap({ tiles, draftPath, draftKind, plannedPaths, onPathClick, onWpSe
                 clipPath={`url(#${clipId})`}
                 style={{ pointerEvents: 'none' }}
               />
-              {t.isAICore && (
-                <g className="map-marker ai-core-marker" style={{ pointerEvents: 'none' }}>
-                  <circle cx={p.x} cy={p.y} r={SIZE * 0.42} fill="none" stroke="#cc3333" strokeWidth="1.4" opacity="0.85" />
-                  <circle cx={p.x} cy={p.y} r={SIZE * 0.25} fill="none" stroke="#ff5555" strokeWidth="1" opacity="0.75" />
-                </g>
-              )}
               {label && (
                 <text x={p.x} y={p.y + 4} textAnchor="middle"
                   fontSize={t.isClanCamp || t.isAICore || wpVisible ? 22 : 18}
                   fill={labelColor} fontFamily="'Courier New', monospace"
-                  fontWeight={t.isClanCamp || t.isAICore || wpVisible ? 'bold' : 'normal'}>
+                  fontWeight={t.isClanCamp || t.isAICore || wpVisible ? 'bold' : 'normal'}
+                  opacity={t.isAICore ? 0.58 : 1}>
                   {label}
                 </text>
               )}
@@ -3014,11 +3009,15 @@ function RationsMini({ value, onChange }: { value: number; onChange: (n: number)
 }
 
 /** Fazni prehod — banner ko AI preide v naslednjo fazo */
-function splitPhaseNarrative(narrative: string): { phaseLines: string[]; statusLines: string[] } {
+function splitPhaseNarrative(narrative: string): string[] {
   const lines = narrative.split('\n').map(l => l.trim()).filter(Boolean);
-  const phaseLines = lines.filter(line => /AI je zaključil fazo|AI je pripeljal/.test(line));
-  const statusLines = lines.filter(line => !/AI je zaključil fazo|AI je pripeljal/.test(line));
-  return { phaseLines, statusLines };
+  return lines.filter(line => /AI je zaključil fazo|AI je pripeljal/.test(line));
+}
+
+function phaseTransitionUnit(toPhase: AIPhase): AIRobotType {
+  if (toPhase === 'eliminate') return 'peopleKillers';
+  if (toPhase === 'understand') return 'attackers';
+  return 'scouts';
 }
 
 function PhaseTransitionBanner({ fromPhase, toPhase, narrative, onClose }: {
@@ -3026,7 +3025,8 @@ function PhaseTransitionBanner({ fromPhase, toPhase, narrative, onClose }: {
 }) {
   const from = PHASE[fromPhase];
   const to = PHASE[toPhase];
-  const { phaseLines, statusLines } = splitPhaseNarrative(narrative);
+  const phaseLines = splitPhaseNarrative(narrative);
+  const unit = phaseTransitionUnit(toPhase);
   return (
     <div className="ptb-overlay" onClick={onClose}>
       <div className="ptb-card" style={{ borderColor: to.color, ['--ptb-color' as string]: to.color }} onClick={e => e.stopPropagation()}>
@@ -3056,6 +3056,14 @@ function PhaseTransitionBanner({ fromPhase, toPhase, narrative, onClose }: {
           </div>
         </div>
 
+        <div className="ptb-unit" style={{ borderColor: to.color }}>
+          <img src={unitEventImage('phase', unit)} alt="" draggable={false} />
+          <div className="ptb-unit-copy">
+            <div className="ptb-unit-kicker">Nove AI enote</div>
+            <div className="ptb-unit-name" style={{ color: to.color }}>{ROBOT_UNIT_LABEL[unit]}</div>
+          </div>
+        </div>
+
         <div className="ptb-phase-copy" style={{ borderColor: to.color }}>
           <div className="ptb-phase-title" style={{ color: to.color }}>{to.full}</div>
           <div className="ptb-phase-lines">
@@ -3064,15 +3072,6 @@ function PhaseTransitionBanner({ fromPhase, toPhase, narrative, onClose }: {
             ))}
           </div>
         </div>
-
-        {statusLines.length > 0 && (
-          <div className="ptb-status">
-            <div className="ptb-status-title">Status tega meseca</div>
-            <ul>
-              {statusLines.map((line, i) => <li key={i}>{line}</li>)}
-            </ul>
-          </div>
-        )}
 
         <button className="ptb-continue" style={{ borderColor: to.color, color: to.color }} onClick={onClose}>
           Nadaljuj
