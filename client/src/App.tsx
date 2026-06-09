@@ -2652,7 +2652,6 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
           const wallShare = Math.max(0, Math.min(1, defenseContribution.walls));
           const peopleShare = Math.max(0, Math.min(1 - wallShare, defenseContribution.people));
           const wallT = 14;      // maksimalna širina varnosti = 100 %, zato ostane fiksna
-          const peopleT = 4.8;
           const wallBase = '#2b302d';
           const wallFace = '#68736b';
           const wallTop = '#aab6a8';
@@ -2661,16 +2660,31 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
           const wallShade = '#111513';
           // Zvezna barva: rdeča (0 %) → rumena (50 %) → zelena (100 %); vsak branilec malo premakne odtenek
           const repelColor = `hsl(${Math.round(rp * 120)}, 75%, 52%)`;
-          const segmentPoint = (s: [[number, number], [number, number]], t: number, yOff = 0): [number, number] => [
-            s[0][0] + (s[1][0] - s[0][0]) * t,
-            s[0][1] + (s[1][1] - s[0][1]) * t + yOff,
-          ];
+          const layerLine = (
+            s: [[number, number], [number, number]],
+            start: number,
+            width: number,
+            yShift = 0
+          ) => {
+            const x1 = s[0][0], y1 = s[0][1], x2 = s[1][0], y2 = s[1][1];
+            const dx = x2 - x1, dy = y2 - y1;
+            const len = Math.max(1, Math.hypot(dx, dy));
+            const nx = -dy / len, ny = dx / len;
+            const off = (start + width / 2 - 0.5) * wallT;
+            return {
+              x1: x1 + nx * off,
+              y1: y1 + ny * off + yShift,
+              x2: x2 + nx * off,
+              y2: y2 + ny * off + yShift,
+              sw: Math.max(0, width * wallT),
+            };
+          };
           return (
             <g className="camp-wall" pointerEvents="none">
               {/* 3D spodnji rob / senca */}
               {segs.map((s, i) => (
                 <line key={`ws${i}`} x1={s[0][0] + 2.4} y1={s[0][1] + 4.2} x2={s[1][0] + 2.4} y2={s[1][1] + 4.2}
-                  stroke={wallShade} strokeWidth={wallT + peopleT + 4} strokeLinecap="round" strokeOpacity="0.85" />
+                  stroke={wallShade} strokeWidth={wallT + 4} strokeLinecap="round" strokeOpacity="0.85" />
               ))}
               {/* Prazna 100 % kapaciteta zidu */}
               {segs.map((s, i) => (
@@ -2681,24 +2695,19 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
                 <line key={`wf${i}`} x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
                   stroke={emptyFace} strokeWidth={wallT} strokeLinecap="round" strokeOpacity="0.86" />
               ))}
-              {/* Zapolnjeni deleži: obzidje + ljudje, ostanek ostane prazen */}
+              {/* Zapolnjeni deleži: obzidje + ljudje spreminjajo debelino, dolžina ostane 100 % */}
               {segs.map((s, i) => {
-                const wallEnd = Math.min(rp, wallShare);
-                const peopleStart = wallEnd;
-                const peopleEnd = Math.min(rp, wallShare + peopleShare);
-                const [wx1, wy1] = segmentPoint(s, 0);
-                const [wx2, wy2] = segmentPoint(s, wallEnd);
-                const [px1, py1] = segmentPoint(s, peopleStart, -0.4);
-                const [px2, py2] = segmentPoint(s, peopleEnd, -0.4);
+                const wallLayer = layerLine(s, 0, wallShare);
+                const peopleLayer = layerLine(s, wallShare, peopleShare, -0.25);
                 return (
                   <Fragment key={`wp${i}`}>
-                    {wallEnd > 0 && (
-                      <line x1={wx1} y1={wy1} x2={wx2} y2={wy2}
-                        stroke={wallFace} strokeWidth={wallT} strokeLinecap="round" strokeOpacity="0.95" />
+                    {wallLayer.sw > 0 && (
+                      <line x1={wallLayer.x1} y1={wallLayer.y1} x2={wallLayer.x2} y2={wallLayer.y2}
+                        stroke={wallFace} strokeWidth={wallLayer.sw} strokeLinecap="round" strokeOpacity="0.95" />
                     )}
-                    {peopleEnd > peopleStart && (
-                      <line x1={px1} y1={py1} x2={px2} y2={py2}
-                        stroke={peopleFace} strokeWidth={peopleT} strokeLinecap="round" strokeOpacity="0.9" />
+                    {peopleLayer.sw > 0 && (
+                      <line x1={peopleLayer.x1} y1={peopleLayer.y1} x2={peopleLayer.x2} y2={peopleLayer.y2}
+                        stroke={peopleFace} strokeWidth={peopleLayer.sw} strokeLinecap="round" strokeOpacity="0.9" />
                     )}
                   </Fragment>
                 );
@@ -2708,22 +2717,11 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
                 <line key={`wh${i}`} x1={s[0][0] - 0.6} y1={s[0][1] - 1.1} x2={s[1][0] - 0.6} y2={s[1][1] - 1.1}
                   stroke={wallTop} strokeWidth={Math.max(1.2, wallT * 0.22)} strokeLinecap="round" strokeOpacity="0.9" />
               ))}
-              {/* Obrambna energija ostane indikator verjetnosti odbijanja */}
-              {segs.map((s, i) => {
-                const x1 = s[0][0], y1 = s[0][1] - 2.4, x2 = s[1][0], y2 = s[1][1] - 2.4;
-                const fx = x1 + (x2 - x1) * rp;
-                const fy = y1 + (y2 - y1) * rp;
-                return (
-                  <Fragment key={`we${i}`}>
-                    <line x1={x1} y1={y1} x2={x2} y2={y2}
-                      stroke="#18201c" strokeWidth={Math.max(1.1, (wallT + peopleT) * 0.13)} strokeLinecap="round" strokeOpacity="0.9" />
-                    {rp > 0 && (
-                      <line x1={x1} y1={y1} x2={fx} y2={fy}
-                        stroke={repelColor} strokeWidth={Math.max(1.2, (wallT + peopleT) * 0.18)} strokeLinecap="round" strokeOpacity="0.88" />
-                    )}
-                  </Fragment>
-                );
-              })}
+              {/* Obrambna energija: dolžina je fiksna, debelina in barva kažeta verjetnost odbijanja */}
+              {segs.map((s, i) => (
+                <line key={`we${i}`} x1={s[0][0]} y1={s[0][1] - 2.4} x2={s[1][0]} y2={s[1][1] - 2.4}
+                  stroke={repelColor} strokeWidth={Math.max(0.6, rp * 3.4)} strokeLinecap="round" strokeOpacity={rp > 0 ? 0.88 : 0.25} />
+              ))}
               {/* Posamezni kamniti bloki na zunanjih robovih */}
               {segs.map((s, i) => {
                 const x1 = s[0][0], y1 = s[0][1], x2 = s[1][0], y2 = s[1][1];
