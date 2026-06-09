@@ -204,6 +204,12 @@ export const WEAPON_MATERIAL_COST   = 1;
 export const WALL_MATERIAL_COST     = 4;
 export const ARTIFACT_MATERIAL_COST = 20;
 
+// ─── Izvidovanje: raziskava polja na obisk ─────────────────────────────────────
+// Raziskava polja je LINEARNA glede na število izvidnikov (brez fiksnega bonusa na
+// skupino), tako da je ena skupina N ljudi enakovredna več manjšim skupinam skupaj.
+// Zgornjo mejo postavi raziskanost polja (klamp na 1.0 ob obisku).
+export const SCOUT_RESEARCH_PER_PERSON = 0.125;  // delež raziskave na osebo na obisk
+
 // ─── Raziskovalne nadgradnje (orožje/obzidje) ──────────────────────────────────
 // Vsak level podvoji učinek (napad orožja oz. obramba obzidja).
 export const RESEARCH_LEVEL_WORKER_MONTHS = 120; // raziskovalec-mesecev za naslednji level (npr. 10 razisk. × 12 mes.)
