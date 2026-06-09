@@ -104,10 +104,8 @@ export function generateAIWeakPoints(): AIWeakPoint[] {
 // Koliko se AI-jevo znanje o nas poveča to rundo
 export function calcAISurveillanceGain(
   genome: AIGenome,
-  clanActivity: number,
   playerExposure: number  // [0,1] — kako izpostavljeni smo bili
 ): number {
   const base = genome.surveillanceIntensity * playerExposure;
-  const clansBlock = clanActivity * 0.5; // drugi klani motijo AI
-  return Math.max(0, base - clansBlock) * 0.1; // max 0.1 na rundo
+  return Math.max(0, base) * 0.1; // max 0.1 na rundo
 }

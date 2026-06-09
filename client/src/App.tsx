@@ -148,7 +148,7 @@ const HELP: Record<string, { title: string; rows: [string, string][] }> = {
   ] },
   allies: { title: 'Kako deluje — Zavezniki', rows: [
     ['🔭', 'Razišči heks klana (⛺), da ga odkriješ v megli.'],
-    ['🤝', 'Pošlji odpravo do njega za zavezništvo — nato mesečno pomaga z viri in dviguje aktivnost klanov (AI manj napada).'],
+    ['🤝', 'Pošlji odpravo do njega za zavezništvo — nato mesečno pomaga z viri (hrana / material / orožje / okrepitve).'],
   ] },
 };
 
@@ -262,7 +262,6 @@ function ResourceRow({ game, eventLog }: { game: GameState; eventLog: EventEntry
     <div className="resource-row">
       <div className="res-group enemy">
         <BigStat icon="🤖" label="AI roboti"    value={game.aiRobots}                      color="#cc3333" />
-        <BigStat icon="🌍" label="Klani aktiv"  value={Math.round(game.clanActivity * 100)} color="#88aa66" unit="%" />
       </div>
       <div className="res-divider" />
       <CompactBalanceTrend entries={eventLog} />
@@ -1040,7 +1039,7 @@ function defenseContributionBreakdown(game: GameState, defenders: number, ration
     (units.scouts ?? 0) * AI_UNIT_DEFS.scouts.attack * Math.max(0, 1 - (logical.scouts ? LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS : 0)) +
     (units.attackers ?? 0) * AI_UNIT_DEFS.attackers.attack * Math.max(0, 1 - (logical.attackers ? LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS : 0)) +
     (units.peopleKillers ?? 0) * AI_UNIT_DEFS.peopleKillers.attack * Math.max(0, 1 - (logical.peopleKillers ? LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS : 0));
-  const aiStr = Math.max(1, raidAttack * (1 - game.clanActivity) * RAID_AI_FORCE_PCT);
+  const aiStr = Math.max(1, raidAttack * RAID_AI_FORCE_PCT);
   const totalP = (peopleStr * wallBonus) / (peopleStr * wallBonus + aiStr);
   const walls = Math.max(0, Math.min(totalP, wallProtection));
   const people = Math.max(0, Math.min(1 - walls, totalP - walls));
@@ -1824,7 +1823,7 @@ function AlliesPanel({ clans }: { clans: OtherClan[] }) {
             </div>
             <div className="def-stat-note" style={{ fontSize: '.68rem' }}>
               {c.allied
-                ? `🤝 Zaveznik — ${s.icon} ${s.gift}; dviguje aktivnost klanov.`
+                ? `🤝 Zaveznik — ${s.icon} ${s.gift}.`
                 : c.discovered
                   ? `Specialnost: ${s.icon} ${s.label}. Pošlji odpravo na ${hexLabel(c)} za zavezništvo.`
                   : 'Neznana lokacija — razišči mapo, da ga najdeš.'}
@@ -1953,7 +1952,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
     { id: 'zavezniki', icon: '⛺', title: 'Drugi klani (zavezniki)', body: (
       <ul>
         <li>Na karti so skriti drugi človeški klani. Razišči njihov heks, da jih <b>odkriješ</b> (⛺).</li>
-        <li>Pošlji odpravo do njih za <b>zavezništvo</b>; nato mesečno pomagajo (hrana / material / orožje / okrepitve) in dvignejo aktivnost klanov (manj napadov AI).</li>
+        <li>Pošlji odpravo do njih za <b>zavezništvo</b>; nato mesečno pomagajo (hrana / material / orožje / okrepitve).</li>
       </ul>
     ) },
     { id: 'konec', icon: '🏁', title: 'Zmaga & poraz', body: (
@@ -3521,8 +3520,6 @@ export default function App() {
         ledger.push({ icon: '🔍', label: 'AI vozlišča', value: log.revealedNodes.length });
       if (log.aiKnowledgeDelta && Math.round(log.aiKnowledgeDelta * 100) !== 0)
         ledger.push({ icon: '🕵', label: 'AI ve o nas %', value: Math.round(log.aiKnowledgeDelta * 100) });
-      if (log.clanActivityDelta && Math.round(log.clanActivityDelta * 100) !== 0)
-        ledger.push({ icon: '🌍', label: 'klani %', value: Math.round(log.clanActivityDelta * 100) });
 
       // Ključne ikone za hitri pregled v traku
       const icons: KeyIcon[] = [];
@@ -4020,7 +4017,6 @@ export default function App() {
 
           {/* DESNO — AI / situacija (stranska metrika) */}
           {(() => {
-            const clansAlly = (game.otherClans ?? []).filter(c => c.allied).length * 4;
             const ourK = game.aiInsight ?? calcOurKnowledge(game.aiTree);
             const aiK  = game.aiKnowledge;
             const ourColor = ourK >= 0.6 ? '#22cc88' : ourK >= 0.3 ? '#3377cc' : '#5a7a99';
@@ -4031,8 +4027,6 @@ export default function App() {
                   note={(() => { const u = game.aiUnits; return u ? `🔭${u.scouts} ⚔${u.attackers} ☠${u.peopleKillers}` : ''; })()}
                   noteColor="#aa8888"
                   title={(() => { const u = game.aiUnits; return u ? `Izvidniške: ${u.scouts} · Napadalne: ${u.attackers} · People-killer: ${u.peopleKillers}` : ''; })()} />
-                <BigStat icon="🌍" label="Klani"     value={Math.round(game.clanActivity * 100)} color="#88aa66" unit="%"
-                  note={clansAlly > 0 ? `+${clansAlly}%` : ''} noteColor={'#22cc88'} />
                 <BigStat icon="🔭" label="Mi vemo"   value={Math.round(ourK * 100)} color={ourColor} unit="%" />
                 <BigStat icon="👁" label="AI ve"     value={Math.round(aiK * 100)}  color={aiColor}  unit="%" />
               </div>

@@ -13,11 +13,11 @@ import { hexLabel } from './types.js';
 import { calcAISurveillanceGain, generateAITree, generateAIWeakPoints, DEFAULT_GENOME } from './ai-brain.js';
 import {
   INITIAL_POPULATION, INITIAL_SURVIVAL, INITIAL_COMBAT, INITIAL_INTELLIGENCE, INITIAL_MATERIAL,
-  INITIAL_AI_KNOWLEDGE, INITIAL_CLAN_ACTIVITY,
+  INITIAL_AI_KNOWLEDGE,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
   AI_UNIT_DEFS, aiAttackPower, aiDefensePower, AI_FULL_ATTACK_POWER,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
-  SCOUT_INTEL_YIELD, CLAN_ACTIVITY_DECAY_PER_PHASE,
+  SCOUT_INTEL_YIELD,
   RATIONS_LEVELS, DEFAULT_RATIONS,
   WEAPON_WORKER_MONTHS, WALL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS,
   WEAPON_MATERIAL_COST, WALL_MATERIAL_COST, ARTIFACT_MATERIAL_COST,
@@ -25,7 +25,7 @@ import {
   INITIAL_AI_INSIGHT, AI_INSIGHT_PER_RESEARCHER, NON_ROBOT_RESEARCH_INSIGHT_FACTOR, INSIGHT_PHASE_CAP,
   LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION, LOGICAL_WEAKNESS_LETHALITY_REDUCTION,
   RAID_BASE_CHANCE, RAID_POP_SCALING_MAX, RAID_POP_REFERENCE, RAID_AI_KNOWLEDGE_BONUS,
-  RAID_CLAN_ABSORPTION, RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT,
+  RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT,
   RAID_BREACH_AREAS, RAID_AREA_PEOPLE_LOSS,
   RAID_DESTROY_FOOD_PCT, RAID_DESTROY_WEAPONS_PCT, RAID_DESTROY_MATERIAL_PCT, RAID_DESTROY_WALL_LEVELS,
   SCOUT_BASE_SUCCESS, SCOUT_INTEL_BONUS_PER_100, SCOUT_ESPIONAGE_BONUS,
@@ -139,7 +139,6 @@ export function raidProbability(state: GameState): number {
   let p = RAID_BASE_CHANCE
     + RAID_POP_SCALING_MAX * popFactor
     + RAID_AI_KNOWLEDGE_BONUS * state.aiKnowledge;
-  p *= (1 - state.clanActivity * RAID_CLAN_ABSORPTION);
   p *= Math.min(1, attackPow / AI_FULL_ATTACK_POWER);  // šibkejša/maloštevilna sila → manj raidov
   return Math.max(0, Math.min(1, p));
 }
@@ -157,7 +156,7 @@ export function raidRepelProbability(state: GameState, assignment: Assignment): 
   const equip = Math.min(state.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT * weaponMult;
   const defStr = (base + equip) * (1 + intelB) * wallBonus;
   // Raid izvaja vsa AI sila (vsi tipi enot napadajo) — moč po njihovem napadu
-  const aiStr = effectiveRaidAttackPower(state) * (1 - state.clanActivity) * RAID_AI_FORCE_PCT;
+  const aiStr = effectiveRaidAttackPower(state) * RAID_AI_FORCE_PCT;
   return defStr / (defStr + Math.max(1, aiStr));
 }
 
@@ -220,7 +219,7 @@ function resolveRaid(
   rng = rngRoll;
   const aiUnits = readAIUnits(state);
   // Število robotov, ki sodelujejo v raidu (za štetje uničenih) — vsi tipi
-  const aiForce = Math.floor(totalAIRobots(aiUnits) * (1 - state.clanActivity) * RAID_AI_FORCE_PCT);
+  const aiForce = Math.floor(totalAIRobots(aiUnits) * RAID_AI_FORCE_PCT);
   // People-killer enote (faza 3) povečajo smrtnost med ljudmi
   const logical = logicalWeaknessByRobot(state);
   const pkReduction = logical.peopleKillers ? LOGICAL_WEAKNESS_LETHALITY_REDUCTION : 0;
@@ -303,7 +302,7 @@ export function newGame(seed?: number): GameState {
     aiKnowledge: INITIAL_AI_KNOWLEDGE,
     aiTree: generateAITree(),
     aiWeakPoints: generateAIWeakPoints(),
-    clanActivity: INITIAL_CLAN_ACTIVITY,
+    clanActivity: 0,
     axisHistory: { obzidje: 0, orozje: 0, roboti: 0 },
     activeMissions: [],
     completedMissions: [],
@@ -868,27 +867,26 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       }
     }
   }
-  let clanAllyBoost = 0;
+  let anyAlly = false;
   for (const c of otherClans) {
     if (!c.allied) continue;
-    clanAllyBoost += 0.04;  // zavezniki dvignejo aktivnost klanov (manj AI napadov)
+    anyAlly = true;
     if (c.specialty === 'food')     { survival += 8; }
     else if (c.specialty === 'material') { material += 4; }
     else if (c.specialty === 'weapons')  { combat += 2; }
     else if (c.specialty === 'people')   { population += 1; }
   }
-  if (clanAllyBoost > 0) {
+  if (anyAlly) {
     const gifts = otherClans.filter(c => c.allied).map(c => c.label).join(', ');
     expeditionEvents.push(`🤝 Zavezniki (${gifts}) so poslali pomoč ta mesec.`);
   }
 
-  // 7. Klan aktivnost — fazna krivulja (faza 2/3 pada hitreje, da dosežemo tarčne vrednosti)
-  const clanDelta = -CLAN_ACTIVITY_DECAY_PER_PHASE[state.phase];
-  const clanActivity = Math.max(0, Math.min(1, state.clanActivity + clanDelta + clanAllyBoost));
+  // Aktivnost klanov odstranjena — AI sila ni več filtrirana skoznjo.
+  const clanActivity = 0;
 
   // 8. AI surveillance gain (skupna izpostavljenost: combatants + scouts)
   const exposure = (assignment.combatants + (assignment.researchers ?? 0)) / Math.max(1, state.population);
-  const aiKnowledgeGain = calcAISurveillanceGain(DEFAULT_GENOME, clanActivity, exposure);
+  const aiKnowledgeGain = calcAISurveillanceGain(DEFAULT_GENOME, exposure);
   const finalAiKnowledge = Math.min(1, aiKnowledge + aiKnowledgeGain);
 
   // 9. Stopnjevana lakota — če hrana pade pod 0, izgubljamo % populacije.
@@ -984,7 +982,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       + tickedMissions.reduce((s, m) => s + m.assigned, 0)
       + tickedExps.reduce((s, e) => s + e.assigned, 0)
     ) - totalClanBefore,  // pravi delta klana (samo smrti/rojstva, ne premiki)
-    clanActivityDelta: clanActivity - state.clanActivity,
+    clanActivityDelta: 0,
     aiKnowledgeDelta: finalAiKnowledge - state.aiKnowledge,
     revealedNodes: revealed,
     narrative: buildNarrative(assignment, combatLog, raidLog, scoutResult, revealed, phaseComplete, state.phase, [...expeditionEvents, ...workshopEvents]),

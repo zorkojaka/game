@@ -64,9 +64,9 @@ export function calcAIStrength(
   state: GameState,
   _phase: AIPhase
 ): number {
-  // AI brani z obrambno močjo enot (po tipih), filtrirano skozi aktivnost klanov
+  // AI brani z obrambno močjo enot (po tipih)
   const units = state.aiUnits ?? { scouts: state.aiRobots, attackers: 0, peopleKillers: 0 };
-  const base = aiDefensePower(units) * (1 - state.clanActivity);
+  const base = aiDefensePower(units);
   // Bonus, če AI ve za nas
   const foreknowledge = state.aiKnowledge > 0.5 ? AI_FOREKNOWLEDGE_BONUS : 1.0;
   return base * foreknowledge;
@@ -164,7 +164,7 @@ export function resolveCombat(
   const mAxis = 1.0;  // M_os ni več v bojni moči
   const { outcome, rng: rngAfter } = rollOutcome(p, rng);
   rng = rngAfter;
-  const aiRobotsEngaged = Math.floor(state.aiRobots * (1 - state.clanActivity) * 0.3);
+  const aiRobotsEngaged = Math.floor(state.aiRobots * 0.3);
 
   const { humanLost, aiRobotsDestroyed, spoils, aiInfoGained, infoGained } =
     calcSpoils(outcome, assignment.combatants, aiRobotsEngaged, state.resources.combat);

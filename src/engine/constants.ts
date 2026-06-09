@@ -74,7 +74,6 @@ export const AI_FULL_ATTACK_POWER =
   + AI_UNIT_DEFS.peopleKillers.arrival * AI_UNIT_DEFS.peopleKillers.attack;
 
 export const INITIAL_AI_KNOWLEDGE = 0.1; // AI malo ve o nas na začetku
-export const INITIAL_CLAN_ACTIVITY = 0.60; // drugi klani aktivni — 60 % AI-ja je zaseden
 
 // ─── Populacijska dinamika ─────────────────────────────────────────────────────
 export const SURVIVAL_PER_PERSON_PER_ROUND = 1;    // vsak človek poje 1 unit/rundo
@@ -245,8 +244,7 @@ export const RAID_POP_SCALING_MAX      = 0.20;  // +do 20 % glede na velikost
 export const RAID_POP_REFERENCE        = 100;   // pop za max scaling
 export const RAID_AI_KNOWLEDGE_BONUS   = 0.15;  // +do 15 % če AI ve veliko
 export const RAID_HIDING_REDUCTION     = 0.50;  // hiding os razpolovi verjetnost
-export const RAID_CLAN_ABSORPTION      = 0.50;  // do 50 % bremena prevzamejo drugi klani
-export const RAID_AI_FORCE_PCT         = 0.50;  // 50 % efektivne AI sile sodeluje pri raidu (5× težje)
+export const RAID_AI_FORCE_PCT         = 0.20;  // 20 % efektivne AI sile sodeluje pri raidu (prej 0.50 × klanski davek ~0.40)
 export const DEFENDER_EQUIPMENT_MULT   = 0.40;  // obrambno orožje učinkuje manj kot ofenzivno
 
 // ─── Preboj obrambe: koliko območij kampa AI opustoši po izidu raida ───────────
