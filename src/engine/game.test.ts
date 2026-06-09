@@ -474,3 +474,24 @@ describe('orožje gre z odpravo v napad', () => {
     expect(r.resources.combat).toBeLessThanOrEqual(25);  // odšlo iz kampa (morda še raid)
   });
 });
+
+describe('izvidniki v skrivanju ne nosijo orožja', () => {
+  it('skrit izvidnik: equippedWeapons = 0, zaloga orožja se ne zmanjša zaradi njih', () => {
+    const base = newGame(7);
+    const g: GameState = { ...base, population: 60, resources: { ...base.resources, combat: 20 } };
+    const path = [{ q: 0, r: 4 }, { q: 1, r: 2 }];
+    const r = processRound(g, action({ foragers: 10,
+      newExpeditions: [{ kind: 'scout', path, assigned: 4, rations: 3, stealth: true }] }));
+    const exp = (r.expeditions ?? []).find(e => e.kind === 'scout');
+    expect(exp?.equippedWeapons ?? 0).toBe(0);
+  });
+  it('navaden (neskrit) izvidnik vzame orožje', () => {
+    const base = newGame(7);
+    const g: GameState = { ...base, population: 60, resources: { ...base.resources, combat: 20 } };
+    const path = [{ q: 0, r: 4 }, { q: 1, r: 2 }];
+    const r = processRound(g, action({ foragers: 10,
+      newExpeditions: [{ kind: 'scout', path, assigned: 4, rations: 3, stealth: false }] }));
+    const exp = (r.expeditions ?? []).find(e => e.kind === 'scout');
+    expect(exp?.equippedWeapons).toBe(4);
+  });
+});

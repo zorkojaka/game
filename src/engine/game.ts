@@ -676,7 +676,9 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     const [idRoll, rngId] = rngInt(rng, 1000, 9999); rng = rngId;
     population -= take;
     // OROŽJE GRE Z NJIMI: vsak član vzame 1 orožje iz kampa (vrne se s preživelimi).
-    const equippedWeapons = Math.min(take, Math.max(0, combat));
+    // Izjema: izvidniki v SKRIVANJU orožja ne nosijo (raje se skrijejo) → 0 orožja.
+    const stealthScout = inp.kind === 'scout' && !!inp.stealth;
+    const equippedWeapons = stealthScout ? 0 : Math.min(take, Math.max(0, combat));
     combat -= equippedWeapons;
     // Hrana za celotno pot TJA IN NAZAJ, vzeta iz zalog upfront
     const months = Math.max(1, roundTripMonths(inp.path));

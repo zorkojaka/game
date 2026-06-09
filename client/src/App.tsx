@@ -3064,27 +3064,35 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
               <text x={cx} y={cy + 7} textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold" fill="#fff" style={{ pointerEvents: 'none' }}>{draftPeople}</text>
               <Btn x={cx + 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="plus" disabled={draftAddDisabled}
                 onClick={() => onDraftPeople(1)} title="Več ljudi" />
-              {/* vrsta 3: obroki (cycle) + skrivanje */}
-              <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftRations(draftRations % 5 + 1); }}>
-                <title>{`Obroki: ${draftRations} — klikni za spremembo`}</title>
-                <circle cx={cx - 16} cy={cy + 30} r={9} fill="#0a1a0a" stroke="#668866" strokeWidth="1.5" />
-                <text x={cx - 16} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>{RATIONS_EMOJI[draftRations] ?? '🍞'}</text>
-              </g>
-              {draftKind === 'attack' ? (
-                /* Napadalci: skrivanje vklop/izklop */
-                <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftStealth(!draftStealth); }}>
-                  <title>{draftStealth ? 'Skrivanje vklopljeno' : 'Skrivanje izklopljeno'}</title>
-                  <circle cx={cx + 16} cy={cy + 30} r={9} fill={draftStealth ? '#1a1a2e' : '#0a0a0a'} stroke={draftStealth ? '#8888ff' : '#555'} strokeWidth="1.5" />
-                  <text x={cx + 16} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none', opacity: draftStealth ? 1 : 0.65 }}>🌙</text>
-                </g>
-              ) : (
-                /* Izvidniki: preklop raziskovanje (🔭) ↔ lootanje (⚙) */
-                <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftLoot(!draftLoot); }}>
-                  <title>{draftLoot ? 'Lootanje: nabira material (raziskava ×0.25)' : 'Raziskovanje: odkriva polja'}</title>
-                  <circle cx={cx + 16} cy={cy + 30} r={9} fill={draftLoot ? '#2a1f0a' : '#0a1a0a'} stroke={draftLoot ? '#cc8800' : '#ffd84a'} strokeWidth="1.5" />
-                  <text x={cx + 16} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>{draftLoot ? '🔨' : '🔭'}</text>
-                </g>
-              )}
+              {/* vrsta 3: obroki + (izvidniki: raziskovanje/lootanje) + skrivanje (oboje) */}
+              {(() => {
+                const isScout = draftKind === 'scout';
+                const ratX = isScout ? cx - 22 : cx - 16;
+                const stealthX = isScout ? cx + 22 : cx + 16;
+                return (
+                  <>
+                    <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftRations(draftRations % 5 + 1); }}>
+                      <title>{`Obroki: ${draftRations} — klikni za spremembo`}</title>
+                      <circle cx={ratX} cy={cy + 30} r={9} fill="#0a1a0a" stroke="#668866" strokeWidth="1.5" />
+                      <text x={ratX} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>{RATIONS_EMOJI[draftRations] ?? '🍞'}</text>
+                    </g>
+                    {isScout && (
+                      /* Izvidniki: preklop raziskovanje (🔭) ↔ lootanje (🔨) */
+                      <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftLoot(!draftLoot); }}>
+                        <title>{draftLoot ? 'Lootanje: nabira material (raziskava ×0.25)' : 'Raziskovanje: odkriva polja'}</title>
+                        <circle cx={cx} cy={cy + 30} r={9} fill={draftLoot ? '#2a1f0a' : '#0a1a0a'} stroke={draftLoot ? '#cc8800' : '#ffd84a'} strokeWidth="1.5" />
+                        <text x={cx} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>{draftLoot ? '🔨' : '🔭'}</text>
+                      </g>
+                    )}
+                    {/* Skrivanje — za napadalce IN izvidnike (izvidniki v skrivanju ne rabijo orožja) */}
+                    <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftStealth(!draftStealth); }}>
+                      <title>{draftStealth ? (isScout ? 'Skrivanje: brez orožja, manj srečanj' : 'Skrivanje vklopljeno') : 'Skrivanje izklopljeno'}</title>
+                      <circle cx={stealthX} cy={cy + 30} r={9} fill={draftStealth ? '#1a1a2e' : '#0a0a0a'} stroke={draftStealth ? '#8888ff' : '#555'} strokeWidth="1.5" />
+                      <text x={stealthX} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none', opacity: draftStealth ? 1 : 0.65 }}>🌙</text>
+                    </g>
+                  </>
+                );
+              })()}
             </g>
           );
         })()}
@@ -3674,9 +3682,11 @@ export default function App() {
   const over = assigned > availablePop;
 
   const weaponCap = game ? Math.floor(game.resources.combat) : 0;
-  // Oboroženi = branilci + napadalci + VSI ki gredo na odpravo/misijo (vsak rabi orožje).
-  const draftArmed = draftPath.length >= 2 ? draftPeople : 0;
-  const armedTotal = combatants + defenders + pendingExpPpl + newMissionPeople + draftArmed;
+  // Oboroženi = branilci + napadalci + odprave/misije — RAZEN izvidnikov v skrivanju (ti orožja ne rabijo).
+  const draftIsStealthScout = draftKind === 'scout' && draftStealth;
+  const draftArmed = (draftPath.length >= 2 && !draftIsStealthScout) ? draftPeople : 0;
+  const pendingArmedPpl = pendingExpeditions.reduce((s, e) => s + ((e.kind === 'scout' && e.stealth) ? 0 : e.assigned), 0);
+  const armedTotal = combatants + defenders + pendingArmedPpl + newMissionPeople + draftArmed;
   const overArmed  = armedTotal > weaponCap;
   const weaponsLeft = Math.max(0, weaponCap - armedTotal);
 
@@ -3843,8 +3853,9 @@ export default function App() {
       path: draftPath,
       returnPath: draftReturn.length >= 2 ? draftReturn : undefined,
       assigned: draftPeople, rations: draftRations,
-      // Napadalci: skrivanje. Izvidniki: lootanje namesto skrivanja.
-      stealth: kind === 'attack' ? draftStealth : false,
+      // Skrivanje velja za oboje. Izvidniki dodatno izberejo raziskovanje/lootanje.
+      // Izvidniki v skrivanju ne nosijo orožja (engine: equippedWeapons = 0).
+      stealth: draftStealth,
       lootMode: kind === 'scout' ? draftLoot : undefined,
     };
   }
@@ -4364,6 +4375,10 @@ export default function App() {
                   <div className="def-stat-note">{draftLoot
                     ? <>🔨 <b style={{ color: '#cc8800' }}>Lootanje</b>: raziskava ×0.25, material pogost, orožje redko, artefakt zelo redko.</>
                     : <>🔭 <b style={{ color: '#ffd84a' }}>Raziskovanje</b>: polno odkrivanje polj.</>}</div>
+                  <label className="stealth-toggle" title="Skrivanje: srečanja ×0.5, pot +50 %. Izvidniki v skrivanju NE rabijo orožja.">
+                    <input type="checkbox" checked={draftStealth} onChange={e => setDraftStealth(e.target.checked)} />
+                    <span>🌙 Skrivanje — brez orožja, srečanja ×0.5, pot +50 %</span>
+                  </label>
                   <div className="def-stat-note">🍞 vzamejo <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane · moč ×{draftRTier.strengthMult}</div>
                   <button className="def-upgrade-btn" disabled={!canConfirmDraft} onClick={confirmDraftExpedition}>✓ Potrdi odpravo</button>
                 </div>
@@ -4382,7 +4397,7 @@ export default function App() {
                   const food = Math.round(e.assigned * months * t.foodMult);
                   return (
                     <div key={i} className="pending-exp-row">
-                      <span>🔭 {e.assigned} · {months}m tja+nazaj · {t.emoji} 🍞{food}{e.lootMode ? ' · ⚙' : ''}{e.stealth ? ' · 🌙' : ''}</span>
+                      <span>🔭 {e.assigned} · {months}m tja+nazaj · {t.emoji} 🍞{food}{e.lootMode ? ' · 🔨' : ''}{e.stealth ? ' · 🌙' : ''}</span>
                       <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
                     </div>
                   );
@@ -4573,7 +4588,7 @@ export default function App() {
               setLeftOpen(true);
             }}
             onDraftPeople={(d) => {
-              if (d > 0) { if (!(assignedHome + plannedTotal + draftPeople >= availablePop || weaponsLeft <= 0)) setDraftPeople(draftPeople + 1); }
+              if (d > 0) { if (!(assignedHome + plannedTotal + draftPeople >= availablePop || (!draftIsStealthScout && weaponsLeft <= 0))) setDraftPeople(draftPeople + 1); }
               else setDraftPeople(Math.max(1, draftPeople - 1));
             }}
             onDraftRations={setDraftRations}
@@ -4581,7 +4596,7 @@ export default function App() {
             onDraftLoot={setDraftLoot}
             onConfirmDraft={() => confirmDraft(draftKind)}
             canConfirmDraft={canConfirmDraft}
-            draftAddDisabled={assignedHome + plannedTotal + draftPeople >= availablePop || weaponsLeft <= 0} />
+            draftAddDisabled={assignedHome + plannedTotal + draftPeople >= availablePop || (!draftIsStealthScout && weaponsLeft <= 0)} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>
