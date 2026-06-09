@@ -2715,3 +2715,35 @@ input[type=range].cz-slider::-moz-range-track { height: 6px; border-radius: 3px;
 .ptb-tl-here { font-size: .5rem; font-weight: 800; letter-spacing: .1em; color: var(--n); margin-top: 2px; }
 .ptb-tl-link { align-self: center; width: 16px; height: 2px; background: #2a3340; flex: 0 0 auto; }
 .ptb-tl-link.on { background: var(--ptb-color, #cc3333); }
+
+/* ─── Info gumb (vrh desno) + celozaslonska pomoč ─── */
+.ph-info-btn { font-size: 1.05rem; }
+.ph-info-btn.on { background: #15324a; border-color: #3a7bb0; color: #cfe8ff; }
+
+.help-ov {
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(4,7,10,.82); backdrop-filter: blur(3px);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 3vh 16px; overflow-y: auto;
+}
+.help-ov-inner {
+  width: min(960px, 100%); background: #0c1218; border: 1px solid #25405a;
+  border-radius: 14px; box-shadow: 0 24px 80px rgba(0,0,0,.6);
+  padding: 1rem 1.1rem 1.2rem;
+}
+.help-ov-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .7rem; }
+.help-ov-head h2 { font-size: 1.05rem; color: #cfe8ff; letter-spacing: .02em; margin: 0; }
+.help-ov-close { background: none; border: none; color: #7c8a9c; font-size: 1.2rem; cursor: pointer; }
+.help-ov-close:hover { color: #cfe3ff; }
+.help-ov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: .7rem; }
+.help-ov-card { background: #11181f; border: 1px solid #223344; border-radius: 10px; padding: .65rem .7rem; }
+.help-ov-card-title { font-size: .82rem; font-weight: 800; color: #9fd0ff; margin-bottom: .45rem; letter-spacing: .02em; }
+.help-ov-row { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: start; margin-bottom: .35rem; }
+.help-ov-ic { font-size: .82rem; text-align: right; color: #ffd84a; line-height: 1.35; }
+.help-ov-txt { font-size: .76rem; color: #c4d2de; line-height: 1.35; }
+.help-ov-got {
+  display: block; width: 100%; margin-top: .9rem; padding: .6rem;
+  background: #15324a; border: 1px solid #3a7bb0; border-radius: 9px;
+  color: #cfe8ff; font-weight: 700; font-family: var(--font); cursor: pointer; letter-spacing: .03em;
+}
+.help-ov-got:hover { background: #1b4360; }

@@ -3311,6 +3311,81 @@ function PhaseTransitionBanner({ toPhase, narrative, onClose }: {
 }
 
 /** Start screen */
+/** Pomoč/legenda — celozaslonski overlay z razlago gumbov za nove igralce. */
+function HelpOverlay({ onClose }: { onClose: () => void }) {
+  const groups: Array<{ title: string; icon: string; rows: Array<[string, string]> }> = [
+    {
+      title: 'Cilj igre', icon: '🎯', rows: [
+        ['🏆', 'Zmagaš, če uničiš vse šibke točke AI ALI iztrebiš vse robote. Izgubiš, če ti izumre populacija.'],
+        ['🗓', 'Vsak klik »Naslednji mesec« je ena poteza. AI gre skozi 3 faze (išče → razume → iztreblja).'],
+      ],
+    },
+    {
+      title: 'Zgornja vrstica — viri in metrike', icon: '📊', rows: [
+        ['👥 / 🏠 / 🎯 / 💤', 'Ljudje: cel klan / v kampu / na odpravi / prosti (nerazporejeni).'],
+        ['🍞', 'Hrana — porabi se vsak mesec; če pade na 0, ljudje stradajo in umirajo.'],
+        ['⚔️', 'Orožje — vsak branilec in vsak član odprave (razen skritih izvidnikov) ga rabi.'],
+        ['🔨', 'Material — surovina za izdelavo orožja in obzidja v delavnicah.'],
+        ['👁 / 💎', 'Intel (znanje) · Artefakti (redki; takoj uničijo eno šibko točko).'],
+        ['🤖 / 🔭 / 👁', 'AI roboti · koliko mi vemo o AI · koliko AI ve o nas.'],
+      ],
+    },
+    {
+      title: 'Levi meni — zavihki (klik ikone)', icon: '🧭', rows: [
+        ['🛡', 'Obramba — branilci odbijajo napade AI na kamp.'],
+        ['🌾', 'Prehrana — nabiralci zbirajo hrano.'],
+        ['🔨', 'Delavnice — delavci izdelujejo orožje / gradijo obzidje / artefakt (porabijo material).'],
+        ['🔬', 'Raziskave — raziskovalci odpirajo AI drevo in odklepajo nadgradnje (orožje/obzidje).'],
+        ['🔭 / ⚔', 'Karta & odprave · Napad — načrtuješ poti izvidnikov in napade na AI.'],
+        ['ⓘ / ☰', 'Ta pomoč (vklop/izklop) · Meni (nova igra, pravila, predlogi).'],
+      ],
+    },
+    {
+      title: 'Operativna karta', icon: '🗺', rows: [
+        ['🖱', 'Klikni katerokoli polje izven kampa → samodejno se nariše najkrajša pot tja in nazaj.'],
+        ['•', 'Točke na poti lahko povlečeš in tako spremeniš pot (rumeno = tja, turkizno = nazaj).'],
+        ['＋ / －', 'Pri kamp-conah dodajaš/odvzemaš ljudi (obramba/prehrana/delavnice/raziskave).'],
+        ['◆ / ⛺', 'Šibka točka AI · drug klan — pokažeta se, ko ju z izvidovanjem najdeš (polje ≥ 50 %).'],
+        ['A1, B3 …', 'Oznaka vsakega polja (stolpec-črka + vrsta-številka) — uporablja se v dnevniku dogodkov.'],
+      ],
+    },
+    {
+      title: 'Gumbi odprave (na zadnjem polju poti)', icon: '🎒', rows: [
+        ['🔭 / ⚔', 'Tip: izvidniki (raziskovanje) ali napad.'],
+        ['－ N ＋', 'Število ljudi v odpravi.'],
+        ['🍞', 'Obroki — več hrane = močnejši, a dražje.'],
+        ['🔭 / 🔨', 'Samo izvidniki: raziskovanje (odkriva polja) ali lootanje (nabira material, raziskava ×0.25).'],
+        ['🌙', 'Skrivanje — manj srečanj, pot +50 %. Izvidniki v skrivanju ne rabijo orožja.'],
+        ['✓', 'Potrdi odpravo (sproži se ob naslednjem mesecu).'],
+      ],
+    },
+  ];
+  return (
+    <div className="help-ov" onClick={onClose}>
+      <div className="help-ov-inner" onClick={e => e.stopPropagation()}>
+        <div className="help-ov-head">
+          <h2>ⓘ Kako se igra — razlaga gumbov</h2>
+          <button className="help-ov-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="help-ov-grid">
+          {groups.map(g => (
+            <div key={g.title} className="help-ov-card">
+              <div className="help-ov-card-title">{g.icon} {g.title}</div>
+              {g.rows.map(([ic, txt], i) => (
+                <div key={i} className="help-ov-row">
+                  <span className="help-ov-ic">{ic}</span>
+                  <span className="help-ov-txt">{txt}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        <button className="help-ov-got" onClick={onClose}>Razumem — zapri</button>
+      </div>
+    </div>
+  );
+}
+
 function StartScreen({ onNew, loading }: { onNew: () => void; loading: boolean }) {
   return (
     <div className="start">
@@ -3457,6 +3532,7 @@ export default function App() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [showRules,    setShowRules]    = useState(false);
   const [appMenuOpen,  setAppMenuOpen]  = useState(false);
+  const [helpOverlay,  setHelpOverlay]  = useState(false);
   const [pendingExpeditions, setPendingExpeditions] = useState<NewExpeditionInput[]>([]);
   const [artifactTargetWp, setArtifactTargetWp] = useState<string>('');
   const [targetWP,   setTargetWP]   = useState('');
@@ -3975,6 +4051,7 @@ export default function App() {
       )}
       {showFeedback && <FeedbackModal game={game} onClose={() => setShowFeedback(false)} />}
       {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+      {helpOverlay && <HelpOverlay onClose={() => setHelpOverlay(false)} />}
       {appMenuOpen && (
         <div className="app-menu-overlay" onClick={() => setAppMenuOpen(false)}>
           <div className="app-menu" onClick={e => e.stopPropagation()}>
@@ -4053,6 +4130,8 @@ export default function App() {
           })()}
         </div>
         <div className="top-menu-wrap">
+          <button className={`ph-menu-btn ph-info-btn${helpOverlay ? ' on' : ''}`} onClick={() => setHelpOverlay(o => !o)}
+            title="Pomoč — razlaga gumbov" aria-label="Pomoč">ⓘ</button>
           <button className="ph-menu-btn" onClick={() => setAppMenuOpen(true)} title="Meni" aria-label="Meni">
             {loading ? '⟳' : '☰'}
           </button>
