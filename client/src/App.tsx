@@ -4,7 +4,7 @@ import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundL
 import { tileId } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
-import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, researchMult, AI_UNIT_DEFS } from '../../src/engine/constants';
+import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS } from '../../src/engine/constants';
 import { missionSuccessProbability } from '../../src/engine/game';
 import { logicalWeaknessBonus } from '../../src/engine/combat';
 import { MAP_COLS, MAP_ROWS, collapseCampRuns } from '../../src/engine/map';
@@ -1022,6 +1022,19 @@ function probColor(p: number): string {
   if (p >= 0.45) return '#cc8800';
   if (p >= 0.20) return '#cc5544';
   return '#cc2222';
+}
+
+function defenseContributionBreakdown(game: GameState, defenders: number, rations: number, intelBonus: number): { people: number; walls: number } {
+  if (defenders <= 0) return { people: 0, walls: 0 };
+  const tier = RATIONS_LEVELS[rations] ?? RATIONS_LEVELS[3];
+  const weaponMult = researchMult(game.weaponResearchLevel ?? 0);
+  const wallMult = researchMult(game.wallResearchLevel ?? 0);
+  const base = defenders * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult;
+  const equip = Math.min(game.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT * weaponMult;
+  const people = (base + equip) * (1 + intelBonus);
+  const walls = people * (0.02 * wallMult * (game.wallsBuilt ?? 0));
+  const total = people + walls;
+  return total > 0 ? { people: people / total, walls: walls / total } : { people: 0, walls: 0 };
 }
 
 /** En slider za razporejanje — z opcijsko verjetnostjo */
@@ -2189,7 +2202,7 @@ function respliceWaypoint(original: Hex[], index: number, y: Hex): Hex[] {
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, research, pop, draftPeople, draftRations, draftStealth, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
+function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, research, pop, draftPeople, draftRations, draftStealth, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   draftReturn: Array<{ q: number; r: number }>;
@@ -2207,7 +2220,8 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
   freePeople: number;
   onCampAdjust: (which: 'd' | 'f' | 'w' | 'r', delta: number) => void;
   onCampSet: (which: 'd' | 'f' | 'w' | 'r', value: number) => void;
-  repelProbability: number;  // 0–1, za polnjenje obrambne linije
+  repelProbability: number;  // 0–1, za barvo + polnost obrambne linije
+  defenseContribution: { people: number; walls: number }; // delež obrambne moči: ljudje vs. obzidje
   rations: number; onRations: (n: number) => void;
   workshopObj: WorkshopObjective; onWorkshop: (o: WorkshopObjective) => void;
   researchObj: ResearchObjective; onResearch: (o: ResearchObjective) => void;
@@ -2613,11 +2627,14 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
             }
           }
           const rp = Math.max(0, Math.min(1, repelProbability));
-          const MAX_T = 13;                       // največja debelina obzidja (100 %)
-          const wallT = Math.max(5, 5 + rp * (MAX_T - 5));  // 3D zid naj ostane viden tudi pri nizki obrambi
+          const wallShare = Math.max(0, Math.min(1, defenseContribution.walls));
+          const peopleShare = Math.max(0, Math.min(1, defenseContribution.people));
+          const wallT = Math.max(2.5, 3 + wallShare * 12);       // debelina kamna = koliko prispeva obzidje
+          const peopleT = Math.max(1.2, 1.5 + peopleShare * 5);  // zgornja plast = koliko prispevajo branilci
           const wallBase = '#2b302d';
           const wallFace = '#68736b';
           const wallTop = '#aab6a8';
+          const peopleFace = '#5d8fa3';
           const wallShade = '#111513';
           // Zvezna barva: rdeča (0 %) → rumena (50 %) → zelena (100 %); vsak branilec malo premakne odtenek
           const repelColor = `hsl(${Math.round(rp * 120)}, 75%, 52%)`;
@@ -2626,16 +2643,21 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
               {/* 3D spodnji rob / senca */}
               {segs.map((s, i) => (
                 <line key={`ws${i}`} x1={s[0][0] + 2.4} y1={s[0][1] + 4.2} x2={s[1][0] + 2.4} y2={s[1][1] + 4.2}
-                  stroke={wallShade} strokeWidth={wallT + 5} strokeLinecap="round" strokeOpacity="0.85" />
+                  stroke={wallShade} strokeWidth={wallT + peopleT + 4} strokeLinecap="round" strokeOpacity="0.85" />
               ))}
               {/* Kamnita masa zidu */}
               {segs.map((s, i) => (
                 <line key={`wb${i}`} x1={s[0][0] + 1.1} y1={s[0][1] + 2.1} x2={s[1][0] + 1.1} y2={s[1][1] + 2.1}
-                  stroke={wallBase} strokeWidth={wallT + 3} strokeLinecap="round" />
+                  stroke={wallBase} strokeWidth={wallT + 2.5} strokeLinecap="round" />
               ))}
               {segs.map((s, i) => (
                 <line key={`wf${i}`} x1={s[0][0]} y1={s[0][1]} x2={s[1][0]} y2={s[1][1]}
                   stroke={wallFace} strokeWidth={wallT} strokeLinecap="round" />
+              ))}
+              {/* Branilci kot modra jeklena plast na vrhu zidu */}
+              {segs.map((s, i) => (
+                <line key={`wp${i}`} x1={s[0][0] - 0.2} y1={s[0][1] - 0.8} x2={s[1][0] - 0.2} y2={s[1][1] - 0.8}
+                  stroke={peopleFace} strokeWidth={peopleT} strokeLinecap="round" strokeOpacity="0.82" />
               ))}
               {/* Svetel zgornji rob, da zid bere kot dvignjen 3D objekt */}
               {segs.map((s, i) => (
@@ -2643,10 +2665,21 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
                   stroke={wallTop} strokeWidth={Math.max(1.2, wallT * 0.22)} strokeLinecap="round" strokeOpacity="0.9" />
               ))}
               {/* Obrambna energija ostane indikator verjetnosti odbijanja */}
-              {segs.map((s, i) => (
-                <line key={`we${i}`} x1={s[0][0]} y1={s[0][1] - 2.4} x2={s[1][0]} y2={s[1][1] - 2.4}
-                  stroke={repelColor} strokeWidth={Math.max(1.1, wallT * 0.16)} strokeLinecap="round" strokeOpacity={0.72} />
-              ))}
+              {segs.map((s, i) => {
+                const x1 = s[0][0], y1 = s[0][1] - 2.4, x2 = s[1][0], y2 = s[1][1] - 2.4;
+                const fx = x1 + (x2 - x1) * rp;
+                const fy = y1 + (y2 - y1) * rp;
+                return (
+                  <Fragment key={`we${i}`}>
+                    <line x1={x1} y1={y1} x2={x2} y2={y2}
+                      stroke="#18201c" strokeWidth={Math.max(1.1, (wallT + peopleT) * 0.13)} strokeLinecap="round" strokeOpacity="0.9" />
+                    {rp > 0 && (
+                      <line x1={x1} y1={y1} x2={fx} y2={fy}
+                        stroke={repelColor} strokeWidth={Math.max(1.2, (wallT + peopleT) * 0.18)} strokeLinecap="round" strokeOpacity="0.88" />
+                    )}
+                  </Fragment>
+                );
+              })}
               {/* Posamezni kamniti bloki na zunanjih robovih */}
               {segs.map((s, i) => {
                 const x1 = s[0][0], y1 = s[0][1], x2 = s[1][0], y2 = s[1][1];
@@ -2657,8 +2690,8 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
                   const x = x1 + dx * t;
                   const y = y1 + dy * t;
                   return (
-                    <line key={`wk${i}-${j}`} x1={x - nx * wallT * 0.22} y1={y - ny * wallT * 0.22}
-                      x2={x + nx * wallT * 0.22} y2={y + ny * wallT * 0.22}
+                    <line key={`wk${i}-${j}`} x1={x - nx * wallT * 0.24} y1={y - ny * wallT * 0.24}
+                      x2={x + nx * wallT * 0.24} y2={y + ny * wallT * 0.24}
                       stroke="#1d231f" strokeWidth="1" strokeLinecap="round" strokeOpacity="0.55" />
                   );
                 });
@@ -4030,6 +4063,9 @@ export default function App() {
             const raid6 = odds ? 1 - Math.pow(1 - raidP, 6) : 0;
             const repel = defenders > 0 && odds ? odds.raidRepelProbability : 0;
             const repelPct = Math.round(repel * 100), raidPct = Math.round(raidP * 100), raid6Pct = Math.round(raid6 * 100);
+            const defenseMix = defenseContributionBreakdown(game, defenders, rations, odds?.intelBonus ?? 0);
+            const wallSharePct = Math.round(defenseMix.walls * 100);
+            const peopleSharePct = Math.round(defenseMix.people * 100);
             const wallLvl = game.wallsBuilt ?? 0;
             const wallProg = game.wallProgress ?? 0;  // gradnja /12
             const risk = (p: number) => p < 0.15 ? 'Nizko tveganje' : p < 0.40 ? 'Srednje tveganje' : 'Visoko tveganje';
@@ -4073,6 +4109,7 @@ export default function App() {
                   <div className="def-stat-label">VERJETNOST OBRAMBE</div>
                   <Gauge pct={repelPct} color={probColor(repel)} />
                   <div className="def-stat-sub" style={{ color: probColor(repel) }}>{safety}</div>
+                  <div className="def-stat-note">ljudje {peopleSharePct}% · obzidje {wallSharePct}%</div>
                 </div>
                 <div className="def-stat">
                   <div className="def-stat-label">VSAJ EN NAPAD V 6 MESECIH</div>
@@ -4483,6 +4520,7 @@ export default function App() {
             onCampAdjust={(which, delta) => bumpRole(which, delta)}
             onCampSet={(which, value) => setRole(which, value)}
             repelProbability={odds?.raidRepelProbability ?? 0}
+            defenseContribution={defenseContributionBreakdown(game, defenders, rations, odds?.intelBonus ?? 0)}
             rations={rations} onRations={setRations}
             workshopObj={workshopObj} onWorkshop={setWorkshopObj}
             researchObj={researchObj} onResearch={setResearchObj}
