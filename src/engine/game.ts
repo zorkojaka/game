@@ -675,12 +675,15 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     }
     const [idRoll, rngId] = rngInt(rng, 1000, 9999); rng = rngId;
     population -= take;
+    // OROŽJE GRE Z NJIMI: vsak član vzame 1 orožje iz kampa (vrne se s preživelimi).
+    const equippedWeapons = Math.min(take, Math.max(0, combat));
+    combat -= equippedWeapons;
     // Hrana za celotno pot TJA IN NAZAJ, vzeta iz zalog upfront
     const months = Math.max(1, roundTripMonths(inp.path));
     const eTier = RATIONS_LEVELS[inp.rations] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
     const foodPack = Math.round(take * months * eTier.foodMult);
     survival = Math.max(0, survival - foodPack);
-    expeditionEvents.push(`🎒 Odprava (${take} ljudi, ${months}m tja+nazaj) vzela ${foodPack} hrane s seboj.`);
+    expeditionEvents.push(`🎒 Odprava (${take} ljudi, ${months}m tja+nazaj) vzela ${foodPack} hrane${equippedWeapons > 0 ? ` in ${equippedWeapons} orožja` : ''} s seboj.`);
     newlyCreated.push({
       id: `exp_${state.totalRounds}_${idRoll}`,
       kind: inp.kind,
@@ -694,6 +697,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       encountersLog: [],
       stealth: inp.stealth,
       lootMode: inp.lootMode,
+      equippedWeapons,
       returnPath: inp.returnPath,
     });
   }
@@ -721,11 +725,12 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         expeditionEvents.push(`☠ Odprava izgubljena na poti domov${cs ? ` · izgubljeno: ${cs}` : ''}.`);
         finishedExps.push({ ...r.exp, carried });
       } else if (r.exp.currentIndex >= r.exp.path.length - 1) {
-        // prispeli v kamp — šele zdaj dostavimo ljudi in plen
+        // prispeli v kamp — šele zdaj dostavimo ljudi, plen IN orožje preživelih
         returnedThisMonth += Math.max(0, r.exp.assigned);
-        material += carried.material; combat += carried.weapons; artifacts += carried.artifacts;
+        const retWeapons = Math.min(Math.max(0, r.exp.assigned), r.exp.equippedWeapons ?? 0);
+        material += carried.material; combat += carried.weapons + retWeapons; artifacts += carried.artifacts;
         const cs = carriedStr(carried);
-        expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${r.exp.assigned} ljudi${cs ? ` · prinesli: ${cs}` : ''}.`);
+        expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${r.exp.assigned} ljudi${retWeapons > 0 ? ` (+${retWeapons} orožja)` : ''}${cs ? ` · prinesli: ${cs}` : ''}.`);
         finishedExps.push({ ...r.exp, status: 'completed', carried });
       } else {
         const stepsLeft = (r.exp.path.length - 1) - r.exp.currentIndex;
@@ -812,11 +817,12 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
           if (cs) expeditionEvents.push(`☠ Z odpravo izgubljeno: ${cs} (nihče se ni vrnil).`);
           finishedExps.push({ ...r.exp, carried });
         } else if (retPath.length <= 1) {
-          // cilj je kamp — takoj doma
+          // cilj je kamp — takoj doma (vrne tudi orožje preživelih)
           returnedThisMonth += survivors;
-          material += carried.material; combat += carried.weapons; artifacts += carried.artifacts;
+          const retWeapons = Math.min(survivors, r.exp.equippedWeapons ?? 0);
+          material += carried.material; combat += carried.weapons + retWeapons; artifacts += carried.artifacts;
           const cs = carriedStr(carried);
-          expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${survivors} ljudi${cs ? ` · prinesli: ${cs}` : ''}.`);
+          expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${survivors} ljudi${retWeapons > 0 ? ` (+${retWeapons} orožja)` : ''}${cs ? ` · prinesli: ${cs}` : ''}.`);
           finishedExps.push({ ...r.exp, carried });
         } else {
           expeditionEvents.push(`↩ ${survivors} se vrača proti kampu — še ${retPath.length - 1} polj(e).`);

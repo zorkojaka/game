@@ -92,6 +92,7 @@ export interface Expedition {
   stealth?: boolean;              // način skrivanja: trajanje +50 %, srečanja ×0.5, boj +20 %
   lootMode?: boolean;             // izvidniki: lootanje namesto raziskovanja (raziskava ×0.25, več najdb)
   returnPath?: Array<{ q: number; r: number }>;  // izbrana povratna pot (cilj → kamp); če manjka, se izračuna najkrajša
+  equippedWeapons?: number;       // orožje, ki ga je odprava vzela s seboj (vrne se s preživelimi)
   returnRemaining?: number;       // ko je status 'returning': mesecev do vrnitve v kamp
   carried?: { material: number; weapons: number; artifacts: number };  // najdbe/plen, ki jih nosijo (dostavljeno šele ob vrnitvi)
 }

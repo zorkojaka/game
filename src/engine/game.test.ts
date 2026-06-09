@@ -461,3 +461,16 @@ describe('izvidniki — način lootanja', () => {
     expect(matLoot).toBeGreaterThan(matNorm);
   });
 });
+
+describe('orožje gre z odpravo v napad', () => {
+  it('napadalci vzamejo orožje s seboj (equippedWeapons) in zalogo zmanjšajo', () => {
+    const base = newGame(42);
+    const g: GameState = { ...base, population: 60, resources: { ...base.resources, combat: 30 } };
+    const path = [{ q: 0, r: 4 }, { q: 1, r: 2 }];
+    const r = processRound(g, action({ foragers: 10,
+      newExpeditions: [{ kind: 'mission', path, assigned: 5, rations: 3 }] }));
+    const exp = (r.expeditions ?? []).find(e => e.kind === 'mission');
+    expect(exp?.equippedWeapons).toBe(5);          // 5 orožja vzeli s seboj
+    expect(r.resources.combat).toBeLessThanOrEqual(25);  // odšlo iz kampa (morda še raid)
+  });
+});
