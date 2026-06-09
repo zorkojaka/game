@@ -5,6 +5,13 @@ on:
     branches:
       - main
 
+# Serializiraj deploye na ravni GitHub Actions: nov push počaka, da se tekoči
+# deploy konča (cancel-in-progress: false → queue, ne prekini). Skupaj s flock
+# v deploy skripti prepreči prekrivanje hkratnih deployev (npr. Claude + Codex).
+concurrency:
+  group: deploy-ai-vs-humanity-main
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
