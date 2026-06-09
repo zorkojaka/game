@@ -7,7 +7,7 @@ import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api
 import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, researchMult, AI_UNIT_DEFS } from '../../src/engine/constants';
 import { missionSuccessProbability } from '../../src/engine/game';
 import { logicalWeaknessBonus } from '../../src/engine/combat';
-import { MAP_COLS, MAP_ROWS } from '../../src/engine/map';
+import { MAP_COLS, MAP_ROWS, collapseCampRuns } from '../../src/engine/map';
 
 // ─── Konstante ───────────────────────────────────────────────────────────────
 
@@ -2154,7 +2154,8 @@ function greedyHexPath(from: Hex, to: Hex): Hex[] {
     cur = best;
     path.push(cur);
   }
-  return path;
+  // Kamp je grozd 2×2 — strni kamp-hekse na koncih, da odprava ne potuje skozi kamp.
+  return collapseCampRuns(path);
 }
 /** Odstrani zaporedne podvojene hekse iz poti. */
 function dedupPath(path: Hex[]): Hex[] {
@@ -2181,10 +2182,10 @@ function respliceWaypoint(original: Hex[], index: number, y: Hex): Hex[] {
       ...greedyHexPath(y, next).slice(1),     // … next
       ...original.slice(index + 2),           // … end
     ];
-    return dedupPath(stitched);
+    return collapseCampRuns(dedupPath(stitched));
   }
   // povlekli smo končno točko (cilj/kamp) → premaknemo konec
-  return dedupPath([...original.slice(0, index), ...greedyHexPath(prev, y).slice(1)]);
+  return collapseCampRuns(dedupPath([...original.slice(0, index), ...greedyHexPath(prev, y).slice(1)]));
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */

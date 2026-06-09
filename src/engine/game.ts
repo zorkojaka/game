@@ -6,7 +6,7 @@ import type { RNGState } from './rng.js';
 import { rngInt, rngNext, seedFromString } from './rng.js';
 import { resolveCombat } from './combat.js';
 import { revealTreeByInsight, revealNodeRetroactive } from './fog.js';
-import { generateMap, generateOtherClans, randomizePlacements } from './map.js';
+import { generateMap, generateOtherClans, randomizePlacements, isCampHex } from './map.js';
 import { tickExpedition, roundTripMonths, pathToCamp } from './expedition.js';
 import type { Expedition } from './types.js';
 import { calcAISurveillanceGain, generateAITree, generateAIWeakPoints, DEFAULT_GENOME } from './ai-brain.js';
@@ -795,11 +795,11 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         // POVRATEK — preživeli krenejo nazaj. Če je igralec izbral lastno povratno pot (in se začne na cilju
         // ter konča v kampu), jo upoštevamo; sicer izračunamo najkrajšo. Med potjo raziskujejo polja.
         survivors = Math.max(0, survivors);
-        const camp = pathToCamp(target)[pathToCamp(target).length - 1];
         const chosenRet = r.exp.returnPath;
+        const retEnd = chosenRet?.[chosenRet.length - 1];
         const retValid = !!chosenRet && chosenRet.length >= 2
           && chosenRet[0].q === target.q && chosenRet[0].r === target.r
-          && chosenRet[chosenRet.length - 1].q === camp.q && chosenRet[chosenRet.length - 1].r === camp.r;
+          && !!retEnd && isCampHex(retEnd);  // povratek se mora končati v kamp-grozdu
         const retPath = retValid ? chosenRet! : pathToCamp(target);
         if (survivors <= 0) {
           // vsi padli na cilju → nošeni plen je izgubljen

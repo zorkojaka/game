@@ -11,7 +11,7 @@ import { rngNext, rngInt } from './rng.js';
 import { tileId } from './types.js';
 import {
   visibilityFromProgress, tileEncounterMultiplier, researchPerVisit, hexDistance,
-  neighbors, MAP_COLS, MAP_ROWS,
+  neighbors, MAP_COLS, MAP_ROWS, isCampHex, collapseCampRuns,
 } from './map.js';
 import {
   SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_AI_KNOWLEDGE_BONUS,
@@ -94,7 +94,8 @@ export function pathToCamp(from: { q: number; r: number }): Array<{ q: number; r
   const path: Array<{ q: number; r: number }> = [{ q: from.q, r: from.r }];
   let cur = { q: from.q, r: from.r };
   let guard = 0;
-  while (!(cur.q === CLAN_POS.q && cur.r === CLAN_POS.r) && guard++ < 64) {
+  // Ustavi se ob VSTOPU v katerikoli kamp-heks (grozd) — to je "doma", ne potuje skozi kamp.
+  while (!isCampHex(cur) && guard++ < 64) {
     const opts = neighbors(cur).filter(n => n.q >= 0 && n.q < MAP_COLS && n.r >= 0 && n.r < MAP_ROWS);
     let best: { q: number; r: number } | undefined;
     let bestD = Infinity;
@@ -106,7 +107,7 @@ export function pathToCamp(from: { q: number; r: number }): Array<{ q: number; r
     cur = { q: best.q, r: best.r };
     path.push(cur);
   }
-  return path;
+  return collapseCampRuns(path);
 }
 
 // Verjetnosti najdb na neraziskanem polju

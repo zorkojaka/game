@@ -2,6 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus } from './combat.js';
 import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp } from './expedition.js';
+import { isCampHex, collapseCampRuns } from './map.js';
 import { createRNG } from './rng.js';
 import type { PlayerAction, GameState } from './types.js';
 
@@ -229,11 +230,13 @@ describe('povratni čas odprav', () => {
   });
 });
 
-describe('pathToCamp — povratna pot proti kampu (0,4)', () => {
-  it('iz oddaljenega heksa zgradi veljavno pot, ki se konča v kampu', () => {
+describe('pathToCamp — povratek se ustavi ob vstopu v kamp-grozd', () => {
+  it('iz oddaljenega heksa zgradi veljavno pot, ki se konča v kamp-grozdu', () => {
     const p = pathToCamp({ q: 4, r: 0 });
     expect(p[0]).toEqual({ q: 4, r: 0 });
-    expect(p[p.length - 1]).toEqual({ q: 0, r: 4 });
+    expect(isCampHex(p[p.length - 1])).toBe(true);  // konča se v kamp-grozdu (ne nujno (0,4))
+    // skozi kamp NE potuje: le ZADNJI heks je kampni
+    for (let i = 0; i < p.length - 1; i++) expect(isCampHex(p[i])).toBe(false);
     // vsak korak je sosednji (heks razdalja 1)
     for (let i = 1; i < p.length; i++) {
       const dq = Math.abs(p[i].q - p[i - 1].q);
@@ -241,8 +244,11 @@ describe('pathToCamp — povratna pot proti kampu (0,4)', () => {
       expect(dq + dr).toBeGreaterThan(0);
     }
   });
-  it('heks tik ob kampu → pot dolžine 2', () => {
-    expect(pathToCamp({ q: 0, r: 3 })).toEqual([{ q: 0, r: 3 }, { q: 0, r: 4 }]);
+  it('heks tik ob kamp-grozdu → pot dolžine 2 (vstop v kamp)', () => {
+    const p = pathToCamp({ q: 2, r: 4 });
+    expect(p.length).toBe(2);
+    expect(p[0]).toEqual({ q: 2, r: 4 });
+    expect(isCampHex(p[1])).toBe(true);
   });
 });
 
@@ -335,5 +341,20 @@ describe('odprave — izbrana povratna pot', () => {
     const exp = (r.expeditions ?? []).find(e => e.kind === 'scout');
     expect(exp).toBeTruthy();
     expect(exp!.returnPath).toEqual(returnPath);
+  });
+});
+
+describe('collapseCampRuns — kamp grozd kot eno polje', () => {
+  it('strni vodilni niz kamp-heksov na en sam (izhodno sidro)', () => {
+    // [0,4]=kamp, [1,4]=kamp, [2,4]=real, [3,4]=real
+    const p = collapseCampRuns([{ q: 0, r: 4 }, { q: 1, r: 4 }, { q: 2, r: 4 }, { q: 3, r: 4 }]);
+    expect(p).toEqual([{ q: 1, r: 4 }, { q: 2, r: 4 }, { q: 3, r: 4 }]);
+    expect(isCampHex(p[0])).toBe(true);
+    expect(isCampHex(p[1])).toBe(false);
+  });
+  it('strni sklepni niz kamp-heksov na en sam (vstopno sidro)', () => {
+    const p = collapseCampRuns([{ q: 3, r: 4 }, { q: 2, r: 4 }, { q: 1, r: 4 }, { q: 0, r: 4 }]);
+    expect(p).toEqual([{ q: 3, r: 4 }, { q: 2, r: 4 }, { q: 1, r: 4 }]);
+    expect(isCampHex(p[p.length - 1])).toBe(true);
   });
 });

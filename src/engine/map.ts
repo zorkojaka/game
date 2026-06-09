@@ -16,6 +16,32 @@ export const MAP_ROWS = 5;
 const CLAN_POS = { q: 0, r: MAP_ROWS - 1 };
 const CORE_POS = { q: MAP_COLS - 1, r: 0 };
 
+/**
+ * Kamp ni eno polje, ampak grozd 2×2 (prehrana, raziskave, delavnice, obramba).
+ * Vstop v katerikoli izmed teh heksov pomeni "doma" — odprave skoznje ne potujejo.
+ * Mora se ujemati s CAMP_ZONES v UI.
+ */
+export const CAMP_CLUSTER: ReadonlyArray<{ q: number; r: number }> = [
+  { q: 0, r: MAP_ROWS - 1 },  // 🌾 prehrana / klan
+  { q: 0, r: MAP_ROWS - 2 },  // 🔬 raziskave
+  { q: 1, r: MAP_ROWS - 1 },  // 🔨 delavnice
+  { q: 1, r: MAP_ROWS - 2 },  // 🛡 obramba
+];
+export function isCampHex(h: { q: number; r: number }): boolean {
+  return CAMP_CLUSTER.some(c => c.q === h.q && c.r === h.r);
+}
+/**
+ * Strni zaporedje kamp-heksov na obeh koncih poti v en sam (mejni) heks,
+ * tako da pot vsebuje največ en kamp-heks na začetku in največ enega na koncu.
+ * Ohrani neprekinjenost (odstrani le kamp-heks, čigar sosed je tudi kamp-heks).
+ */
+export function collapseCampRuns(path: Array<{ q: number; r: number }>): Array<{ q: number; r: number }> {
+  let p = path.slice();
+  while (p.length >= 2 && isCampHex(p[0]) && isCampHex(p[1])) p.shift();
+  while (p.length >= 2 && isCampHex(p[p.length - 1]) && isCampHex(p[p.length - 2])) p.pop();
+  return p;
+}
+
 /** Fisher-Yates shuffle s seedanim RNG. */
 function shufflePositions(arr: Array<{q:number,r:number}>, rng: RNGState): [Array<{q:number,r:number}>, RNGState] {
   const a = [...arr];
