@@ -252,9 +252,13 @@ function resolveRaid(
   // Žrtve med ljudmi v prebitih območjih (delež dodeljenih tej vlogi)
   const peopleLossFrac = (outcome === 'partial' || outcome === 'defeat' || outcome === 'annihilation')
     ? RAID_AREA_PEOPLE_LOSS[outcome] * lethality : 0;
-  const foragersLost    = breachedAreas.includes('food')     ? Math.floor((assignment.foragers ?? 0)    * peopleLossFrac) : 0;
-  const workersLost     = breachedAreas.includes('workshop') ? Math.floor((assignment.workers ?? 0)     * peopleLossFrac) : 0;
-  const researchersLost = breachedAreas.includes('research') ? Math.floor((assignment.researchers ?? 0) * peopleLossFrac) : 0;
+  // Žrtve v coni so omejene s številom ljudi v TISTI coni (lethality je lahko > 1 v pozni igri).
+  const forAssigned = assignment.foragers ?? 0;
+  const wrkAssigned = assignment.workers ?? 0;
+  const resAssigned = assignment.researchers ?? 0;
+  const foragersLost    = breachedAreas.includes('food')     ? Math.min(forAssigned, Math.floor(forAssigned * peopleLossFrac)) : 0;
+  const workersLost     = breachedAreas.includes('workshop') ? Math.min(wrkAssigned, Math.floor(wrkAssigned * peopleLossFrac)) : 0;
+  const researchersLost = breachedAreas.includes('research') ? Math.min(resAssigned, Math.floor(resAssigned * peopleLossFrac)) : 0;
   if (breachedAreas.includes('defense')) {
     defendersLost += Math.floor(defenders * peopleLossFrac);
   }
