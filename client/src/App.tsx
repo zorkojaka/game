@@ -2402,7 +2402,7 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
           if (t.isClanCamp) {
             fill = '#0a2018'; stroke = '#22aa88'; label = '⌂'; labelColor = '#66ccaa';
           } else if (t.isAICore) {
-            fill = '#220606'; stroke = '#cc2222'; label = ''; labelColor = '#cc3333';
+            fill = '#220606'; stroke = '#cc2222'; label = code; labelColor = '#cc3333';
           } else if (clanVisible) {
             label = '';
             if (clan!.allied) { labelColor = '#33cc88'; stroke = '#33cc88'; fill = '#0a1c14'; }
@@ -2464,10 +2464,10 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
               />
               {label && (
                 <text x={p.x} y={p.y + (label === code ? 3 : 4)} textAnchor="middle"
-                  fontSize={t.isClanCamp || t.isAICore || wpVisible ? 22 : label === code ? 12 : 18}
+                  fontSize={t.isClanCamp || wpVisible ? 22 : label === code ? 12 : 18}
                   fill={labelColor} fontFamily="'Courier New', monospace"
-                  fontWeight={t.isClanCamp || t.isAICore || wpVisible ? 'bold' : label === code ? 'bold' : 'normal'}
-                  opacity={t.isAICore ? 0.58 : label === code ? (t.researchProgress < 0.25 ? 0.4 : 0.62) : 1}
+                  fontWeight={t.isClanCamp || wpVisible ? 'bold' : label === code ? 'bold' : 'normal'}
+                  opacity={label === code ? (t.researchProgress < 0.25 ? 0.4 : 0.62) : 1}
                   letterSpacing={label === code ? '0.5' : undefined}>
                   {label}
                 </text>
