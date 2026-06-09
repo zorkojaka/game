@@ -8,7 +8,7 @@
 import type { Expedition, HexTile, GameState, Assignment, AIWeakPoint } from './types.js';
 import type { RNGState } from './rng.js';
 import { rngNext, rngInt } from './rng.js';
-import { tileId } from './types.js';
+import { tileId, hexLabel } from './types.js';
 import {
   visibilityFromProgress, tileEncounterMultiplier, researchPerVisit, hexDistance,
   neighbors, MAP_COLS, MAP_ROWS, isCampHex, collapseCampRuns,
@@ -167,7 +167,7 @@ export function tickExpedition(
       const lost = Math.max(1, Math.floor(assignedNow * pctRoll / 100));
       assignedNow = Math.max(0, assignedNow - lost);
       popLoss += lost;
-      events.push(`Srečanje na (${tile.q},${tile.r}): ${lost} izgub`);
+      events.push(`Srečanje na ${hexLabel(tile)}: ${lost} izgub`);
       if (assignedNow < 1) {
         lostAll = true;
         break;
@@ -180,15 +180,15 @@ export function tickExpedition(
       // Sestavi prag po prioriteti: prva najdba ki preseže prag
       if (findRoll < FIND_ARTIFACT_CHANCE) {
         finds.artifacts += 1;
-        events.push(`💎 Artefakt najden na (${tile.q},${tile.r})!`);
+        events.push(`💎 Artefakt najden na ${hexLabel(tile)}!`);
       } else if (findRoll < FIND_ARTIFACT_CHANCE + FIND_WEAPON_CHANCE) {
         const [w, rngW] = rngInt(rng, 1, 3); rng = rngW;
         finds.weapons += w;
-        events.push(`⚔ ${w} orožja najdenega na (${tile.q},${tile.r}).`);
+        events.push(`⚔ ${w} orožja najdenega na ${hexLabel(tile)}.`);
       } else if (findRoll < FIND_ARTIFACT_CHANCE + FIND_WEAPON_CHANCE + FIND_MATERIAL_CHANCE) {
         const [m, rngM] = rngInt(rng, 1, 4); rng = rngM;
         finds.material += m;
-        events.push(`⚙ ${m} materiala najdenega na (${tile.q},${tile.r}).`);
+        events.push(`⚙ ${m} materiala najdenega na ${hexLabel(tile)}.`);
       }
     }
   }
