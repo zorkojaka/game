@@ -183,6 +183,8 @@ export interface RaidResult {
   wallsDestroyed: number;     // porušene stopnje obzidja (obramba prebita)
   breachedAreas: CampArea[];  // katera območja kampa je AI opustošil
   successProbability: number;
+  aiInfoGained: number;       // koliko znanja o nas je AI odnesel iz raida (0 ob dominaciji obrambe)
+  domination: 'defense' | 'ai' | null;  // skrajni izid: ena stran je drugo iztrebila
 }
 
 /** Razčlemba AI robotov po tipu enote. Vsota = aiRobots. */

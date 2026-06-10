@@ -556,3 +556,32 @@ describe('vojna megla — poročilo odprave šele ob vrnitvi', () => {
     expect((r.expeditions ?? [])[0]?.departedCount).toBe(6);
   });
 });
+
+describe('dominacija v raidu', () => {
+  it('ob dominaciji obrambe (victory) so uničeni VSI roboti in AI ne dobi informacij; ob AI dominaciji padejo vsi branilci', () => {
+    let sawDefDom = false, sawAiDom = false;
+    for (let seed = 1; seed <= 600 && !(sawDefDom && sawAiDom); seed++) {
+      const base = newGame(seed);
+      const g: GameState = { ...base, phase: 'eliminate', population: 80, clanActivity: 0,
+        aiUnits: { scouts: 100, attackers: 75, peopleKillers: 25 }, aiRobots: 200,
+        aiKnowledge: 0.4 };
+      const r = processRound(g, action({ defenders: 15, foragers: 20 }));
+      const raid = r.lastRoundLog?.raid;
+      if (!raid?.occurred) continue;
+      if (raid.domination === 'defense') {
+        sawDefDom = true;
+        expect(raid.aiInfoGained).toBe(0);
+        expect(r.aiKnowledge).toBeLessThanOrEqual(g.aiKnowledge + 0.011);  // surveillance ~0, raid 0
+        expect(raid.aiRobotsDestroyed).toBeGreaterThan(0);
+      } else if (raid.domination === 'ai') {
+        sawAiDom = true;
+        expect(raid.defendersLost).toBe(15);             // vsi branilci padli
+        expect(raid.aiInfoGained).toBeCloseTo(0.15, 5);  // AI odnese največ informacij
+      } else {
+        expect(raid.aiInfoGained).toBeGreaterThan(0);
+      }
+    }
+    expect(sawDefDom).toBe(true);
+    expect(sawAiDom).toBe(true);
+  });
+});

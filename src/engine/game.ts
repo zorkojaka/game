@@ -230,10 +230,17 @@ function resolveRaid(
   const lethality = (1 + PEOPLEKILLER_LETHALITY_PER_UNIT * aiUnits.peopleKillers) * (1 - pkReduction);
 
   // Front-line žrtve branilcev + uničenje AI po izidu
+  // DOMINACIJA: skrajni izid izniči poraženca v celoti —
+  //  'victory' (odločilna obramba) → uničeni VSI napadalni roboti, AI ne dobi NOBENE informacije;
+  //  'annihilation' (AI dominacija) → padejo vsi branilci, AI odnese največ informacij.
   const frontFrac:   Record<typeof outcome, number> = { victory: 0.05, partial: 0.25, defeat: 0.60, annihilation: 1.00 };
-  const destroyFrac: Record<typeof outcome, number> = { victory: 0.80, partial: 0.35, defeat: 0.12, annihilation: 0.03 };
+  const destroyFrac: Record<typeof outcome, number> = { victory: 1.00, partial: 0.35, defeat: 0.12, annihilation: 0.03 };
   let defendersLost = outcome === 'annihilation' ? defenders : Math.floor(defenders * frontFrac[outcome] * lethality);
   const aiRobotsDestroyed = Math.floor(aiForce * destroyFrac[outcome]);
+  const domination: 'defense' | 'ai' | null =
+    outcome === 'victory' ? 'defense' : outcome === 'annihilation' ? 'ai' : null;
+  // Informacije, ki jih preživeli roboti odnesejo AI-ju (ob dominaciji obrambe = 0)
+  const aiInfoGained = outcome === 'victory' ? 0 : outcome === 'partial' ? 0.05 : outcome === 'defeat' ? 0.10 : 0.15;
 
   // Uničenje orožja v skladišču (kar ni v rabi, ko napadejo)
   const weaponsInUse = defenders + assignment.combatants;
@@ -276,6 +283,8 @@ function resolveRaid(
       survivalDestroyed: 0, materialDestroyed: 0, wallsDestroyed: 0,
       breachedAreas,
       successProbability: p,
+      aiInfoGained,
+      domination,
     },
     rng,
   };
@@ -621,14 +630,16 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       defendersLost: actualDef, foragersLost: actualFor, workersLost: actualWrk, researchersLost: actualRes,
       weaponsDestroyed, survivalDestroyed, materialDestroyed, wallsDestroyed,
     };
-    aiKnowledge = Math.min(1, aiKnowledge + (raidRes.outcome === 'victory' ? 0.03 : raidRes.outcome === 'partial' ? 0.07 : 0.15));
+    // AI dobi informacije le, če se kak robot vrne — ob DOMINACIJI obrambe ne dobi nič.
+    aiKnowledge = Math.min(1, aiKnowledge + raidRes.aiInfoGained);
   } else {
     raidLog = { occurred: false, outcome: null,
       defendersLost: 0, foragersLost: 0, workersLost: 0, researchersLost: 0,
       aiRobotsDestroyed: 0, weaponsDestroyed: 0,
       survivalDestroyed: 0, materialDestroyed: 0, wallsDestroyed: 0,
       breachedAreas: [],
-      successProbability: raidRepelProbability(state, assignment) };
+      successProbability: raidRepelProbability(state, assignment),
+      aiInfoGained: 0, domination: null };
   }
 
   // 6c. Pop loss od ujetih izvidnikov
@@ -1088,7 +1099,7 @@ function buildNarrative(
   if (raid && raid.occurred) {
     const o = raid.outcome;
     if (o === 'victory') {
-      parts.push(`AI je napadel kamp, obramba je zdržala${raid.defendersLost > 0 ? ` (${raid.defendersLost} branilcev padlo)` : ''}.`);
+      parts.push(`🛡️ DOMINACIJA OBRAMBE: AI je napadel kamp, obramba je IZTREBILA vseh ${raid.aiRobotsDestroyed} robotov${raid.defendersLost > 0 ? ` (${raid.defendersLost} branilcev padlo)` : ' brez večjih izgub'}. Noben robot se ni vrnil — AI ni dobil NOBENE informacije o kampu.`);
     } else {
       const areaLabels: Record<string, string> = { food: 'prehrano', workshop: 'delavnice', research: 'raziskave', defense: 'obrambo' };
       const breached = (raid.breachedAreas ?? []).map(a => areaLabels[a] ?? a);
@@ -1105,10 +1116,13 @@ function buildNarrative(
       if (raid.materialDestroyed > 0) damage.push(`${raid.materialDestroyed} materiala`);
       if (raid.wallsDestroyed > 0)    damage.push(`${raid.wallsDestroyed} stopnjo obzidja`);
       const verb = o === 'annihilation' ? 'je opustošil kamp' : 'je prebil obrambo';
-      let msg = `AI ${verb}`;
+      let msg = o === 'annihilation'
+        ? `☠ AI DOMINACIJA: ${verb} — obramba je bila iztrebljena do zadnjega`
+        : `AI ${verb}`;
       if (breached.length) msg += ` (prizadeta: ${breached.join(', ')})`;
       if (losses.length) msg += ` — padlo ${losses.join(', ')}`;
       if (damage.length) msg += `; uničeno ${damage.join(', ')}`;
+      if (raid.aiInfoGained > 0) msg += `. Preživeli roboti so AI-ju prinesli informacije o kampu (+${Math.round(raid.aiInfoGained * 100)} % AI ve)`;
       parts.push(msg + '.');
     }
   }
