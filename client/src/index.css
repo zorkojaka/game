@@ -2716,34 +2716,41 @@ input[type=range].cz-slider::-moz-range-track { height: 6px; border-radius: 3px;
 .ptb-tl-link { align-self: center; width: 16px; height: 2px; background: #2a3340; flex: 0 0 auto; }
 .ptb-tl-link.on { background: var(--ptb-color, #cc3333); }
 
-/* ─── Info gumb (vrh desno) + celozaslonska pomoč ─── */
+/* ─── Info gumb (vrh desno) + kontekstualna pomoč (oblački na živih elementih) ─── */
 .ph-info-btn { font-size: 1.05rem; }
 .ph-info-btn.on { background: #15324a; border-color: #3a7bb0; color: #cfe8ff; }
 
-.help-ov {
+.hctx-ov {
   position: fixed; inset: 0; z-index: 2000;
-  background: rgba(4,7,10,.82); backdrop-filter: blur(3px);
-  display: flex; align-items: flex-start; justify-content: center;
-  padding: 3vh 16px; overflow-y: auto;
+  background: rgba(3,6,9,.55);  /* rahla zatemnitev — igralni zaslon ostane viden */
 }
-.help-ov-inner {
-  width: min(960px, 100%); background: #0c1218; border: 1px solid #25405a;
-  border-radius: 14px; box-shadow: 0 24px 80px rgba(0,0,0,.6);
-  padding: 1rem 1.1rem 1.2rem;
+.hctx-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.hctx-lines line { stroke: #ffd84a; stroke-width: 1.4; stroke-dasharray: 3 3; opacity: .85; }
+.hctx-hl {
+  position: absolute; pointer-events: none;
+  border: 1.6px solid #ffd84a; border-radius: 8px;
+  box-shadow: 0 0 12px rgba(255,216,74,.35), 0 0 0 4px rgba(255,216,74,.07);
 }
-.help-ov-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .7rem; }
-.help-ov-head h2 { font-size: 1.05rem; color: #cfe8ff; letter-spacing: .02em; margin: 0; }
-.help-ov-close { background: none; border: none; color: #7c8a9c; font-size: 1.2rem; cursor: pointer; }
-.help-ov-close:hover { color: #cfe3ff; }
-.help-ov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: .7rem; }
-.help-ov-card { background: #11181f; border: 1px solid #223344; border-radius: 10px; padding: .65rem .7rem; }
-.help-ov-card-title { font-size: .82rem; font-weight: 800; color: #9fd0ff; margin-bottom: .45rem; letter-spacing: .02em; }
-.help-ov-row { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: start; margin-bottom: .35rem; }
-.help-ov-ic { font-size: .82rem; text-align: right; color: #ffd84a; line-height: 1.35; }
-.help-ov-txt { font-size: .76rem; color: #c4d2de; line-height: 1.35; }
-.help-ov-got {
-  display: block; width: 100%; margin-top: .9rem; padding: .6rem;
-  background: #15324a; border: 1px solid #3a7bb0; border-radius: 9px;
-  color: #cfe8ff; font-weight: 700; font-family: var(--font); cursor: pointer; letter-spacing: .03em;
+.hctx-label {
+  position: absolute;
+  background: #0e1722; border: 1px solid #3a7bb0; border-radius: 9px;
+  padding: .42rem .55rem; box-shadow: 0 8px 26px rgba(0,0,0,.55);
 }
-.help-ov-got:hover { background: #1b4360; }
+.hctx-title { font-size: .72rem; font-weight: 800; color: #ffd84a; margin-bottom: .18rem; letter-spacing: .02em; }
+.hctx-text { font-size: .64rem; color: #cfe0ee; line-height: 1.42; }
+.hctx-foot {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px;
+  background: #0e1722; border: 1px solid #3a7bb0; border-radius: 999px;
+  padding: .45rem .9rem; box-shadow: 0 8px 26px rgba(0,0,0,.55);
+  font-size: .72rem; color: #cfe0ee; white-space: nowrap;
+}
+.hctx-foot button {
+  background: #15324a; border: 1px solid #3a7bb0; border-radius: 999px;
+  color: #cfe8ff; font-family: var(--font); font-size: .72rem; font-weight: 700;
+  padding: .3rem .7rem; cursor: pointer;
+}
+.hctx-foot button:hover { background: #1b4360; }
+@media (max-width: 820px) {
+  .hctx-foot span { display: none; }  /* na telefonu samo gumb Zapri */
+}
