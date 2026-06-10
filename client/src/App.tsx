@@ -4,7 +4,7 @@ import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundL
 import { tileId, hexLabel } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
-import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT, wpGarrisonUnits } from '../../src/engine/constants';
+import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT, wpGarrisonUnits, RESEARCH_LEVEL_WORKER_MONTHS } from '../../src/engine/constants';
 import { missionSuccessProbability } from '../../src/engine/game';
 import { logicalWeaknessBonus, logicalWeaknessByRobot } from '../../src/engine/combat';
 import { MAP_COLS, MAP_ROWS, collapseCampRuns } from '../../src/engine/map';
@@ -188,7 +188,7 @@ const HELP: Record<string, { title: string; rows: [string, string][] }> = {
     ['💎', 'Artefakt: 360 delavec-mes. + 20 materiala. Takoj uniči eno odkrito šibko točko.'],
   ] },
   research: { title: 'Kako deluje — Raziskave', rows: [
-    ['🤖', 'Roboti (120 razisk.-mes./stopnjo, max 3): napredek raste z raziskovalci in odklepa stopnje orožja in obzidja.'],
+    ['🤖', 'Roboti (60 razisk.-mes./stopnjo, max 3): napredek raste z raziskovalci in odklepa stopnje orožja in obzidja.'],
     ['⚙', 'Mehanske šibkosti v AI drevesu prav tako odklenejo tech stopnje. Vsaka stopnja orožja/obzidja podvoji učinek (×2/stopnjo).'],
     ['◆', 'Logične šibkosti takoj dodajo pasivne bonuse v vseh bojih in obrambi.'],
   ] },
@@ -1999,7 +1999,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
     ) },
     { id: 'raziskave', icon: '🔬', title: 'Research loop', body: (
       <ul>
-        <li><b>Roboti</b> (120 razisk.-mes./stopnjo, max 3 stopnje) odklepajo možnost nadgradnje orožja in obzidja — najprej razišči robote.</li>
+        <li><b>Roboti</b> ({RESEARCH_LEVEL_WORKER_MONTHS} razisk.-mes./stopnjo, max 3 stopnje) odklepajo možnost nadgradnje orožja in obzidja — najprej razišči robote.</li>
         <li><b>Mehanske šibkosti</b> v AI drevesu prav tako odklenejo tech stopnje (izvidniki → 1, napadalci → 2, people-killerji → 3).</li>
         <li><b>Orožje / Obzidje</b>: vsaka stopnja podvoji učinek (×2/stopnjo). Stopnja orožja veča moč <b>vseh</b> napadov — v kampu in na odpravah.</li>
         <li><b>Logične šibkosti</b> takoj dajo pasivne bonuse v boju in obrambi brez nadaljnjega dela.</li>
@@ -2946,7 +2946,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                     total: 360 } },
               ];
             } else if (z.adj === 'r') {
-              const R = 120;  // raziskovalec-mesecev na stopnjo
+              const R = RESEARCH_LEVEL_WORKER_MONTHS;  // raziskovalec-mesecev na stopnjo
               const seg = (obj: ResearchObjective, prog: number) => ({
                 done: prog,
                 next: researchObj === obj && research.researchers > 0 ? Math.min(R, prog + research.researchers) : prog,
@@ -2958,15 +2958,15 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
               btns = [
                 { label: '🤖', active: researchObj === 'robots', onClick: () => onResearch('robots'),
                   locked: false, lvl: research.robotsLevel,
-                  title: `Roboti Lv${research.robotsLevel}: odkrivanje šibkih točk, odklene Orožje/Obzidje. 120 razisk.-mes. na stopnjo.`,
+                  title: `Roboti Lv${research.robotsLevel}: odkrivanje šibkih točk, odklene Orožje/Obzidje. ${RESEARCH_LEVEL_WORKER_MONTHS} razisk.-mes. na stopnjo.`,
                   segments: seg('robots', research.robotsProgress) },
                 { label: '⚔️', active: researchObj === 'weapon', onClick: () => onResearch('weapon'),
                   locked: wpnLocked, lvl: research.weaponLevel,
-                  title: `Raziskava orožja Lv${research.weaponLevel}: vsaka stopnja podvoji napad (120 razisk.-mes.).${wpnLocked ? ` Zaklenjeno — najprej Roboti ${research.weaponLevel + 1}.` : ''}`,
+                  title: `Raziskava orožja Lv${research.weaponLevel}: vsaka stopnja podvoji napad (${RESEARCH_LEVEL_WORKER_MONTHS} razisk.-mes.).${wpnLocked ? ` Zaklenjeno — najprej Roboti ${research.weaponLevel + 1}.` : ''}`,
                   segments: seg('weapon', research.weaponProgress) },
                 { label: '🧱', active: researchObj === 'wall', onClick: () => onResearch('wall'),
                   locked: wallLocked, lvl: research.wallLevel,
-                  title: `Raziskava obzidja Lv${research.wallLevel}: vsaka stopnja podvoji obrambo (120 razisk.-mes.).${wallLocked ? ` Zaklenjeno — najprej Roboti ${research.wallLevel + 1}.` : ''}`,
+                  title: `Raziskava obzidja Lv${research.wallLevel}: vsaka stopnja podvoji obrambo (${RESEARCH_LEVEL_WORKER_MONTHS} razisk.-mes.).${wallLocked ? ` Zaklenjeno — najprej Roboti ${research.wallLevel + 1}.` : ''}`,
                   segments: seg('wall', research.wallProgress) },
               ];
             }
@@ -4656,7 +4656,7 @@ export default function App() {
               : researchObj === 'weapon'
                 ? { label: RESEARCH_LEVEL_NAMES.weapon[Math.min(game.weaponResearchLevel ?? 0, 2)], lvl: game.weaponResearchLevel ?? 0, prog: game.weaponResearchProgress ?? 0, color: '#cc4433', icon: '⚔️', eff: `napad ×${Math.pow(2, game.weaponResearchLevel ?? 0)}` }
                 : { label: RESEARCH_LEVEL_NAMES.wall[Math.min(game.wallResearchLevel ?? 0, 2)], lvl: game.wallResearchLevel ?? 0, prog: game.wallResearchProgress ?? 0, color: '#aabb88', icon: '🏰', eff: `obramba ×${Math.pow(2, game.wallResearchLevel ?? 0)}` };
-            const months = researchers > 0 ? Math.ceil((120 - cfg.prog) / researchers) : Infinity;
+            const months = researchers > 0 ? Math.ceil((RESEARCH_LEVEL_WORKER_MONTHS - cfg.prog) / researchers) : Infinity;
             const pctv = Math.round((cfg.prog / 120) * 100);
             const dots = Math.min(24, researchers);
             return (

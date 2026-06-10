@@ -231,7 +231,7 @@ export const SCOUT_RESEARCH_PER_PERSON = 0.125;  // delež raziskave na osebo na
 
 // ─── Raziskovalne nadgradnje (orožje/obzidje) ──────────────────────────────────
 // Vsak level podvoji učinek (napad orožja oz. obramba obzidja).
-export const RESEARCH_LEVEL_WORKER_MONTHS = 120; // raziskovalec-mesecev za naslednji level (npr. 10 razisk. × 12 mes.)
+export const RESEARCH_LEVEL_WORKER_MONTHS = 60;  // raziskovalec-mesecev za naslednji level (npr. 10 razisk. × 6 mes.) — prepolovljeno s 120
 export const RESEARCH_EFFECT_MULT = 2;           // ×2 na level
 /** Multiplikator učinka pri danem nivoju raziskave (level 0 = ×1, 1 = ×2, 2 = ×4 …). */
 export function researchMult(level: number): number {
