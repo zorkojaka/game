@@ -2957,14 +2957,14 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                   // Enotna velikost vseh gumbov; izbrani je večji od neizbranih.
                   const rIn = b.active ? 9.5 : 8;
                   return (
-                    <g key={i} style={{ cursor: locked ? 'default' : 'pointer', opacity: locked ? 0.45 : b.active ? 1 : 0.78 }}
+                    <g key={i} style={{ cursor: locked ? 'default' : 'pointer', opacity: locked ? 0.45 : b.active ? 1 : 0.7 }}
                        onClick={(e) => { e.stopPropagation(); if (!locked) b.onClick(); }}>
                       <title>{b.title}</title>
-                      {/* Ikona z okvirom (brez soja); segmenti narišejo svoj obroč */}
+                      {/* IZBRANI gumb: svetlo polnilo v barvi cone + bela obroba — nezgrešljivo. */}
                       <circle cx={bxp} cy={byp} r={rIn}
-                        fill={b.active ? '#0d1612' : '#0a0a0a'}
-                        stroke={b.segments ? 'none' : z.color}
-                        strokeWidth={b.active ? 2.5 : 1.5} />
+                        fill={b.active ? z.color : '#0a0a0a'}
+                        stroke={b.segments ? 'none' : (b.active ? '#ffffff' : z.color)}
+                        strokeWidth={b.active ? 2 : 1.5} />
                       {/* Segmenti / lok kot obroba ikone — done = polno, next-month napoved = svetlo */}
                       {b.segments && (() => {
                         const { done, next, total } = b.segments;
