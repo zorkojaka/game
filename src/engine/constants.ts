@@ -72,6 +72,26 @@ export const AI_FULL_ATTACK_POWER =
   AI_UNIT_DEFS.scouts.arrival * AI_UNIT_DEFS.scouts.attack
   + AI_UNIT_DEFS.attackers.arrival * AI_UNIT_DEFS.attackers.attack
   + AI_UNIT_DEFS.peopleKillers.arrival * AI_UNIT_DEFS.peopleKillers.attack;
+// Spodnja meja faktorja sile pri raidih — tudi v fazi 1 (sami izvidniki, ~16 % polne
+// moči) se morajo raidi DOGAJATI, le redkejši/šibkejši so. Brez te meje raidi
+// praktično izginejo do faze 3.
+export const RAID_FORCE_FLOOR = 0.55;
+
+// ─── Garnizija šibkih točk ──────────────────────────────────────────────────────
+// AI del svojih enot razporedi na obrambo šibkih točk. Ko prispejo nove enote
+// (faza 2: napadalci, faza 3: people-killerji), se garnizija okrepi; ko igralec
+// uničuje robote, oslabi.
+export function wpGarrisonUnits(u?: { scouts: number; attackers: number; peopleKillers: number }): number {
+  if (!u) return 0;
+  return Math.round(u.scouts * 0.05 + u.attackers * 0.15 + u.peopleKillers * 0.30);
+}
+/** Multiplikator težavnosti napada na šibko točko (1 = brez garnizije). */
+export function wpGarrisonMult(u?: { scouts: number; attackers: number; peopleKillers: number }): number {
+  return 1 + wpGarrisonUnits(u) / 20;
+}
+// Stražena polja: heks s šibko točko ali AI jedrom ima več srečanj (straža).
+export const GUARD_TILE_ENCOUNTER_MULT = 2.2;
+export const NEAR_CORE_ENCOUNTER_MULT  = 1.5;
 
 export const INITIAL_AI_KNOWLEDGE = 0.1; // AI malo ve o nas na začetku
 
@@ -269,7 +289,7 @@ export const RAID_DESTROY_WALL_LEVELS  = 1;    // obramba → poruši toliko sto
 export const SCOUT_BASE_SUCCESS        = 0.80;  // 80 % baza
 export const SCOUT_INTEL_BONUS_PER_100 = 0.10;  // +10 % uspeha na 100 intela
 export const SCOUT_ESPIONAGE_BONUS     = 0.10;  // +10 % če os = espionage
-export const SCOUT_CAPTURE_BASE        = 0.05;  // 5 % bazna verjetnost ujetja
+export const SCOUT_CAPTURE_BASE        = 0.07;  // 7 % bazna verjetnost srečanja (prej 5 % — srečanja so bila preredka)
 export const SCOUT_CAPTURE_PER_SCOUT   = 0.004; // +0.4 % za vsakega scoutsa (več → bolj vidni)
 export const SCOUT_HIDING_REDUCTION    = 0.50;  // hiding os razpolovi verjetnost ujetja
 export const SCOUT_AI_KNOWLEDGE_BONUS  = 0.20;  // +do 20 % ujetja če AI ve veliko

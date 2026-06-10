@@ -17,6 +17,7 @@ import {
   SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_AI_KNOWLEDGE_BONUS,
   SCOUT_CAPTURED_LOSS_MIN, SCOUT_CAPTURED_LOSS_MAX,
   ENCOUNTER_SCOUT_REFERENCE, ENCOUNTER_MIN_FACTOR,
+  GUARD_TILE_ENCOUNTER_MULT, NEAR_CORE_ENCOUNTER_MULT,
 } from './constants.js';
 
 export const TILES_PER_MONTH = 1;  // en korak = en mesec
@@ -32,13 +33,16 @@ export function encounterScoutFactor(aiScouts: number): number {
   return Math.max(0, Math.min(1, f));
 }
 
-/** Verjetnost srečanja na enem polju, glede na opremo izvidnikov + teren + AI izvidniške enote. */
+/** Verjetnost srečanja na enem polju, glede na opremo izvidnikov + teren + AI izvidniške enote.
+ *  Polja s šibko točko / AI jedrom so STRAŽENA (garnizija) → bistveno več srečanj. */
 export function tileEncounterProbability(tile: HexTile, assigned: number, aiKnowledge: number, aiScouts: number = ENCOUNTER_SCOUT_REFERENCE): number {
   const distFromCamp = hexDistance({ q: tile.q, r: tile.r }, CLAN_POS);
   const base = SCOUT_CAPTURE_BASE
     + SCOUT_CAPTURE_PER_SCOUT * assigned
     + SCOUT_AI_KNOWLEDGE_BONUS * aiKnowledge;
-  const p = base * tileEncounterMultiplier(tile.researchProgress, distFromCamp) * encounterScoutFactor(aiScouts);
+  const guard = (tile.hidesWeakPointId || tile.isAICore) ? GUARD_TILE_ENCOUNTER_MULT
+    : tile.distanceToCore <= 1 ? NEAR_CORE_ENCOUNTER_MULT : 1;
+  const p = base * tileEncounterMultiplier(tile.researchProgress, distFromCamp) * encounterScoutFactor(aiScouts) * guard;
   return Math.max(0, Math.min(0.85, p));
 }
 

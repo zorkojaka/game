@@ -25,7 +25,7 @@ import {
   INITIAL_AI_INSIGHT, AI_INSIGHT_PER_RESEARCHER, NON_ROBOT_RESEARCH_INSIGHT_FACTOR, INSIGHT_PHASE_CAP,
   LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION, LOGICAL_WEAKNESS_LETHALITY_REDUCTION,
   RAID_BASE_CHANCE, RAID_POP_SCALING_MAX, RAID_POP_REFERENCE, RAID_AI_KNOWLEDGE_BONUS,
-  RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT,
+  RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT, RAID_FORCE_FLOOR, wpGarrisonMult,
   RAID_BREACH_AREAS, RAID_AREA_PEOPLE_LOSS,
   RAID_DESTROY_FOOD_PCT, RAID_DESTROY_WEAPONS_PCT, RAID_DESTROY_MATERIAL_PCT, RAID_DESTROY_WALL_LEVELS,
   SCOUT_BASE_SUCCESS, SCOUT_INTEL_BONUS_PER_100, SCOUT_ESPIONAGE_BONUS,
@@ -139,7 +139,9 @@ export function raidProbability(state: GameState): number {
   let p = RAID_BASE_CHANCE
     + RAID_POP_SCALING_MAX * popFactor
     + RAID_AI_KNOWLEDGE_BONUS * state.aiKnowledge;
-  p *= Math.min(1, attackPow / AI_FULL_ATTACK_POWER);  // šibkejša/maloštevilna sila → manj raidov
+  // Šibkejša sila → manj raidov, a s spodnjo mejo: raidi se dogajajo SKOZI CELO igro
+  // (tudi v fazi 1 s samimi izvidniki), le redkejši so.
+  p *= Math.max(RAID_FORCE_FLOOR, Math.min(1, attackPow / AI_FULL_ATTACK_POWER));
   return Math.max(0, Math.min(1, p));
 }
 
@@ -200,7 +202,9 @@ export function missionEncounterProbability(state: GameState, assigned: number):
 /** Končna verjetnost uspeha misije — uporabi rations za moč ekipe. */
 export function missionSuccessProbability(state: GameState, weakPointId: string, assigned: number, rationsLevel: number = DEFAULT_RATIONS): number {
   if (assigned < MISSION_MIN_TEAM) return 0;
-  const diff = MISSION_WP_DIFFICULTY[weakPointId] ?? 100;
+  // Garnizija: AI straži šibke točke — z novimi enotami (faza 2/3) je napad težji,
+  // z uničevanjem robotov garnizija slabi.
+  const diff = (MISSION_WP_DIFFICULTY[weakPointId] ?? 100) * wpGarrisonMult(readAIUnits(state));
   const tier = RATIONS_LEVELS[rationsLevel] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
   const equip = Math.min(state.resources.combat, assigned);
   const wMult = researchMult(state.weaponResearchLevel ?? 0);

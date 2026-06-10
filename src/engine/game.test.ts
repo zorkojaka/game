@@ -1,7 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
-import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability } from './game.js';
+import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability, missionSuccessProbability } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus } from './combat.js';
-import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp } from './expedition.js';
+import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp, tileEncounterProbability } from './expedition.js';
+import { wpGarrisonMult } from './constants.js';
 import { isCampHex, collapseCampRuns, researchPerVisit, generateMap } from './map.js';
 import { tickExpedition } from './expedition.js';
 import { hexLabel } from './types.js';
@@ -493,5 +494,37 @@ describe('izvidniki v skrivanju ne nosijo orožja', () => {
       newExpeditions: [{ kind: 'scout', path, assigned: 4, rations: 3, stealth: false }] }));
     const exp = (r.expeditions ?? []).find(e => e.kind === 'scout');
     expect(exp?.equippedWeapons).toBe(4);
+  });
+});
+
+describe('spopadi skozi celo igro', () => {
+  it('raid verjetnost v fazi 1 ni zanemarljiva (force floor)', () => {
+    const g = newGame(11);  // faza 1: samo izvidniki
+    expect(raidProbability(g)).toBeGreaterThan(0.08);
+  });
+  it('garnizija šibkih točk raste z novimi AI enotami in slabi z izgubami', () => {
+    const ph1 = wpGarrisonMult({ scouts: 100, attackers: 0, peopleKillers: 0 });
+    const ph2 = wpGarrisonMult({ scouts: 100, attackers: 75, peopleKillers: 0 });
+    const ph3 = wpGarrisonMult({ scouts: 100, attackers: 75, peopleKillers: 25 });
+    expect(ph2).toBeGreaterThan(ph1);
+    expect(ph3).toBeGreaterThan(ph2);
+    expect(wpGarrisonMult({ scouts: 0, attackers: 0, peopleKillers: 0 })).toBe(1);
+  });
+  it('napad na šibko točko je težji, ko prispejo nove AI enote', () => {
+    const base = newGame(3);
+    const wpId = base.aiWeakPoints[0].id;
+    const ph1: GameState = { ...base, aiUnits: { scouts: 100, attackers: 0, peopleKillers: 0 } };
+    const ph3: GameState = { ...base, aiUnits: { scouts: 100, attackers: 75, peopleKillers: 25 } };
+    const p1 = missionSuccessProbability(ph1, wpId, 10, 3);
+    const p3 = missionSuccessProbability(ph3, wpId, 10, 3);
+    expect(p3).toBeLessThan(p1);
+  });
+  it('polje s šibko točko je straženo — več srečanj kot enako navadno polje', () => {
+    const tiles = generateMap();
+    const wpTile = tiles.find(t => t.hidesWeakPointId)!;
+    const plain = { ...wpTile, hidesWeakPointId: undefined, isAICore: false };
+    const pGuard = tileEncounterProbability(wpTile, 4, 0.1, 100);
+    const pPlain = tileEncounterProbability(plain, 4, 0.1, 100);
+    expect(pGuard).toBeGreaterThan(pPlain);
   });
 });

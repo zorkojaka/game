@@ -4,7 +4,7 @@ import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundL
 import { tileId, hexLabel } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
-import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT } from '../../src/engine/constants';
+import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT, wpGarrisonUnits } from '../../src/engine/constants';
 import { missionSuccessProbability } from '../../src/engine/game';
 import { logicalWeaknessBonus, logicalWeaknessByRobot } from '../../src/engine/combat';
 import { MAP_COLS, MAP_ROWS, collapseCampRuns } from '../../src/engine/map';
@@ -2216,10 +2216,11 @@ function respliceWaypoint(original: Hex[], index: number, y: Hex): Hex[] {
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, research, pop, draftPeople, draftRations, draftStealth, draftLoot, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onDraftLoot, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
+function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, research, pop, draftPeople, draftRations, draftStealth, draftLoot, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onDraftLoot, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   draftReturn: Array<{ q: number; r: number }>;
+  wpGarrison: number;
   draftKind: 'scout' | 'attack';
   plannedPaths: Array<{ path: Array<{ q: number; r: number }>; returnPath?: Array<{ q: number; r: number }>; kind: 'scout' | 'mission' }>;
   onPathClick: (tile: { q: number; r: number }) => void;
@@ -2499,6 +2500,14 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
                   {wpLabelLines.map((line, i) => (
                     <tspan key={line} x={p.x} dy={i === 0 ? 0 : 8}>{line}</tspan>
                   ))}
+                </text>
+              )}
+              {/* Garnizija — AI enote, ki stražijo šibko točko */}
+              {wpVisible && wp && !wp.exploited && wpGarrison > 0 && (
+                <text x={p.x} y={p.y + SIZE * 0.18 + wpLabelLines.length * 8 + 7} textAnchor="middle"
+                  fontSize="6.5" fill="#cc5544" fontFamily="'Courier New', monospace" fontWeight="bold"
+                  stroke="#050706" strokeWidth="2" paintOrder="stroke" style={{ pointerEvents: 'none' }}>
+                  🤖×{wpGarrison} straža
                 </text>
               )}
               {clanVisible && clan && clanMeta && (
@@ -4738,6 +4747,7 @@ export default function App() {
           </div>
           <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
             draftReturn={draftReturn}
+            wpGarrison={wpGarrisonUnits(game.aiUnits)}
             draftKind={draftKind}
             plannedPaths={pendingExpeditions.map(e => ({ path: e.path, returnPath: e.returnPath, kind: e.kind }))}
             onPathClick={handlePathClick}
