@@ -2267,7 +2267,21 @@ function dedupPath(path: Hex[]): Hex[] {
  * `index` je položaj povlečene točke v ORIGINALNI poti.
  */
 function respliceWaypoint(original: Hex[], index: number, y: Hex): Hex[] {
-  if (index <= 0 || index >= original.length) return original;
+  if (index < 0 || index >= original.length) return original;
+  if (index === 0) {
+    // povlekli smo ZAČETNO točko: sidro (kamp) ostane, pot pa najprej skoči skozi Y
+    // (s tem izbereš, na kateri strani pot zapusti kamp), nato do prve naslednje točke.
+    const anchor = original[0];
+    const next = original[1];
+    if (!next) return original;
+    const stitched = [
+      anchor,
+      ...greedyHexPath(anchor, y).slice(1),   // … y
+      ...greedyHexPath(y, next).slice(1),     // … nazaj na staro pot
+      ...original.slice(2),
+    ];
+    return collapseCampRuns(dedupPath(stitched));
+  }
   const prev = original[index - 1];
   const next = original[index + 1];  // lahko undefined, če je to zadnja (končna) točka
   if (next) {
@@ -2721,19 +2735,30 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                   </g>
                 );
               })}
-              {/* odhodne točke (vmesne, povlecljive) + cilj (oznaka) */}
+              {/* ZAČETNA točka (izhod iz kampa) — povlecljiva: izbere smer izhoda */}
+              {draftPath.length > 1 && (() => {
+                const p = legPos(draftPath[0], 'out');
+                return (
+                  <g key="od0" style={{ cursor: 'grab', touchAction: 'none' }}
+                     onPointerDown={(e) => startDotDrag(e, 'out', 0, draftPath)}>
+                    <title>Začetek poti — povleci, da pot zapusti kamp drugje</title>
+                    <circle cx={p.x} cy={p.y} r="7.5" fill="transparent" />
+                    <circle cx={p.x} cy={p.y} r="3.2" fill="#0f2a14" stroke={draftColor} strokeWidth="1.6" />
+                  </g>
+                );
+              })()}
+              {/* odhodne točke (vmesne + CILJ — obe povlecljivi) */}
               {draftPath.slice(1).map((h, idx) => {
                 const i = idx + 1; const p = legPos(h, 'out');
                 const isTarget = i === draftPath.length - 1;
-                if (isTarget) {
-                  return <circle key={`od${i}`} cx={p.x} cy={p.y} r="2.6" fill={draftColor} pointerEvents="none" />;
-                }
                 return (
                   <g key={`od${i}`} style={{ cursor: 'grab', touchAction: 'none' }}
                      onPointerDown={(e) => startDotDrag(e, 'out', i, draftPath)}>
-                    <title>Točka poti — povleci za spremembo poti tja</title>
-                    <circle cx={p.x} cy={p.y} r="6.5" fill="transparent" />
-                    <circle cx={p.x} cy={p.y} r="2.3" fill="#1a1405" stroke={draftColor} strokeWidth="1.2" />
+                    <title>{isTarget ? 'CILJ — povleci za spremembo cilja' : 'Točka poti — povleci za spremembo poti tja'}</title>
+                    <circle cx={p.x} cy={p.y} r={isTarget ? 8 : 6.5} fill="transparent" />
+                    {isTarget
+                      ? <circle cx={p.x} cy={p.y} r="3.6" fill={draftColor} stroke="#000" strokeWidth="1" />
+                      : <circle cx={p.x} cy={p.y} r="2.3" fill="#1a1405" stroke={draftColor} strokeWidth="1.2" />}
                   </g>
                 );
               })}
