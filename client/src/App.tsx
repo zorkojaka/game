@@ -3327,41 +3327,44 @@ type HelpAnchorDef = {
   w?: number;                  // širina oblačka (privzeto 232)
 };
 
+// VODENI OGLED: koraki si sledijo po pomembnosti (prikazan je EN oblaček naenkrat).
+// 1 prehrana → 2 delavnice → 3 raziskave → 4 obramba → 5 napad → 6 izvidniki → gumbi odprave → ostalo.
 const HELP_ANCHORS: HelpAnchorDef[] = [
+  // ── Kamp-cone (DOM vrstni red con: raziskave, prehrana, delavnice, obramba) ──
+  { sel: '.camp-zone', pick: 1, side: 'below', title: '🌾 Prehrana', w: 210,
+    text: 'Nabiralci zbirajo hrano. Kamp vsak mesec poje 🍞 — brez hrane ljudje umirajo. Z gumbi +/− ob coni premikaš ljudi.' },
+  { sel: '.camp-zone', pick: 2, side: 'below', title: '🔨 Delavnice', w: 210,
+    text: 'Delavci iz 🔨 materiala izdelujejo ⚔️ orožje, gradijo 🧱 obzidje ali 💎 artefakt — cilj izbereš na gumbih ob coni.' },
+  { sel: '.camp-zone', pick: 0, side: 'right', title: '🔬 Raziskave', w: 210,
+    text: 'Raziskovalci zbirajo 👁 intel, odpirajo AI drevo in odklepajo nadgradnje orožja/obzidja (vsaka stopnja ×2).' },
+  { sel: '.camp-zone', pick: 3, side: 'right', title: '🛡 Obramba', w: 210,
+    text: 'Branilci (vsak rabi ⚔️ orožje) odbijajo napade AI na kamp. Barvni obroč okoli kampa = verjetnost odbitja.' },
+  { sel: '.side-menu .sm-btn', pick: 5, side: 'right', title: '⚔️ Napad', w: 220,
+    text: 'Nariši pot do odkrite ◆ šibke točke ali ☣ AI jedra. Spopad se sproži ob prihodu; napadalci vzamejo orožje s seboj. Uniči vse šibke točke ali vse robote = zmaga!' },
+  { sel: '.side-menu .sm-btn', pick: 4, side: 'right', title: '🔭 Izvidniki', w: 220,
+    text: 'Odkrivajo mapo: šibke točke AI, druge klane, najdbe. Odpravo sestaviš kar na mapi — klikni cilj in pokaže se meni odprave (naslednji koraki ↓).' },
+  // ── Gumbi odprave (pomoč nariše demo pot, da so vidni) ──
+  { sel: '.dc-kind', side: 'above', title: '🔭/⚔️ Tip odprave', w: 190,
+    text: 'Izvidniki raziskujejo; napad udari ob prihodu na cilj.' },
+  { sel: '.dc-people', side: 'right', title: '− Ljudje +', w: 190,
+    text: 'Število članov odprave. Vsak (razen skritih izvidnikov) vzame ⚔️ orožje iz kampa.' },
+  { sel: '.dc-rations', side: 'left', title: '🍞 Obroki', w: 180,
+    text: 'Klik kroži 💀→🥩: več hrane = močnejši in varnejši, a dražje.' },
+  { sel: '.dc-loot', side: 'below', title: '🔭/🔨 Naloga izvidnikov', w: 200,
+    text: 'Raziskovanje odkriva polja; lootanje nabira 🔨 material (raziskava ×0.25).' },
+  { sel: '.dc-stealth', side: 'right', title: '🌙 Skrivanje', w: 190,
+    text: 'Manj srečanj, pot +50 %. Skriti izvidniki ne rabijo orožja.' },
+  { sel: '.dc-confirm', side: 'above', title: '✓ Pošlji', w: 170,
+    text: 'Potrdi odpravo — krene ob naslednjem mesecu.' },
+  // ── Mapa + zgornja vrstica + desni stolpec ──
+  { sel: '.hex-map', side: 'over', title: '🗺 Operativna mapa',
+    text: 'Klikni KATEROKOLI polje → najkrajša pot tja (rumena/rdeča) in nazaj (turkizna); točke poti lahko povlečeš. Oznake: A1… ime polja · ? neraziskano · ◆ šibka točka AI · ⛺ klan · ☣ AI jedro.' },
+  { sel: '.tr-group.tr-main', side: 'below', title: '📦 Viri kampa',
+    text: '🍞 hrana (porabi se vsak mesec) · ⚔️ orožje (rabi ga vsak branilec/odprava) · 🔨 material (za delavnice) · 👁 intel · 💎 artefakt (uniči eno šibko točko AI).' },
   { sel: '.tr-group.tr-side', pick: 0, side: 'below', title: '👥 Ljudje',
     text: 'Klan skupaj · v kampu · na odpravi · 💤 prosti = še nerazporejeni. Razporedi jih v cone kampa ali na odprave.' },
-  { sel: '.tr-group.tr-main', side: 'below', title: '📦 Viri kampa',
-    text: '🍞 hrana — porabi se vsak mesec (0 = stradanje) · ⚔️ orožje — rabi ga vsak branilec in član odprave · 🔨 material — surovina za delavnice · 👁 intel · 💎 artefakt (uniči eno šibko točko AI).' },
   { sel: '.tr-group.tr-side', pick: 1, side: 'below', title: '🤖 Sovražnik',
-    text: 'Število AI robotov · 🔭 koliko MI vemo o AI (odpira AI drevo) · 👁 koliko AI ve o nas — več ko ve, pogosteje napada kamp.' },
-  { sel: '.ph-menu-btn:not(.ph-info-btn)', side: 'below', title: '☰ Meni',
-    text: 'Nova igra, pravila, predlogi. Gumb ⓘ levo vklopi/izklopi to pomoč.', w: 180 },
-  { sel: '.side-menu', side: 'right', title: '🧭 Zavihki kampa',
-    text: 'Od zgoraj: 🛡 obramba · 🌾 prehrana · 🔨 delavnice · 🔬 raziskave · 🔭 izvidniki · ⚔️ napad. Klik ikone odpre panel — isto pa nastavljaš tudi kar na mapi.' },
-  // ── Kamp: vsaka cona (heks) posebej — vrstni red v DOM: raziskave, prehrana, delavnice, obramba ──
-  { sel: '.camp-zone', pick: 0, side: 'left', title: '🔬 Raziskave', w: 170,
-    text: 'Raziskovalci zbirajo intel, odpirajo AI drevo in odklepajo nadgradnje orožja/obzidja. +/− premika ljudi.' },
-  { sel: '.camp-zone', pick: 1, side: 'below', title: '🌾 Prehrana', w: 170,
-    text: 'Nabiralci zbirajo hrano. Kamp vsak mesec poje 🍞 — brez hrane ljudje umirajo.' },
-  { sel: '.camp-zone', pick: 2, side: 'below', title: '🔨 Delavnice', w: 170,
-    text: 'Delavci iz 🔨 materiala izdelujejo ⚔️ orožje, gradijo 🧱 obzidje ali 💎 artefakt (izberi cilj na gumbih ob coni).' },
-  { sel: '.camp-zone', pick: 3, side: 'right', title: '🛡 Obramba', w: 170,
-    text: 'Branilci (vsak rabi orožje) odbijajo napade AI. Barvni obroč okoli kampa = verjetnost odbitja.' },
-  { sel: '.hex-map', side: 'over', title: '🗺 Operativna mapa',
-    text: 'Klikni KATEROKOLI polje → najkrajša pot tja (rumena/rdeča) in nazaj (turkizna); točke lahko povlečeš. Oznake: A1… ime polja · ? neraziskano · ◆ šibka točka AI · ⛺ klan · ☣ AI jedro.' },
-  // ── Gumbi odprave na zadnjem polju poti (pomoč nariše demo pot, da so vidni) ──
-  { sel: '.dc-kind', side: 'above', title: '🔭/⚔️ Tip odprave', w: 170,
-    text: 'Izvidniki raziskujejo; napad udari ob prihodu na cilj.' },
-  { sel: '.dc-people', side: 'right', title: '− Ljudje +', w: 150,
-    text: 'Število članov odprave. Vsak (razen skritih izvidnikov) vzame ⚔️ orožje iz kampa.' },
-  { sel: '.dc-rations', side: 'left', title: '🍞 Obroki', w: 150,
-    text: 'Klik kroži 💀→🥩: več hrane = močnejši in varnejši, a dražje.' },
-  { sel: '.dc-loot', side: 'below', title: '🔭/🔨 Naloga', w: 160,
-    text: 'Raziskovanje odkriva polja; lootanje nabira material (raziskava ×0.25).' },
-  { sel: '.dc-stealth', side: 'right', title: '🌙 Skrivanje', w: 160,
-    text: 'Manj srečanj, pot +50 %. Skriti izvidniki ne rabijo orožja.' },
-  { sel: '.dc-confirm', side: 'above', title: '✓ Pošlji', w: 140,
-    text: 'Potrdi odpravo — krene ob naslednjem mesecu.' },
+    text: 'Število AI robotov · 🔭 koliko MI vemo o AI (odpira AI drevo) · 👁 koliko AI ve o nas — več ko ve, pogosteje napada.' },
   { sel: '.right-col', side: 'left', title: '📜 Dnevnik dogodkov',
     text: 'Kaj se je zgodilo vsak mesec: najdbe, srečanja, napadi, vrnitve. Lokacije z oznako polja (npr. C4).' },
   { sel: '.right-col .exec-btn', side: 'left', title: '▶ Naslednji mesec',
@@ -3418,6 +3421,22 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
     return () => { clearTimeout(t1); clearTimeout(t2); window.removeEventListener('resize', measure); };
   }, []);
 
+  // VODENI OGLED: en korak naenkrat
+  const [step, setStep] = useState(0);
+  const cur = places.length ? places[Math.min(step, places.length - 1)] : null;
+  const next = () => { if (step >= places.length - 1) onClose(); else setStep(s => s + 1); };
+  const prev = () => setStep(s => Math.max(0, s - 1));
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); next(); }
+      else if (e.key === 'ArrowLeft') prev();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   // Točki povezovalne črte: od roba oblačka do roba cilja
   const lineFor = (p: Place): { x1: number; y1: number; x2: number; y2: number } | null => {
     const { rect: r, a } = p;
@@ -3429,28 +3448,31 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
     return null;  // 'over' — brez črte
   };
 
+  const l = cur ? lineFor(cur) : null;
   return (
-    <div className="hctx-ov" onClick={onClose}>
-      <svg className="hctx-lines" aria-hidden="true">
-        {places.map((p, i) => {
-          const l = lineFor(p);
-          return l ? <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} /> : null;
-        })}
-      </svg>
-      {places.map((p, i) => (
-        <div key={`h${i}`} className="hctx-hl"
-          style={{ left: p.rect.x - 3, top: p.rect.y - 3, width: p.rect.w + 6, height: p.rect.h + 6 }} />
-      ))}
-      {places.map((p, i) => (
-        <div key={`l${i}`} className="hctx-label" style={{ left: p.lx, top: p.ly, width: p.w }}
-          onClick={e => e.stopPropagation()}>
-          <div className="hctx-title">{p.a.title}</div>
-          <div className="hctx-text">{p.a.text}</div>
-        </div>
-      ))}
+    <div className="hctx-ov" onClick={next}>
+      {cur && (
+        <>
+          <svg className="hctx-lines" aria-hidden="true">
+            {l && <line x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} />}
+          </svg>
+          <div className="hctx-hl"
+            style={{ left: cur.rect.x - 3, top: cur.rect.y - 3, width: cur.rect.w + 6, height: cur.rect.h + 6 }} />
+          <div className="hctx-label" style={{ left: cur.lx, top: cur.ly, width: cur.w }}
+            onClick={e => e.stopPropagation()}>
+            <div className="hctx-title"><span className="hctx-num">{step + 1}</span> {cur.a.title}</div>
+            <div className="hctx-text">{cur.a.text}</div>
+            <div className="hctx-nav">
+              <button onClick={prev} disabled={step === 0}>← Nazaj</button>
+              <span className="hctx-count">{step + 1} / {places.length}</span>
+              <button className="hctx-next" onClick={next}>{step >= places.length - 1 ? '✓ Konec' : 'Naprej →'}</button>
+            </div>
+          </div>
+        </>
+      )}
       <div className="hctx-foot" onClick={e => e.stopPropagation()}>
-        <span>ⓘ Pomoč — vsak oblaček razlaga element, na katerega kaže.</span>
-        <button onClick={onClose}>✕ Zapri (ali klik kjerkoli)</button>
+        <span>ⓘ Vodena pomoč — klik kjerkoli ali → za naslednji korak.</span>
+        <button onClick={onClose}>✕ Zapri</button>
       </div>
     </div>
   );
