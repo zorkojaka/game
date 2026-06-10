@@ -4,7 +4,7 @@ import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundL
 import { tileId, hexLabel } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
-import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT, wpGarrisonUnits, RESEARCH_LEVEL_WORKER_MONTHS } from '../../src/engine/constants';
+import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT, wpGarrisonUnits, RESEARCH_LEVEL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS } from '../../src/engine/constants';
 import { missionSuccessProbability } from '../../src/engine/game';
 import { logicalWeaknessBonus, logicalWeaknessByRobot } from '../../src/engine/combat';
 import { MAP_COLS, MAP_ROWS, collapseCampRuns } from '../../src/engine/map';
@@ -185,7 +185,7 @@ const HELP: Record<string, { title: string; rows: [string, string][] }> = {
   workshop: { title: 'Kako deluje — Delavnice', rows: [
     ['⚔️', 'Orožje: 6 delavec-mes. + 1 material. Dovoli enemu borcu, da se bori z orožjem.'],
     ['🏰', 'Obzidje: 12 delavec-mes. + 4 materiala. Vsaka stopnja doda +2 % k obrambi.'],
-    ['💎', 'Artefakt: 360 delavec-mes. + 20 materiala. Takoj uniči eno odkrito šibko točko.'],
+    ['💎', `Artefakt: ${ARTIFACT_WORKER_MONTHS} delavec-mes. + 20 materiala. Takoj uniči eno odkrito šibko točko.`],
   ] },
   research: { title: 'Kako deluje — Raziskave', rows: [
     ['🤖', 'Roboti (60 razisk.-mes./stopnjo, max 3): napredek raste z raziskovalci in odklepa stopnje orožja in obzidja.'],
@@ -2462,7 +2462,9 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
           if (campZoneIds.has(id)) return null;  // kamp zoni se izrišejo posebej
           const p = shift(hexToPixel(t.q, t.r, SIZE));
           const wp = t.hidesWeakPointId ? wpById[t.hidesWeakPointId] : undefined;
-          const wpVisible = wp && t.researchProgress >= 0.50;
+          // Šibka točka je vidna, ko je ODKRITA (ali heks ≥ 50 % raziskan) — sicer
+          // odkrita točka (npr. ob prihodu odprave) na mapi ne bi kazala ◆ in straže.
+          const wpVisible = !!wp && (wp.discovered || wp.exploited || t.researchProgress >= 0.50);
           const wpLabelLines = wpVisible && wp ? splitMapLabel(wp.label, 15) : [];
 
           let { fill, stroke, labelColor } = hexColorByProgress(t.researchProgress);
@@ -2929,7 +2931,8 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                       : workshop.weaponProgress,
                     total: 6 } },
                 { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),
-                  title: 'Obzidje: 12 delavec-mesecev + 4 materiala za 1 obzidje. Napredek se ohrani ob preklopu.',
+                  lvl: workshop.wallsBuilt,
+                  title: `Obzidje: 12 delavec-mesecev + 4 materiala za 1 obzidje. Zgrajenih: ${workshop.wallsBuilt}. Napredek se ohrani ob preklopu.`,
                   segments: {
                     done: workshop.wallProgress,
                     next: workshopObj === 'wall' && workshop.workers > 0
@@ -2937,13 +2940,13 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                       : workshop.wallProgress,
                     total: 12 } },
                 { label: '💎', active: workshopObj === 'artifact', onClick: () => onWorkshop('artifact'),
-                  title: 'Artefakt: 360 delavec-mesecev (30 let z 1 delavcem) + 20 materiala za 1 artefakt. Napredek se ohrani ob preklopu.',
+                  title: `Artefakt: ${ARTIFACT_WORKER_MONTHS} delavec-mesecev (10 let z 1 delavcem) + 20 materiala za 1 artefakt. Napredek se ohrani ob preklopu.`,
                   segments: {
                     done: workshop.artifactProgress,
                     next: workshopObj === 'artifact' && workshop.workers > 0
-                      ? Math.min(360, workshop.artifactProgress + workshop.workers)
+                      ? Math.min(ARTIFACT_WORKER_MONTHS, workshop.artifactProgress + workshop.workers)
                       : workshop.artifactProgress,
-                    total: 360 } },
+                    total: ARTIFACT_WORKER_MONTHS } },
               ];
             } else if (z.adj === 'r') {
               const R = RESEARCH_LEVEL_WORKER_MONTHS;  // raziskovalec-mesecev na stopnjo
@@ -3269,7 +3272,7 @@ function WorkshopSelector({ value, onChange, weaponLevel, wallLevel }: { value: 
   const opts: Array<{ id: WorkshopObjective; icon: string; label: string; color: string; desc: string; research?: number }> = [
     { id: 'weapon',   icon: '⚔️', label: 'Orožje',   color: '#cc4433', desc: '6 delavec-mesecev za 1 orožje (−1 material). Napredek se ohrani ob preklopu.', research: weaponLevel },
     { id: 'wall',     icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: '12 delavec-mesecev za 1 obzidje (−4 materiala). +2 % obrambe. Ohrani napredek.', research: wallLevel },
-    { id: 'artifact', icon: '💎', label: 'Artefakt', color: '#ffd84a', desc: '360 delavec-mesecev (30 let z 1 delavcem) za 1 artefakt (−20 materiala). Ohrani napredek.' },
+    { id: 'artifact', icon: '💎', label: 'Artefakt', color: '#ffd84a', desc: `${ARTIFACT_WORKER_MONTHS} delavec-mesecev (10 let z 1 delavcem) za 1 artefakt (−20 materiala). Ohrani napredek.` },
   ];
   const sel = opts.find(o => o.id === value);
   return (
@@ -4368,7 +4371,7 @@ export default function App() {
             const wlProg = (game.wallProgress ?? 0) + (workshopObj === 'wall' ? workers : 0);
             const wlMade = workshopObj === 'wall' ? Math.min(Math.floor(wlProg / 12), Math.floor(matAvail / 4)) : 0;
             const arProg = (game.artifactWorkshopProgress ?? 0) + (workshopObj === 'artifact' ? workers : 0);
-            const arMade = workshopObj === 'artifact' ? Math.min(Math.floor(arProg / 360), Math.floor(matAvail / 20)) : 0;
+            const arMade = workshopObj === 'artifact' ? Math.min(Math.floor(arProg / ARTIFACT_WORKER_MONTHS), Math.floor(matAvail / 20)) : 0;
             const weaponDelta = wpMade;
             const materialDelta = -(wpMade * 1 + wlMade * 4 + arMade * 20);
             const intelDelta = researchIntel;
@@ -4545,12 +4548,12 @@ export default function App() {
               {(() => {
                 const arts = game.resources.artifacts ?? 0;
                 const artProg = game.artifactWorkshopProgress ?? 0;
-                const artPct = Math.min(100, Math.round((artProg / 360) * 100));
+                const artPct = Math.min(100, Math.round((artProg / ARTIFACT_WORKER_MONTHS) * 100));
                 return (
                   <div className="def-card">
                     <div className="def-card-title">💎 ARTEFAKT</div>
                     <div className="def-big-num" style={{ color: '#ffd84a' }}>💎 {arts}</div>
-                    <div className="def-stat-note">Instant uniči 1 šibko točko AI · napredek {artProg}/360</div>
+                    <div className="def-stat-note">Instant uniči 1 šibko točko AI · napredek {artProg}/{ARTIFACT_WORKER_MONTHS}</div>
                     <div className="def-progbar"><span className="def-progbar-fill" style={{ width: `${artPct}%`, background: '#ffd84a' }} /></div>
                     <button className="def-upgrade-btn artifact" onClick={() => { setWorkshopObj('artifact'); setTab('workshop'); }}>💎 GRADI ARTEFAKT</button>
                   </div>
@@ -4609,7 +4612,7 @@ export default function App() {
               ? { label: 'orožje', total: 6, prog: game.weaponWorkshopProgress ?? 0, color: '#cc7733', icon: '⚔️', made: game.resources.combat }
               : workshopObj === 'wall'
                 ? { label: 'obzidje', total: 12, prog: game.wallProgress ?? 0, color: '#aabb88', icon: '🏰', made: game.wallsBuilt ?? 0 }
-                : { label: 'artefakt', total: 360, prog: game.artifactWorkshopProgress ?? 0, color: '#ffd84a', icon: '💎', made: game.resources.artifacts ?? 0 };
+                : { label: 'artefakt', total: ARTIFACT_WORKER_MONTHS, prog: game.artifactWorkshopProgress ?? 0, color: '#ffd84a', icon: '💎', made: game.resources.artifacts ?? 0 };
             const need = Math.max(0, cfg.total - cfg.prog);
             const months = workers > 0 ? Math.ceil(need / workers) : Infinity;
             const pctv = Math.round((cfg.prog / cfg.total) * 100);

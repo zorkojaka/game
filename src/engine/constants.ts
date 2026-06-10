@@ -217,7 +217,7 @@ export const WEAPON_DESTROY_MAX_PCT = 0.80;
 // Več delavcev pospeši (vsak prispeva svoj mesec).
 export const WEAPON_WORKER_MONTHS   = 6;
 export const WALL_WORKER_MONTHS     = 12;
-export const ARTIFACT_WORKER_MONTHS = 360;
+export const ARTIFACT_WORKER_MONTHS = 120;  // prej 360 — skrajšano (10 let z 1 delavcem)
 // Material za 1 izdelek
 export const WEAPON_MATERIAL_COST   = 1;
 export const WALL_MATERIAL_COST     = 4;
