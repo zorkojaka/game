@@ -2586,8 +2586,9 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                   ))}
                 </text>
               )}
-              {/* Garnizija — AI enota, ki straži šibko točko */}
-              {wpVisible && wp && !wp.exploited && wpGarrison > 0 && (() => {
+              {/* Garnizija — AI enote VIDNO stražijo šibko točko (tudi pred odkritjem:
+                  patrulje izdajo, da je tam nekaj pomembnega — namig za izvidnico). */}
+              {wp && !wp.exploited && wpGarrison > 0 && (() => {
                 const guardImg = aiGuardImageHref(wp.phase);
                 const guardLabel = aiGuardLabel(wp.phase);
                 const guardColor = wp.phase === 'find'
@@ -2735,18 +2736,6 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                   </g>
                 );
               })}
-              {/* ZAČETNA točka (izhod iz kampa) — povlecljiva: izbere smer izhoda */}
-              {draftPath.length > 1 && (() => {
-                const p = legPos(draftPath[0], 'out');
-                return (
-                  <g key="od0" style={{ cursor: 'grab', touchAction: 'none' }}
-                     onPointerDown={(e) => startDotDrag(e, 'out', 0, draftPath)}>
-                    <title>Začetek poti — povleci, da pot zapusti kamp drugje</title>
-                    <circle cx={p.x} cy={p.y} r="7.5" fill="transparent" />
-                    <circle cx={p.x} cy={p.y} r="3.2" fill="#0f2a14" stroke={draftColor} strokeWidth="1.6" />
-                  </g>
-                );
-              })()}
               {/* odhodne točke (vmesne + CILJ — obe povlecljivi) */}
               {draftPath.slice(1).map((h, idx) => {
                 const i = idx + 1; const p = legPos(h, 'out');
@@ -3147,6 +3136,23 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
         })}
 
         {/* ─── Kontrole odprave na ZADNJEM heksu poti ─── */}
+        {/* ZAČETNA točka poti — v ZGORNJI plasti (nad grafiko kampa), na robu kampa
+            proti prvemu polju poti. Povlecljiva: izbere, kje pot zapusti kamp. */}
+        {drawingMode && draftPath.length > 1 && (() => {
+          const a = legPos(draftPath[0], 'out');
+          const b = legPos(draftPath[1], 'out');
+          const p = { x: a.x + (b.x - a.x) * 0.45, y: a.y + (b.y - a.y) * 0.45 };  // rob kampa
+          return (
+            <g key="od0" style={{ cursor: 'grab', touchAction: 'none' }}
+               onPointerDown={(e) => startDotDrag(e, 'out', 0, draftPath)}>
+              <title>ZAČETEK poti — povleci, da pot zapusti kamp drugje</title>
+              <circle cx={p.x} cy={p.y} r="9" fill="transparent" />
+              <circle cx={p.x} cy={p.y} r="4" fill="#0f2a14" stroke="#66cc88" strokeWidth="1.8" />
+              <circle cx={p.x} cy={p.y} r="1.5" fill="#8df0a5" pointerEvents="none" />
+            </g>
+          );
+        })()}
+
         {drawingMode && draftPath.length >= 2 && lastStep && (() => {
           const lp = shift(hexToPixel(lastStep.q, lastStep.r, SIZE));
           const aboveCy = lp.y - SIZE * 1.15;
