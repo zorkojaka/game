@@ -3729,18 +3729,27 @@ function FitScale({ children, deps }: { children: React.ReactNode; deps?: unknow
     const recompute = () => {
       const o = outer.current, n = inner.current;
       if (!o || !n) return;
-      const iw = n.scrollWidth;
       const ow = o.clientWidth;
+      // Panel zaprt ali sredi animacije zapiranja → NE meri (sicer scale pade in obtiči).
+      if (ow < 60) return;
+      // Izmeri NARAVNO širino vsebine (začasno brez transforma in raztegnjene širine),
+      // sicer meritev vidi lastni scale in se zatakne v povratni zanki.
+      const prevW = n.style.width, prevT = n.style.transform;
+      n.style.transform = 'none';
+      n.style.width = 'max-content';
+      const iw = n.scrollWidth;
+      n.style.width = prevW;
+      n.style.transform = prevT;
       if (iw <= 0) return;
       // Prilagodi le po ŠIRINI (besedilo ostane berljivo); previsoka vsebina se drsi navpično.
-      const s = Math.min(1, ow / iw);
-      setScale(s > 0.6 ? s : 0.6);
+      const s = Math.max(0.6, Math.min(1, ow / iw));
+      setScale(prev => Math.abs(prev - s) > 0.01 ? s : prev);
     };
     recompute();
+    const t = setTimeout(recompute, 320);  // po koncu CSS tranzicije odpiranja panela
     const ro = new ResizeObserver(recompute);
     if (outer.current) ro.observe(outer.current);
-    if (inner.current) ro.observe(inner.current);
-    return () => ro.disconnect();
+    return () => { clearTimeout(t); ro.disconnect(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return (
