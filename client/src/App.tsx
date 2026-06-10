@@ -2964,7 +2964,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                       {/* IZBRANI gumb: svetlo polnilo v barvi cone + bela obroba — nezgrešljivo. */}
                       <circle cx={bxp} cy={byp} r={rIn}
                         fill={b.active ? z.color : '#0a0a0a'}
-                        stroke={b.segments ? 'none' : (b.active ? '#ffffff' : z.color)}
+                        stroke={b.segments ? 'none' : (b.active ? '#000000' : z.color)}
                         strokeWidth={b.active ? 2 : 1.5} />
                       {/* Segmenti / lok kot obroba ikone — done = polno, next-month napoved = svetlo */}
                       {b.segments && (() => {
@@ -3075,7 +3075,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
               <text x={p.x + SIZE * 0.38} y={p.y + SIZE * 0.43 + 3} textAnchor="middle"
                 fontSize="8" fill={color} fontWeight="bold" fontFamily="'Courier New', monospace"
                 style={{ pointerEvents: 'none' }}>
-                {exp.assigned}
+                {exp.departedCount ?? exp.assigned}
               </text>
             </g>
           );
@@ -3205,7 +3205,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                 <button className="ep-close" onClick={() => setSelectedExpId(null)}>✕</button>
               )}
             </div>
-            <div className="ep-row"><span className="dim small">Ljudi:</span><b>{exp.assigned}</b></div>
+            <div className="ep-row"><span className="dim small">Ljudi:</span><b>{exp.departedCount ?? exp.assigned}</b></div>
             <div className="ep-row"><span className="dim small">Lokacija:</span><b>{hexLabel(tile)}</b></div>
             <div className="ep-row"><span className="dim small">Cilj:</span><b>{hexLabel(target)}</b></div>
             <div className="ep-row"><span className="dim small">Napredek:</span>
@@ -3218,14 +3218,8 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
             <div className="ep-row"><span className="dim small">Obroki:</span>
               <b>{RATIONS[exp.rations]?.emoji ?? '🍽'} {RATIONS[exp.rations]?.label ?? 'Normalno'}</b>
             </div>
-            {exp.encountersLog.length > 0 && (
-              <div className="ep-events">
-                <div className="dim small" style={{ marginTop: 4, marginBottom: 3 }}>Zadnji dogodki:</div>
-                {exp.encountersLog.slice(-3).map((ev, i) => (
-                  <div key={i} className="small">{ev}</div>
-                ))}
-              </div>
-            )}
+            {/* Vojna megla: dogodki s poti so skriti — poročilo dobiš ob vrnitvi. */}
+            <div className="ep-events dim small" style={{ marginTop: 4 }}>📋 Poročilo ob vrnitvi v kamp.</div>
           </div>
         );
       })()}
@@ -3987,7 +3981,8 @@ export default function App() {
 
   // game.population = ljudje V KAMPU (ljudje na misijah/odpravah so že odšteti ob odhodu).
   const campPop = game?.population ?? 0;
-  const inMissions = (game?.expeditions ?? []).reduce((s, e) => s + e.assigned, 0);
+  // Med potjo kažemo ŠTEVILO OB ODHODU — izgube so skrite do vrnitve (vojna megla).
+  const inMissions = (game?.expeditions ?? []).reduce((s, e) => s + (e.departedCount ?? e.assigned), 0);
   const totalClan = campPop + inMissions;  // cel klan = kamp + ljudje zunaj
   const pop = campPop;  // ostane za kompatibilnost spodaj
   const newMissionPeople = 0;
@@ -4935,14 +4930,8 @@ export default function App() {
         </div>
       </section>
 
-      {/* DESNO: dnevnik dogodkov (zgoraj, scrollable) + V teku (pod trakom) */}
+      {/* DESNO: V teku (zgoraj) + dnevnik dogodkov (spodaj, scrollable) */}
       <aside className="right-col">
-        <div className="panel rc-log">
-          <div className="panel-head"><h3>DNEVNIK DOGODKOV</h3></div>
-          <div className="rc-log-scroll">
-            <EventLog entries={eventLog} />
-          </div>
-        </div>
         <div className="panel rc-active">
           <div className="panel-head">
             <h3>⏳ V TEKU</h3>
@@ -4965,7 +4954,7 @@ export default function App() {
                 return (
                   <div key={e.id} className="exp-card">
                     <div className="exp-head">
-                      <span className="exp-kind" style={{ color }}>{kindLabel} · {e.assigned} ljudi</span>
+                      <span className="exp-kind" style={{ color }}>{kindLabel} · {e.departedCount ?? e.assigned} ljudi</span>
                       <span className="dim small">→ {returning ? 'kamp' : (target ? hexLabel(target) : '?')}</span>
                     </div>
                     <div className="exp-progress">
@@ -4978,13 +4967,19 @@ export default function App() {
                       {returning
                         ? (remaining === 0 ? 'prihod v kamp ta mesec' : `↩ še ${remaining} polj(e) do kampa`)
                         : remaining === 0 ? 'prihod ta mesec' : `še ${remaining} mesec(ev) do cilja`}
-                      {e.encountersLog.length > 0 && ` · ${e.encountersLog.slice(-1)[0]}`}
+                      {' · poročilo ob vrnitvi'}
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
+        </div>
+        <div className="panel rc-log">
+          <div className="panel-head"><h3>DNEVNIK DOGODKOV</h3></div>
+          <div className="rc-log-scroll">
+            <EventLog entries={eventLog} />
+          </div>
         </div>
       </aside>
 

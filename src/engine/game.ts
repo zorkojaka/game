@@ -704,6 +704,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       stealth: inp.stealth,
       lootMode: inp.lootMode,
       equippedWeapons,
+      departedCount: take,
       returnPath: inp.returnPath,
     });
   }
@@ -721,26 +722,33 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       artifacts: (e.carried?.artifacts ?? 0) + r.finds.artifacts,
     };
 
-    // Dogodki med potjo (srečanja + najdbe)
-    for (const ev of r.events) expeditionEvents.push(`🔭 ${ev}`);
+    // VOJNA MEGLA: dogodki s poti (srečanja, najdbe, spopadi) se NE objavijo sproti —
+    // zbirajo se v exp.encountersLog in se objavijo kot POROČILO šele ob vrnitvi v kamp.
+    // Če se nihče ne vrne, poročila NI — izvemo samo, da so izgubljeni.
+    const dumpReport = (log: string[]) => {
+      if (!log.length) return;
+      expeditionEvents.push(`📋 Poročilo odprave:`);
+      for (const ev of log) expeditionEvents.push(`· ${ev}`);
+    };
+    const departed = e.departedCount ?? e.assigned;
 
     // ── POVRATNI LEG — odprava potuje nazaj po NOVI poti proti kampu: raziskuje polja in je vidna na mapi ──
     if (e.status === 'returning') {
       if (r.exp.status === 'lost') {
-        const cs = carriedStr(carried);
-        expeditionEvents.push(`☠ Odprava izgubljena na poti domov${cs ? ` · izgubljeno: ${cs}` : ''}.`);
+        // nihče se ni vrnil — brez podrobnosti in brez plena
+        expeditionEvents.push(`☠ Odprava (${departed} ljudi) se ni vrnila. Nihče ne ve, kaj se je zgodilo.`);
         finishedExps.push({ ...r.exp, carried });
       } else if (r.exp.currentIndex >= r.exp.path.length - 1) {
-        // prispeli v kamp — šele zdaj dostavimo ljudi, plen IN orožje preživelih
+        // prispeli v kamp — šele zdaj dostavimo ljudi, plen IN orožje preživelih + objavimo poročilo
         returnedThisMonth += Math.max(0, r.exp.assigned);
         const retWeapons = Math.min(Math.max(0, r.exp.assigned), r.exp.equippedWeapons ?? 0);
         material += carried.material; combat += carried.weapons + retWeapons; artifacts += carried.artifacts;
         const cs = carriedStr(carried);
-        expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${r.exp.assigned} ljudi${retWeapons > 0 ? ` (+${retWeapons} orožja)` : ''}${cs ? ` · prinesli: ${cs}` : ''}.`);
+        expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${r.exp.assigned}/${departed} ljudi${retWeapons > 0 ? ` (+${retWeapons} orožja)` : ''}${cs ? ` · prinesli: ${cs}` : ''}.`);
+        dumpReport(r.exp.encountersLog);
         finishedExps.push({ ...r.exp, status: 'completed', carried });
       } else {
-        const stepsLeft = (r.exp.path.length - 1) - r.exp.currentIndex;
-        expeditionEvents.push(`↩ ${r.exp.assigned} se vrača — še ${stepsLeft} polj(e) do kampa.`);
+        // še na poti domov — na mapi se vidi premik, novic pa ni
         tickedExps.push({ ...r.exp, carried });
       }
       continue;
@@ -766,6 +774,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
           }
         }
         let survivors = r.exp.assigned;
+        const arrivalLog: string[] = [];  // izid na cilju → v poročilo ob vrnitvi (ne objavi sproti)
         if (r.exp.kind === 'mission') {
           // SPOPAD OB PRIHODU — napadalci udarijo na cilju, preživeli se nato vračajo
           const aTier = RATIONS_LEVELS[r.exp.rations] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
@@ -783,11 +792,11 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
               const lost = Math.round(survivors * (1 - p) * 0.3);
               survivors = Math.max(0, survivors - lost);
               aiWeakPoints[wpIdx] = { ...aiWeakPoints[wpIdx], exploited: true, discovered: true };
-              expeditionEvents.push(`💥 ŠIBKA TOČKA UNIČENA: ${wpLabel} — ${lost} padlih, ${survivors} se vrača.`);
+              arrivalLog.push(`💥 ŠIBKA TOČKA UNIČENA: ${wpLabel} — ${lost} padlih.`);
             } else {
               const lost = Math.round(survivors * 0.5);
               survivors = Math.max(0, survivors - lost);
-              expeditionEvents.push(`✗ Napad na ${wpLabel} ni uspel — ${lost} padlih, ${survivors} se vrača.`);
+              arrivalLog.push(`✗ Napad na ${wpLabel} ni uspel — ${lost} padlih.`);
             }
           } else {
             // Splošni napad na AI robote — naša moč raste z orožjem in razkritimi logičnimi šibkostmi
@@ -802,18 +811,18 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
               carried.material += destroyed;  // plen nosijo s seboj, dostavijo ob vrnitvi
               const lost = Math.round(survivors * (1 - p) * 0.3);
               survivors = Math.max(0, survivors - lost);
-              expeditionEvents.push(`⚔ Napad uspešen na ${hexLabel(target)}: ${destroyed} robotov uničenih, ${lost} padlih, ${survivors} se vrača.`);
+              arrivalLog.push(`⚔️ Napad uspešen na ${hexLabel(target)}: ${destroyed} robotov uničenih, ${lost} padlih.`);
             } else {
               const destroyed = Math.min(aiRobots, Math.round(survivors * 0.5));
               applyDestroy(destroyed);
               carried.material += destroyed;  // plen nosijo s seboj, dostavijo ob vrnitvi
               const lost = Math.round(survivors * 0.6);
               survivors = Math.max(0, survivors - lost);
-              expeditionEvents.push(`⚔ Napad odbit na ${hexLabel(target)}: ${destroyed} robotov, a ${lost} padlih, ${survivors} se vrača.`);
+              arrivalLog.push(`⚔️ Napad odbit na ${hexLabel(target)}: ${destroyed} robotov, a ${lost} padlih.`);
             }
           }
         } else {
-          expeditionEvents.push(`✓ Izvidniška odprava dospela na ${hexLabel(target)}.`);
+          arrivalLog.push(`✓ Dospeli na cilj ${hexLabel(target)}.`);
         }
         // POVRATEK — preživeli krenejo nazaj. Če je igralec izbral lastno povratno pot (in se začne na cilju
         // ter konča v kampu), jo upoštevamo; sicer izračunamo najkrajšo. Med potjo raziskujejo polja.
@@ -825,26 +834,26 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
           && !!retEnd && isCampHex(retEnd);  // povratek se mora končati v kamp-grozdu
         const retPath = retValid ? chosenRet! : pathToCamp(target);
         if (survivors <= 0) {
-          // vsi padli na cilju → nošeni plen je izgubljen
-          const cs = carriedStr(carried);
-          if (cs) expeditionEvents.push(`☠ Z odpravo izgubljeno: ${cs} (nihče se ni vrnil).`);
+          // vsi padli na cilju → nihče se ni vrnil; brez poročila, brez plena
+          expeditionEvents.push(`☠ Odprava (${departed} ljudi) se ni vrnila. Nihče ne ve, kaj se je zgodilo.`);
           finishedExps.push({ ...r.exp, carried });
         } else if (retPath.length <= 1) {
-          // cilj je kamp — takoj doma (vrne tudi orožje preživelih)
+          // cilj je kamp — takoj doma (vrne tudi orožje preživelih) + poročilo
           returnedThisMonth += survivors;
           const retWeapons = Math.min(survivors, r.exp.equippedWeapons ?? 0);
           material += carried.material; combat += carried.weapons + retWeapons; artifacts += carried.artifacts;
           const cs = carriedStr(carried);
-          expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${survivors} ljudi${retWeapons > 0 ? ` (+${retWeapons} orožja)` : ''}${cs ? ` · prinesli: ${cs}` : ''}.`);
+          expeditionEvents.push(`✓ Odprava se je vrnila v kamp — ${survivors}/${departed} ljudi${retWeapons > 0 ? ` (+${retWeapons} orožja)` : ''}${cs ? ` · prinesli: ${cs}` : ''}.`);
+          dumpReport([...r.exp.encountersLog, ...arrivalLog]);
           finishedExps.push({ ...r.exp, carried });
         } else {
-          expeditionEvents.push(`↩ ${survivors} se vrača proti kampu — še ${retPath.length - 1} polj(e).`);
-          tickedExps.push({ ...r.exp, status: 'returning', path: retPath, currentIndex: 0, assigned: survivors, carried });
+          // krenejo nazaj — izid na cilju gre v poročilo (objavi se ob vrnitvi)
+          tickedExps.push({ ...r.exp, status: 'returning', path: retPath, currentIndex: 0, assigned: survivors, carried,
+            encountersLog: [...r.exp.encountersLog, ...arrivalLog] });
         }
       } else {
-        // ODPRAVA IZGUBLJENA — vsi padli; karkoli so nosili, je izgubljeno
-        const cs = carriedStr(carried);
-        expeditionEvents.push(`☠ Odprava izgubljena — vsi člani so padli${cs ? ` · izgubljeno: ${cs}` : ''}.`);
+        // ODPRAVA IZGUBLJENA na poti — nihče se ni vrnil; brez podrobnosti in plena
+        expeditionEvents.push(`☠ Odprava (${departed} ljudi) se ni vrnila. Nihče ne ve, kaj se je zgodilo.`);
         finishedExps.push({ ...r.exp, carried });
       }
     } else {

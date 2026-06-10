@@ -528,3 +528,31 @@ describe('spopadi skozi celo igro', () => {
     expect(pGuard).toBeGreaterThan(pPlain);
   });
 });
+
+describe('vojna megla — poročilo odprave šele ob vrnitvi', () => {
+  it('med potjo ni dogodkov odprave v dnevniku; poročilo pride z vrnitvijo', () => {
+    let s: GameState = newGame(21);
+    const path = [{ q: 1, r: 4 }, { q: 2, r: 4 }, { q: 2, r: 3 }];
+    s = processRound(s, action({ foragers: 20,
+      newExpeditions: [{ kind: 'scout', path, returnPath: [{ q: 2, r: 3 }, { q: 2, r: 4 }, { q: 1, r: 4 }], assigned: 4, rations: 3 }] }));
+    let sawReport = false;
+    for (let i = 0; i < 12 && s.status === 'active'; i++) {
+      const active = (s.expeditions ?? []).length > 0;
+      const n = s.lastRoundLog?.narrative ?? '';
+      if (active) {
+        // dokler je odprava zunaj, v dnevniku NI najdb/srečanj/prihodov z njene poti
+        expect(n).not.toMatch(/Srečanje na|najdenega na|najden na|Dospeli na cilj/);
+      }
+      if (/📋 Poročilo odprave:/.test(n)) { sawReport = true; break; }
+      s = processRound(s, action({ foragers: 20 }));
+    }
+    expect(sawReport).toBe(true);
+  });
+
+  it('departedCount se ohrani (UI med potjo kaže odhodno število)', () => {
+    const g = newGame(5);
+    const r = processRound(g, action({ foragers: 10,
+      newExpeditions: [{ kind: 'scout', path: [{ q: 1, r: 4 }, { q: 2, r: 4 }], assigned: 6, rations: 3 }] }));
+    expect((r.expeditions ?? [])[0]?.departedCount).toBe(6);
+  });
+});

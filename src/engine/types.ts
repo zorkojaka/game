@@ -93,6 +93,7 @@ export interface Expedition {
   lootMode?: boolean;             // izvidniki: lootanje namesto raziskovanja (raziskava ×0.25, več najdb)
   returnPath?: Array<{ q: number; r: number }>;  // izbrana povratna pot (cilj → kamp); če manjka, se izračuna najkrajša
   equippedWeapons?: number;       // orožje, ki ga je odprava vzela s seboj (vrne se s preživelimi)
+  departedCount?: number;         // koliko jih je odšlo — UI med potjo kaže TO (izgube so skrite do vrnitve)
   returnRemaining?: number;       // ko je status 'returning': mesecev do vrnitve v kamp
   carried?: { material: number; weapons: number; artifacts: number };  // najdbe/plen, ki jih nosijo (dostavljeno šele ob vrnitvi)
 }
