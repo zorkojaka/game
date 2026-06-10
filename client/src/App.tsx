@@ -3732,17 +3732,17 @@ function FitScale({ children, deps }: { children: React.ReactNode; deps?: unknow
       const ow = o.clientWidth;
       // Panel zaprt ali sredi animacije zapiranja → NE meri (sicer scale pade in obtiči).
       if (ow < 60) return;
-      // Izmeri NARAVNO širino vsebine (začasno brez transforma in raztegnjene širine),
-      // sicer meritev vidi lastni scale in se zatakne v povratni zanki.
+      // Izmeri pri ŠIRINI PANELA (besedilo se normalno lomi!) in brez transforma —
+      // scrollWidth preseže ow le, če česa res ni mogoče zlomiti (fiksne mreže ipd.).
       const prevW = n.style.width, prevT = n.style.transform;
       n.style.transform = 'none';
-      n.style.width = 'max-content';
+      n.style.width = `${ow}px`;
       const iw = n.scrollWidth;
       n.style.width = prevW;
       n.style.transform = prevT;
       if (iw <= 0) return;
-      // Prilagodi le po ŠIRINI (besedilo ostane berljivo); previsoka vsebina se drsi navpično.
-      const s = Math.max(0.6, Math.min(1, ow / iw));
+      // Berljivost ima prednost: pomanjšamo največ za 12 %.
+      const s = Math.max(0.88, Math.min(1, ow / iw));
       setScale(prev => Math.abs(prev - s) > 0.01 ? s : prev);
     };
     recompute();
