@@ -44,6 +44,62 @@ const RATIONS: Record<number, RationsRow> = Object.fromEntries(
 
 const STORAGE_KEY = 'avh-runId';
 
+type StartTacticId = 'food' | 'research' | 'workshop' | 'defense';
+
+type StartTactic = {
+  id: StartTacticId;
+  num: string;
+  label: string;
+  title: string;
+  desc: string;
+  detail: string;
+  color: string;
+  allocation: { defenders: number; foragers: number; workers: number; researchers: number };
+};
+
+const START_TACTICS: StartTactic[] = [
+  {
+    id: 'food',
+    num: '1',
+    label: 'Prehrana',
+    title: 'Širši klan, močnejše odprave',
+    desc: 'Več ljudi v hrani pomeni rast populacije in več rezerve za dolge izvidniške poti.',
+    detail: 'Hrana drži kamp živ in omogoči boljše obroke. Dobro nahranjene odprave se lažje prebijejo skozi teren in boj.',
+    color: '#66aa44',
+    allocation: { defenders: 15, foragers: 35, workers: 8, researchers: 7 },
+  },
+  {
+    id: 'research',
+    num: '2',
+    label: 'Raziskave',
+    title: 'Poznaj robote, nato jih udari',
+    desc: 'Raziskovalci odpirajo AI drevo in nadgradijo napad ali obrambo.',
+    detail: 'Boljše poznavanje robotov izboljša možnosti v boju, odklepa šibkosti in naredi kasnejše napade manj slepe.',
+    color: '#22aacc',
+    allocation: { defenders: 15, foragers: 15, workers: 10, researchers: 25 },
+  },
+  {
+    id: 'workshop',
+    num: '3',
+    label: 'Delavnice',
+    title: 'Oprema za obrambo ali napad',
+    desc: 'Delavnice pretvarjajo material v orožje, zidove ali artefakte za skrite udarce.',
+    detail: 'Z orožjem opremiš obrambo in odprave, z zidovi kupiš čas, artefakti pa lahko pripravijo odločilen skriti napad.',
+    color: '#cc8844',
+    allocation: { defenders: 15, foragers: 15, workers: 25, researchers: 10 },
+  },
+  {
+    id: 'defense',
+    num: '4',
+    label: 'Obramba',
+    title: 'Bunkerica in zidovi',
+    desc: 'Močan kamp AI-ju oteži vdor in zmanjša, koliko lahko izve o klanu.',
+    detail: 'Branilci držijo linijo, zidove pa kasneje pojača raziskava. Če AI ne prebije kampa, težko razume tvoje vzorce.',
+    color: '#d6b44a',
+    allocation: { defenders: 35, foragers: 15, workers: 8, researchers: 7 },
+  },
+];
+
 // ─── Pomožne funkcije ─────────────────────────────────────────────────────────
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
@@ -3475,7 +3531,18 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
   );
 }
 
-function StartScreen({ onNew, loading }: { onNew: () => void; loading: boolean }) {
+function StartScreen({ onNew, loading }: { onNew: (tactic: StartTacticId) => void; loading: boolean }) {
+  const [selectedTactic, setSelectedTactic] = useState<StartTacticId>('food');
+  const tactic = START_TACTICS.find(t => t.id === selectedTactic) ?? START_TACTICS[0];
+  const alloc = [
+    { key: 'foragers', label: 'Prehrana', value: tactic.allocation.foragers, color: '#66aa44' },
+    { key: 'researchers', label: 'Raziskave', value: tactic.allocation.researchers, color: '#22aacc' },
+    { key: 'workers', label: 'Delavnice', value: tactic.allocation.workers, color: '#cc8844' },
+    { key: 'defenders', label: 'Obramba', value: tactic.allocation.defenders, color: '#d6b44a' },
+  ];
+  const assignedStart = alloc.reduce((s, a) => s + a.value, 0);
+  const freeStart = 15;
+
   return (
     <div className="start">
       <div className="start-inner">
@@ -3487,9 +3554,9 @@ function StartScreen({ onNew, loading }: { onNew: () => void; loading: boolean }
         <p className="start-sub">AI je prevzel Zemljo. Ti vodiš zadnji klan. Preberi AI-jev skrivni načrt — ali izumri.</p>
         <div className="start-phases">
           {[
-            { num: '01', title: 'AI IŠČE', desc: 'Droni, sateliti, senzorji. Skrij se.', color: '#e06c30' },
-            { num: '02', title: 'AI RAZUME', desc: 'Analiza vzorcev, predikcija. Špijoniraj.', color: '#cc3333' },
-            { num: '03', title: 'AI IZTREBLJA', desc: 'Udar na preživetvene stebre. Brani se.', color: '#991111' },
+            { num: '01', title: 'RAZIŠČI', desc: 'Pošlji izvidnike, odpri meglo in najdi šibke točke AI.', color: '#e06c30' },
+            { num: '02', title: 'NADGRADI', desc: 'Razvij robote, orožje ali zidove; delavnice naj naredijo opremo.', color: '#cc3333' },
+            { num: '03', title: 'UNIČI', desc: 'Zberi oborožene odprave in udari, preden AI razume klan.', color: '#991111' },
           ].map(ph => (
             <div key={ph.num} className="start-phase" style={{ borderColor: ph.color }}>
               <span className="sp-num" style={{ color: ph.color }}>{ph.num}</span>
@@ -3501,9 +3568,58 @@ function StartScreen({ onNew, loading }: { onNew: () => void; loading: boolean }
         <div className="start-legend dim small">
           12 mesecev na fazo · 36 skupaj · Vsaka odločitev šteje · Izumrli ne vstanejo
         </div>
-        <button className="start-btn" onClick={onNew} disabled={loading}>
+        <button className="start-btn" onClick={() => onNew(selectedTactic)} disabled={loading}>
           {loading ? '⟳ Nalagam…' : '▶  ZAČNI IGRO'}
         </button>
+      </div>
+      <div className="start-tactics" aria-label="Začetna taktika">
+        <div className="st-tabs">
+          {START_TACTICS.map(t => (
+            <button
+              key={t.id}
+              className={`st-tab ${selectedTactic === t.id ? 'active' : ''}`}
+              style={{ '--st-color': t.color } as React.CSSProperties}
+              onClick={() => setSelectedTactic(t.id)}
+              type="button"
+            >
+              <span className="st-num">{t.num}/4</span>
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="st-board" style={{ '--st-color': tactic.color } as React.CSSProperties}>
+          <div className="st-copy">
+            <div className="st-kicker">Izbrana taktika</div>
+            <h2>{tactic.label}: {tactic.title}</h2>
+            <p>{tactic.detail}</p>
+          </div>
+          <div className="st-graphic" aria-hidden="true">
+            <div className="st-node st-camp">KLAN</div>
+            <div className="st-lanes">
+              {alloc.map(a => (
+                <div key={a.key} className="st-lane">
+                  <span>{a.label}</span>
+                  <div className="st-track">
+                    <div className="st-fill" style={{ width: `${Math.round((a.value / assignedStart) * 100)}%`, background: a.color }} />
+                  </div>
+                  <b>{a.value}</b>
+                </div>
+              ))}
+              <div className="st-lane st-free">
+                <span>Prosti za odprave</span>
+                <div className="st-track">
+                  <div className="st-fill" style={{ width: `${Math.round((freeStart / (assignedStart + freeStart)) * 100)}%` }} />
+                </div>
+                <b>{freeStart}</b>
+              </div>
+            </div>
+            <div className="st-route">
+              <span>izvid</span>
+              <span>oprema</span>
+              <span>udar</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -3782,14 +3898,15 @@ export default function App() {
     if (normalized !== researchObj) setResearchObj(normalized);
   }, [game?.robotsResearchLevel, game?.weaponResearchLevel, game?.wallResearchLevel, researchObj, game]);
 
-  const handleNew = async () => {
+  const handleNew = async (startTactic: StartTacticId = 'food') => {
+    const tactic = START_TACTICS.find(t => t.id === startTactic) ?? START_TACTICS[0];
     setLoading(true);
     try {
       const g = await createGame();
       setGame(g);
       setShowStart(false);
       localStorage.setItem(STORAGE_KEY, g.runId);
-      setAxis('obzidje'); setCombatants(0); setDefenders(15); setForagers(20); setWorkers(5); setResearchers(5); setWorkshopObj('weapon'); setResearchObj('robots'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setRoundCards([]); setDraftPath([]); setDraftReturn([]); setDraftPeople(5); setDraftRations(3); setDraftStealth(false); setDraftLoot(false); setPendingExpeditions([]); setArtifactTargetWp('');
+      setAxis('obzidje'); setCombatants(0); setDefenders(tactic.allocation.defenders); setForagers(tactic.allocation.foragers); setWorkers(tactic.allocation.workers); setResearchers(tactic.allocation.researchers); setWorkshopObj('weapon'); setResearchObj('robots'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setRoundCards([]); setDraftPath([]); setDraftReturn([]); setDraftPeople(5); setDraftRations(3); setDraftStealth(false); setDraftLoot(false); setPendingExpeditions([]); setArtifactTargetWp('');
     } finally { setLoading(false); }
   };
 
