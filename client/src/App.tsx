@@ -2586,9 +2586,9 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                   ))}
                 </text>
               )}
-              {/* Garnizija — AI enote VIDNO stražijo šibko točko (tudi pred odkritjem:
-                  patrulje izdajo, da je tam nekaj pomembnega — namig za izvidnico). */}
-              {wp && !wp.exploited && wpGarrison > 0 && (() => {
+              {/* Garnizija — straža ODKRITE šibke točke (ne izda skritih). Napadi jo redčijo. */}
+              {wpVisible && wp && !wp.exploited && (wpGarrison - (wp.garrisonLoss ?? 0)) > 0 && (() => {
+                const effGarrison = wpGarrison - (wp.garrisonLoss ?? 0);
                 const guardImg = aiGuardImageHref(wp.phase);
                 const guardLabel = aiGuardLabel(wp.phase);
                 const guardColor = wp.phase === 'find'
@@ -2597,10 +2597,10 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                     ? '#cc6633'
                     : '#cc3344';
                 const guardSize = wp.phase === 'eliminate' ? 24 : 22;
-                const gy = p.y + SIZE * 0.18 + wpLabelLines.length * 8 + 14;
+                const gy = p.y - SIZE * 0.45;  // ZGORAJ na heksu (prej prenizko — ni bilo vidno)
                 return (
                   <g className="wp-guard" pointerEvents="none">
-                    <title>{`${guardLabel} · ${wpGarrison}`}</title>
+                    <title>{`${guardLabel} · ${effGarrison} enot — straža viša težavnost napada; vsak napad jo oslabi`}</title>
                     <circle cx={p.x} cy={gy} r={guardSize * 0.44} fill="#081014" stroke={guardColor} strokeWidth="1.3" opacity="0.96" />
                     <image
                       href={guardImg}
@@ -2615,7 +2615,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                     <text x={p.x + guardSize * 0.42} y={gy + guardSize * 0.33 + 2.5}
                       textAnchor="middle" fontSize="7.5" fill={guardColor} fontWeight="bold"
                       fontFamily="'Courier New', monospace" style={{ pointerEvents: 'none' }}>
-                      ×{wpGarrison}
+                      ×{effGarrison}
                     </text>
                   </g>
                 );

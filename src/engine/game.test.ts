@@ -603,3 +603,16 @@ describe('zvezne žrtve raida — moč preboja določa izgube', () => {
     expect(checked).toBeGreaterThan(0);
   });
 });
+
+describe('straža šibke točke slabi z napadi', () => {
+  it('garrisonLoss zviša verjetnost uspeha naslednjega napada', () => {
+    const base = newGame(9);
+    const wpId = base.aiWeakPoints[0].id;
+    const fresh: GameState = { ...base, aiUnits: { scouts: 100, attackers: 75, peopleKillers: 0 } };
+    const worn: GameState = { ...fresh,
+      aiWeakPoints: fresh.aiWeakPoints.map(w => w.id === wpId ? { ...w, garrisonLoss: 12 } : w) };
+    const pFresh = missionSuccessProbability(fresh, wpId, 10, 3);
+    const pWorn  = missionSuccessProbability(worn,  wpId, 10, 3);
+    expect(pWorn).toBeGreaterThan(pFresh);
+  });
+});

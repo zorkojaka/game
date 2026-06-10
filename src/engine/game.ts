@@ -25,7 +25,7 @@ import {
   INITIAL_AI_INSIGHT, AI_INSIGHT_PER_RESEARCHER, NON_ROBOT_RESEARCH_INSIGHT_FACTOR, INSIGHT_PHASE_CAP,
   LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION, LOGICAL_WEAKNESS_LETHALITY_REDUCTION,
   RAID_BASE_CHANCE, RAID_POP_SCALING_MAX, RAID_POP_REFERENCE, RAID_AI_KNOWLEDGE_BONUS,
-  RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT, RAID_FORCE_FLOOR, wpGarrisonMult,
+  RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT, RAID_FORCE_FLOOR, wpGarrisonUnits,
   RAID_BREACH_AREAS, RAID_FRONT_LOSS_MULT, RAID_AREA_LOSS_MULT, RAID_AREA_LOSS_ANNIHILATION,
   RAID_DESTROY_FOOD_PCT, RAID_DESTROY_WEAPONS_PCT, RAID_DESTROY_MATERIAL_PCT, RAID_DESTROY_WALL_LEVELS,
   SCOUT_BASE_SUCCESS, SCOUT_INTEL_BONUS_PER_100, SCOUT_ESPIONAGE_BONUS,
@@ -200,11 +200,17 @@ export function missionEncounterProbability(state: GameState, assigned: number):
 }
 
 /** Končna verjetnost uspeha misije — uporabi rations za moč ekipe. */
+/** Efektivna straža šibke točke: bazna garnizija (po prisotnih AI enotah) − tam pobite enote. */
+export function wpEffectiveGarrison(state: GameState, weakPointId: string): number {
+  const wp = state.aiWeakPoints.find(w => w.id === weakPointId);
+  return Math.max(0, wpGarrisonUnits(readAIUnits(state)) - (wp?.garrisonLoss ?? 0));
+}
+
 export function missionSuccessProbability(state: GameState, weakPointId: string, assigned: number, rationsLevel: number = DEFAULT_RATIONS): number {
   if (assigned < MISSION_MIN_TEAM) return 0;
-  // Garnizija: AI straži šibke točke — z novimi enotami (faza 2/3) je napad težji,
-  // z uničevanjem robotov garnizija slabi.
-  const diff = (MISSION_WP_DIFFICULTY[weakPointId] ?? 100) * wpGarrisonMult(readAIUnits(state));
+  // Garnizija: AI straži šibke točke — z novimi enotami (faza 2/3) je napad težji.
+  // Vsak napad stražo oslabi (garrisonLoss) → naslednji napadi so LAŽJI.
+  const diff = (MISSION_WP_DIFFICULTY[weakPointId] ?? 100) * (1 + wpEffectiveGarrison(state, weakPointId) / 20);
   const tier = RATIONS_LEVELS[rationsLevel] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
   const equip = Math.min(state.resources.combat, assigned);
   const wMult = researchMult(state.weaponResearchLevel ?? 0);
@@ -804,15 +810,26 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
             const p = Math.min(0.98, pBase * stealthBonus);
             const [roll, rngA] = rngNext(rng); rng = rngA;
             const wpLabel = wpIdx >= 0 ? aiWeakPoints[wpIdx].label : 'šibka točka';
+            // Straža te točke: napad jo vedno redči — neuspešen napad olajša naslednjega.
+            const effG = wpIdx >= 0
+              ? Math.max(0, wpGarrisonUnits(aiUnits) - (aiWeakPoints[wpIdx].garrisonLoss ?? 0))
+              : 0;
+            const attackersNow = survivors;
             if (roll < p && wpIdx >= 0) {
               const lost = Math.round(survivors * (1 - p) * 0.3);
               survivors = Math.max(0, survivors - lost);
               aiWeakPoints[wpIdx] = { ...aiWeakPoints[wpIdx], exploited: true, discovered: true };
-              arrivalLog.push(`💥 ŠIBKA TOČKA UNIČENA: ${wpLabel} — ${lost} padlih.`);
+              if (effG > 0) applyDestroy(effG);  // straža je padla z njo
+              arrivalLog.push(`💥 ŠIBKA TOČKA UNIČENA: ${wpLabel} — ${lost} padlih${effG > 0 ? `, pobita straža (${effG} enot)` : ''}.`);
             } else {
               const lost = Math.round(survivors * 0.5);
               survivors = Math.max(0, survivors - lost);
-              arrivalLog.push(`✗ Napad na ${wpLabel} ni uspel — ${lost} padlih.`);
+              const killedG = Math.min(effG, Math.round(attackersNow * 0.35));
+              if (wpIdx >= 0 && killedG > 0) {
+                aiWeakPoints[wpIdx] = { ...aiWeakPoints[wpIdx], garrisonLoss: (aiWeakPoints[wpIdx].garrisonLoss ?? 0) + killedG };
+                applyDestroy(killedG);
+              }
+              arrivalLog.push(`✗ Napad na ${wpLabel} ni uspel — ${lost} padlih${killedG > 0 ? ` · straža oslabljena (−${killedG}, ostane ${effG - killedG})` : ''}.`);
             }
           } else {
             // Splošni napad na AI robote — naša moč raste z orožjem in razkritimi logičnimi šibkostmi

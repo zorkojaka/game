@@ -34,6 +34,7 @@ export interface AIWeakPoint {
   discovered: boolean;
   exploited: boolean;
   phase: AIPhase; // v kateri fazi postane relevantna
+  garrisonLoss?: number; // pobite enote straže TE točke — vsak napad jo oslabi (lažji naslednji)
 }
 
 // ─── Resources ────────────────────────────────────────────────────────────────
