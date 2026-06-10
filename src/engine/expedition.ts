@@ -205,7 +205,7 @@ export function tickExpedition(
       } else if (findRoll < aC + wC + mC) {
         const [m, rngM] = rngInt(rng, loot ? 2 : 1, loot ? 6 : 4); rng = rngM;
         finds.material += m;
-        events.push(`⚙ ${m} materiala najdenega na ${hexLabel(tile)}.`);
+        events.push(`🔨 ${m} materiala najdenega na ${hexLabel(tile)}.`);
       }
     }
   }

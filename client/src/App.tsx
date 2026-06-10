@@ -183,7 +183,7 @@ const HELP: Record<string, { title: string; rows: [string, string][] }> = {
     ['⚠', 'Če zaloga pade na 0, klan strada in vsak mesec izgublja ljudi (25 % → 50 % → 75 %).'],
   ] },
   workshop: { title: 'Kako deluje — Delavnice', rows: [
-    ['⚔', 'Orožje: 6 delavec-mes. + 1 material. Dovoli enemu borcu, da se bori z orožjem.'],
+    ['⚔️', 'Orožje: 6 delavec-mes. + 1 material. Dovoli enemu borcu, da se bori z orožjem.'],
     ['🏰', 'Obzidje: 12 delavec-mes. + 4 materiala. Vsaka stopnja doda +2 % k obrambi.'],
     ['💎', 'Artefakt: 360 delavec-mes. + 20 materiala. Takoj uniči eno odkrito šibko točko.'],
   ] },
@@ -198,7 +198,7 @@ const HELP: Record<string, { title: string; rows: [string, string][] }> = {
     ['🌙', 'Skrivanje (🌙 na mapi) zniža srečanja z AI za 50 %, a vsak 3. mesec preskoči korak.'],
   ] },
   attack: { title: 'Kako deluje — Napad', rows: [
-    ['⚔', 'Napadalci udarijo ob prihodu. Moč raste z orožjem, stopnjo raziskave orožja (×2/stopnjo) in razk. log. šibkostmi.'],
+    ['⚔️', 'Napadalci udarijo ob prihodu. Moč raste z orožjem, stopnjo raziskave orožja (×2/stopnjo) in razk. log. šibkostmi.'],
     ['◆', 'Napad na razkrito šibko točko (◆) ima bonus verjetnosti uspeha in je lažji od splošnega napada.'],
     ['↩', 'Preživeli se vrnejo v kamp; material iz uničenih robotov nesejo s seboj in ga dostavijo ob vrnitvi.'],
   ] },
@@ -1061,7 +1061,7 @@ function PeopleBar({ pop, combatants, defenders, foragers, scouts, inMissions, n
         {free       > 0 && <div className="pb-seg free"    style={{ flex: free }}       title={`Prosti: ${free}`} />}
       </div>
       <div className="pb-legend">
-        <span className="pbl combat">⚔ {combatants}</span>
+        <span className="pbl combat">⚔️ {combatants}</span>
         <span className="pbl defense">🛡 {defenders}</span>
         <span className="pbl forage">🌾 {foragers}</span>
         <span className="pbl scout">🔭 {scouts}</span>
@@ -1855,8 +1855,8 @@ function HumanMissionsPlaceholder() {
 function AlliesPanel({ clans }: { clans: OtherClan[] }) {
   const specInfo: Record<string, { icon: string; label: string; gift: string }> = {
     food:     { icon: '🌾', label: 'hrana',    gift: '+8 hrane / mesec' },
-    material: { icon: '⚙',  label: 'material',  gift: '+4 materiala / mesec' },
-    weapons:  { icon: '⚔',  label: 'orožje',    gift: '+2 orožja / mesec' },
+    material: { icon: '🔨', label: 'material',  gift: '+4 materiala / mesec' },
+    weapons:  { icon: '⚔️', label: 'orožje',    gift: '+2 orožja / mesec' },
     people:   { icon: '👥', label: 'okrepitve', gift: '+1 oseba / mesec' },
   };
   const discovered = clans.filter(c => c.discovered);
@@ -1958,8 +1958,8 @@ function RulesModal({ onClose }: { onClose: () => void }) {
     { id: 'viri', icon: '📦', title: 'Viri', body: (
       <ul>
         <li>🍞 <b>Hrana</b> — porablja jo populacija; nabiralci jo pridelajo.</li>
-        <li>⚔ <b>Orožje</b> — omejuje, koliko ljudi se lahko bori; izdela se iz materiala.</li>
-        <li>⚙ <b>Material</b> — surovina za orožje in obzidje; najdeš ga z odpravami in iz uničenih robotov.</li>
+        <li>⚔️ <b>Orožje</b> — omejuje, koliko ljudi se lahko bori; izdela se iz materiala.</li>
+        <li>🔨 <b>Material</b> — surovina za orožje in obzidje; najdeš ga z odpravami in iz uničenih robotov.</li>
         <li>👁 <b>Intel</b> — raziskovalci ga zbirajo; izboljša boje in poganja odkrivanje AI drevesa.</li>
         <li>💎 <b>Artefakt</b> — redek; takoj uniči eno odkrito šibko točko.</li>
       </ul>
@@ -1982,7 +1982,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
         <li>Pot izvidnice je <b>rumena</b>, napadalna pot je <b>rdeča</b>.</li>
       </ul>
     ) },
-    { id: 'napad', icon: '⚔', title: 'Napad', body: (
+    { id: 'napad', icon: '⚔️', title: 'Napad', body: (
       <ul>
         <li>V zavihku <b>Napad</b> narišeš pot do odkrite <b>šibke točke (◆)</b> ali splošni napad na AI jedro (☣).</li>
         <li>Spopad se sproži <b>ob prihodu</b>; moč napada raste z orožjem, <b>stopnjo raziskave orožja</b> (×2/stopnjo) in razk. logičnimi šibkostmi.</li>
@@ -2054,7 +2054,7 @@ function RoundLog({ log }: { log: RoundLog }) {
       <div className="rl-cols">
         {c && (
           <div className="rl-section">
-            <div className="rl-sec-title">⚔ Napad</div>
+            <div className="rl-sec-title">⚔️ Napad</div>
             <div className="rl-outcome" style={{ color: outcomeColor(c.outcome) }}>
               {outcomeLabel(c.outcome)}
             </div>
@@ -3826,8 +3826,8 @@ export default function App() {
       const dI = log.resourceDelta?.intelligence ?? 0;
       const dMat = (log.resourceDelta as { material?: number })?.material ?? 0;
       if (dS !== 0) ledger.push({ icon: '🍞', label: 'hrana',  value: dS });
-      if (dC !== 0) ledger.push({ icon: '⚔',  label: 'orožje', value: dC });
-      if (dMat !== 0) ledger.push({ icon: '⚙', label: 'material', value: dMat });
+      if (dC !== 0) ledger.push({ icon: '⚔️', label: 'orožje', value: dC });
+      if (dMat !== 0) ledger.push({ icon: '🔨', label: 'material', value: dMat });
       if (dI !== 0) ledger.push({ icon: '👁',  label: 'intel',  value: dI });
       const robotsKilled = (log.combat?.aiRobotsDestroyed ?? 0) + (log.raid?.aiRobotsDestroyed ?? 0);
       if (robotsKilled) ledger.push({ icon: '🤖', label: 'AI roboti', value: -robotsKilled });
@@ -3844,7 +3844,7 @@ export default function App() {
       const icons: KeyIcon[] = [];
       const outcomeColors = { victory: '#22cc66', partial: '#cc8800', defeat: '#cc4444', annihilation: '#cc2222' } as const;
       if (log.combat) {
-        icons.push({ icon: '⚔', color: outcomeColors[log.combat.outcome], title: `Napad: ${log.combat.outcome}` });
+        icons.push({ icon: '⚔️', color: outcomeColors[log.combat.outcome], title: `Napad: ${log.combat.outcome}` });
       }
       if (log.raid?.occurred && log.raid.outcome) {
         icons.push({ icon: '🛡', color: outcomeColors[log.raid.outcome], title: `Raid: ${log.raid.outcome}` });
@@ -4347,7 +4347,7 @@ export default function App() {
             return (
               <div className="tr-group tr-side">
                 <BigStat icon="🤖" label="AI roboti" value={game.aiRobots}                       color="#cc3333"
-                  note={(() => { const u = game.aiUnits; return u ? `🔭${u.scouts} ⚔${u.attackers} ☠${u.peopleKillers}` : ''; })()}
+                  note={(() => { const u = game.aiUnits; return u ? `🔭${u.scouts} ⚔️${u.attackers} ☠${u.peopleKillers}` : ''; })()}
                   noteColor="#aa8888"
                   title={(() => { const u = game.aiUnits; return u ? `Izvidniške: ${u.scouts} · Napadalne: ${u.attackers} · People-killer: ${u.peopleKillers}` : ''; })()} />
                 <BigStat icon="🔭" label="Mi vemo"   value={Math.round(ourK * 100)} color={ourColor} unit="%" />
@@ -4467,13 +4467,13 @@ export default function App() {
               {/* OROŽJE + OBZIDJE */}
               <div className="def-bottom-grid">
                 <div className="def-card">
-                  <div className="def-card-title">⚔ OROŽJE</div>
-                  <div className="def-big-num" style={{ color: overArmed ? '#cc4444' : '#cc7755' }}>⚔ {weaponCap}</div>
+                  <div className="def-card-title">⚔️ OROŽJE</div>
+                  <div className="def-big-num" style={{ color: overArmed ? '#cc4444' : '#cc7755' }}>⚔️ {weaponCap}</div>
                   <div className="def-stat-note">Prosto: <b style={{ color: weaponsLeft > 0 ? '#66cc88' : '#cc4444' }}>{weaponsLeft}</b> · v rabi {armedTotal}</div>
                   <div className="def-bullets">
                     {Array.from({ length: bullets }).map((_, i) => <span key={i} className={`def-bullet ${i < armedTotal ? 'used' : ''}`}>▮</span>)}
                   </div>
-                  <button className="def-upgrade-btn weapon" onClick={() => { setWorkshopObj('weapon'); setTab('workshop'); }}>⚔ GRADI OROŽJE</button>
+                  <button className="def-upgrade-btn weapon" onClick={() => { setWorkshopObj('weapon'); setTab('workshop'); }}>⚔️ GRADI OROŽJE</button>
                 </div>
                 <div className="def-card">
                   <div className="def-card-title">🏰 OBZIDJE</div>
@@ -4549,7 +4549,7 @@ export default function App() {
           {/* ─── DELAVNICE ─── */}
           {tab === 'workshop' && (() => {
             const cfg = workshopObj === 'weapon'
-              ? { label: 'orožje', total: 6, prog: game.weaponWorkshopProgress ?? 0, color: '#cc7733', icon: '⚔', made: game.resources.combat }
+              ? { label: 'orožje', total: 6, prog: game.weaponWorkshopProgress ?? 0, color: '#cc7733', icon: '⚔️', made: game.resources.combat }
               : workshopObj === 'wall'
                 ? { label: 'obzidje', total: 12, prog: game.wallProgress ?? 0, color: '#aabb88', icon: '🏰', made: game.wallsBuilt ?? 0 }
                 : { label: 'artefakt', total: 360, prog: game.artifactWorkshopProgress ?? 0, color: '#ffd84a', icon: '💎', made: game.resources.artifacts ?? 0 };
@@ -4597,7 +4597,7 @@ export default function App() {
             const cfg = researchObj === 'robots'
               ? { label: RESEARCH_LEVEL_NAMES.robots[Math.min(game.robotsResearchLevel ?? 0, 2)], lvl: game.robotsResearchLevel ?? 0, prog: game.robotsResearchProgress ?? 0, color: '#cc8800', icon: '🤖', eff: 'razkriva AI drevo' }
               : researchObj === 'weapon'
-                ? { label: RESEARCH_LEVEL_NAMES.weapon[Math.min(game.weaponResearchLevel ?? 0, 2)], lvl: game.weaponResearchLevel ?? 0, prog: game.weaponResearchProgress ?? 0, color: '#cc4433', icon: '⚔', eff: `napad ×${Math.pow(2, game.weaponResearchLevel ?? 0)}` }
+                ? { label: RESEARCH_LEVEL_NAMES.weapon[Math.min(game.weaponResearchLevel ?? 0, 2)], lvl: game.weaponResearchLevel ?? 0, prog: game.weaponResearchProgress ?? 0, color: '#cc4433', icon: '⚔️', eff: `napad ×${Math.pow(2, game.weaponResearchLevel ?? 0)}` }
                 : { label: RESEARCH_LEVEL_NAMES.wall[Math.min(game.wallResearchLevel ?? 0, 2)], lvl: game.wallResearchLevel ?? 0, prog: game.wallResearchProgress ?? 0, color: '#aabb88', icon: '🏰', eff: `obramba ×${Math.pow(2, game.wallResearchLevel ?? 0)}` };
             const months = researchers > 0 ? Math.ceil((120 - cfg.prog) / researchers) : Infinity;
             const pctv = Math.round((cfg.prog / 120) * 100);
@@ -4607,7 +4607,7 @@ export default function App() {
               <div className="def-head"><span className="def-head-icon">🔬</span><div><h3>RAZISKAVE</h3><div className="def-sub">RAZVOJ</div></div><InfoButton kind="research" /></div>
               <div className="def-card">
                 <div className="def-card-title">RAZISKOVALNA VERIGA</div>
-                <div className="dim small">🔬 Research → 👁 Intel → ◆ AI šibkosti → ⚔/🧱 Nadgradnje → 👥 Preživetje</div>
+                <div className="dim small">🔬 Research → 👁 Intel → ◆ AI šibkosti → ⚔️/🧱 Nadgradnje → 👥 Preživetje</div>
               </div>
               <div className="def-card">
                 <div className="def-card-title">RAZISKOVALCI</div>
@@ -4650,7 +4650,7 @@ export default function App() {
               {pendingExpeditions.some(e => e.kind === 'scout') && <span className="panel-badge" style={{ marginLeft: 'auto' }}>{pendingExpeditions.filter(e => e.kind === 'scout').length} potrjenih</span>}
               <InfoButton kind="scout" />
             </div>
-            <div className="pb-instr dim small">Klikni sosednje hekse na mapi za pot — odpravo lahko nastaviš tudi kar na zadnjem heksu (🔭/⚔ · −/+ · ✓).</div>
+            <div className="pb-instr dim small">Klikni sosednje hekse na mapi za pot — odpravo lahko nastaviš tudi kar na zadnjem heksu (🔭/⚔️ · −/+ · ✓).</div>
             {draftPath.length < 2 ? (
               <div className="map-hint">Pot je prazna. Začni s klikom na sosednji heks ⌂ klana.</div>
             ) : (
@@ -4719,7 +4719,7 @@ export default function App() {
           {tab === 'attack' && (
           <>
           <div className="panel def-panel">
-            <div className="def-head"><span className="def-head-icon">⚔</span>
+            <div className="def-head"><span className="def-head-icon">⚔️</span>
               <div><h3>NAPAD</h3><div className="def-sub">UDAR NA AI</div></div>
               {pendingExpeditions.filter(e => e.kind === 'mission').length > 0 && <span className="panel-badge" style={{ marginLeft: 'auto' }}>{pendingExpeditions.filter(e => e.kind === 'mission').length} napadov</span>}
               <InfoButton kind="attack" />
@@ -4758,7 +4758,7 @@ export default function App() {
                   <div className="def-card">
                     <div className="def-card-title">NAPADALCI</div>
                     <div className="def-defenders">
-                      <div className="def-big-num" style={{ color: '#cc4433' }}>⚔ {draftPeople}</div>
+                      <div className="def-big-num" style={{ color: '#cc4433' }}>⚔️ {draftPeople}</div>
                       <div className="def-slider-row" style={{ justifyContent: 'flex-end' }}>
                         <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
                         <button className="pa-btn" disabled={assignedHome + plannedTotal + draftPeople >= availablePop || weaponsLeft <= 0} onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
@@ -4771,7 +4771,7 @@ export default function App() {
                       <span>🌙 Skrivanje — pot +50 %, srečanja ×0.5, boj +20 %</span>
                     </label>
                     <div className="def-stat-note">🍞 vzamejo <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane · moč ×{draftRTier.strengthMult}</div>
-                    <button className="def-upgrade-btn weapon" disabled={!canConfirmDraft} onClick={() => confirmDraft('attack')}>⚔ Pošlji napad</button>
+                    <button className="def-upgrade-btn weapon" disabled={!canConfirmDraft} onClick={() => confirmDraft('attack')}>⚔️ Pošlji napad</button>
                   </div>
                 </>
               );
@@ -4830,7 +4830,7 @@ export default function App() {
                   const ret = clan && last ? Math.min(oneWay, hexDistFE(last, { q: clan.q, r: clan.r })) : oneWay;
                   return (
                     <div key={i} className="pending-exp-row">
-                      <span>⚔ {e.assigned} · {oneWay + ret}m tja+nazaj{e.weakPointId ? ' · ◆ šibka točka' : ''}{e.stealth ? ' · 🌙' : ''}</span>
+                      <span>⚔️ {e.assigned} · {oneWay + ret}m tja+nazaj{e.weakPointId ? ' · ◆ šibka točka' : ''}{e.stealth ? ' · 🌙' : ''}</span>
                       <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
                     </div>
                   );
@@ -4945,7 +4945,7 @@ export default function App() {
                 const returning = e.status === 'returning';
                 const color = returning ? '#66cc88' : isAttack ? '#cc3333' : '#ffd84a';
                 const wp = e.weakPointId ? game.aiWeakPoints.find(w => w.id === e.weakPointId) : undefined;
-                const kindLabel = (returning ? '↩ Vračanje' : isAttack ? (wp ? `⚔ Napad na ◆ ${wp.label}` : '⚔ Napad') : '🔭 Izvidnica') + (e.stealth ? ' · 🌙' : '');
+                const kindLabel = (returning ? '↩ Vračanje' : isAttack ? (wp ? `⚔️ Napad na ◆ ${wp.label}` : '⚔️ Napad') : '🔭 Izvidnica') + (e.stealth ? ' · 🌙' : '');
                 return (
                   <div key={e.id} className="exp-card">
                     <div className="exp-head">
