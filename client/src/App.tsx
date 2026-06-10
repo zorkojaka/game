@@ -2869,7 +2869,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
             const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
             const px = -dy, py = dx;  // pravokotno za razporeditev gumbov
             // Definiraj gumbe glede na zono
-            type Btn = { label: string; active: boolean; onClick: () => void; title: string; locked?: boolean; sub?: string; segments?: { done: number; next: number; total: number } };
+            type Btn = { label: string; active: boolean; onClick: () => void; title: string; locked?: boolean; sub?: string; lvl?: number; segments?: { done: number; next: number; total: number } };
             let btns: Btn[] = [];
             if (z.adj === 'f') {
               btns = [1,2,3,4,5].map(lvl => {
@@ -2917,18 +2917,19 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
               });
               const wpnLocked = research.weaponLevel >= research.robotsLevel;
               const wallLocked = research.wallLevel >= research.robotsLevel;
+              // Tudi zaklenjena gumba kažeta SVOJO ikono (⚔️/🧱) — ključavnica je le značka.
               btns = [
                 { label: '🤖', active: researchObj === 'robots', onClick: () => onResearch('robots'),
-                  locked: false,
+                  locked: false, lvl: research.robotsLevel,
                   title: `Roboti Lv${research.robotsLevel}: odkrivanje šibkih točk, odklene Orožje/Obzidje. 120 razisk.-mes. na stopnjo.`,
                   segments: seg('robots', research.robotsProgress) },
-                { label: wpnLocked ? '🔒' : '⚔️', active: researchObj === 'weapon', onClick: () => onResearch('weapon'),
-                  locked: wpnLocked,
-                  title: `Orožje Lv${research.weaponLevel}: vsaka stopnja podvoji napad (120 razisk.-mes.).${wpnLocked ? ` Zaklenjeno — najprej Roboti ${research.weaponLevel + 1}.` : ''}`,
+                { label: '⚔️', active: researchObj === 'weapon', onClick: () => onResearch('weapon'),
+                  locked: wpnLocked, lvl: research.weaponLevel,
+                  title: `Raziskava orožja Lv${research.weaponLevel}: vsaka stopnja podvoji napad (120 razisk.-mes.).${wpnLocked ? ` Zaklenjeno — najprej Roboti ${research.weaponLevel + 1}.` : ''}`,
                   segments: seg('weapon', research.weaponProgress) },
-                { label: wallLocked ? '🔒' : '🧱', active: researchObj === 'wall', onClick: () => onResearch('wall'),
-                  locked: wallLocked,
-                  title: `Obzidje Lv${research.wallLevel}: vsaka stopnja podvoji obrambo (120 razisk.-mes.).${wallLocked ? ` Zaklenjeno — najprej Roboti ${research.wallLevel + 1}.` : ''}`,
+                { label: '🧱', active: researchObj === 'wall', onClick: () => onResearch('wall'),
+                  locked: wallLocked, lvl: research.wallLevel,
+                  title: `Raziskava obzidja Lv${research.wallLevel}: vsaka stopnja podvoji obrambo (120 razisk.-mes.).${wallLocked ? ` Zaklenjeno — najprej Roboti ${research.wallLevel + 1}.` : ''}`,
                   segments: seg('wall', research.wallProgress) },
               ];
             }
@@ -3018,6 +3019,21 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                       })()}
                       <text x={bxp} y={byp} textAnchor="middle" dominantBaseline="central"
                         fontSize={b.active ? 11 : 10} style={{ pointerEvents: 'none' }}>{b.label}</text>
+                      {/* 🔒 značka — gumb zaklenjen, a ikona ostane vidna (vidiš, KAJ je zaklenjeno) */}
+                      {locked && (
+                        <text x={bxp + rIn * 0.9} y={byp - rIn * 0.9} textAnchor="middle" dominantBaseline="central"
+                          fontSize="8" style={{ pointerEvents: 'none' }}>🔒</text>
+                      )}
+                      {/* Lv značka — stopnja raziskave (roboti/orožje/obzidje) */}
+                      {b.lvl !== undefined && (
+                        <g pointerEvents="none">
+                          <circle cx={bxp + rIn * 0.95} cy={byp + rIn * 0.95} r="5.5"
+                            fill="#0a0e12" stroke={z.color} strokeWidth="1" />
+                          <text x={bxp + rIn * 0.95} y={byp + rIn * 0.95} textAnchor="middle" dominantBaseline="central"
+                            fontSize="6.5" fontWeight="bold" fill="#fff"
+                            fontFamily="'Courier New', monospace">{b.lvl}</text>
+                        </g>
+                      )}
                       {b.sub && (
                         <text x={bxp} y={byp + 12} textAnchor="middle" dominantBaseline="central"
                           fontSize="6.5" fill={z.color} fontWeight="bold"
