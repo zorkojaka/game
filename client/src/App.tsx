@@ -3044,7 +3044,7 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
           return (
             <g className="draft-controls">
               {/* potrditev na sredini hexa */}
-              <g style={{ cursor: canConfirmDraft ? 'pointer' : 'default', opacity: canConfirmDraft ? 1 : 0.4 }}
+              <g className="dc-confirm" style={{ cursor: canConfirmDraft ? 'pointer' : 'default', opacity: canConfirmDraft ? 1 : 0.4 }}
                  onClick={(e) => { e.stopPropagation(); if (canConfirmDraft) onConfirmDraft(); }}>
                 <title>Pošlji odpravo</title>
                 <circle cx={lp.x} cy={lp.y} r={13} fill={canConfirmDraft ? '#0f2a14' : '#11171f99'} stroke={canConfirmDraft ? '#66cc88' : '#555'} strokeWidth="1.5" />
@@ -3053,17 +3053,21 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
                 </g>
               </g>
               {/* vrsta 1: izbira tipa odprave */}
-              <Btn x={cx - 13} y={cy - 16} fill={draftKind === 'scout' ? '#3a2a00' : '#0a0a0a'} stroke={draftKind === 'scout' ? '#ffd84a' : '#555'}
-                icon="scout" iconColor={draftKind === 'scout' ? '#ffd84a' : '#b8b8b8'} onClick={() => onDraftKind('scout')} title="Izvidniki (raziskovanje)" />
-              <Btn x={cx + 13} y={cy - 16} fill={draftKind === 'attack' ? '#3a1010' : '#0a0a0a'} stroke={draftKind === 'attack' ? '#cc3333' : '#555'}
-                icon="attack" iconColor={draftKind === 'attack' ? '#ff7777' : '#b8b8b8'} onClick={() => onDraftKind('attack')} title="Napad" />
+              <g className="dc-kind">
+                <Btn x={cx - 13} y={cy - 16} fill={draftKind === 'scout' ? '#3a2a00' : '#0a0a0a'} stroke={draftKind === 'scout' ? '#ffd84a' : '#555'}
+                  icon="scout" iconColor={draftKind === 'scout' ? '#ffd84a' : '#b8b8b8'} onClick={() => onDraftKind('scout')} title="Izvidniki (raziskovanje)" />
+                <Btn x={cx + 13} y={cy - 16} fill={draftKind === 'attack' ? '#3a1010' : '#0a0a0a'} stroke={draftKind === 'attack' ? '#cc3333' : '#555'}
+                  icon="attack" iconColor={draftKind === 'attack' ? '#ff7777' : '#b8b8b8'} onClick={() => onDraftKind('attack')} title="Napad" />
+              </g>
               {/* vrsta 2: − število + */}
-              <Btn x={cx - 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="minus" disabled={draftPeople <= 1}
-                onClick={() => onDraftPeople(-1)} title="Manj ljudi" />
-              <circle cx={cx} cy={cy + 7} r={11} fill="#11171f" stroke={draftKind === 'attack' ? '#cc3333' : '#ffd84a'} strokeWidth="1.5" />
-              <text x={cx} y={cy + 7} textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold" fill="#fff" style={{ pointerEvents: 'none' }}>{draftPeople}</text>
-              <Btn x={cx + 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="plus" disabled={draftAddDisabled}
-                onClick={() => onDraftPeople(1)} title="Več ljudi" />
+              <g className="dc-people">
+                <Btn x={cx - 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="minus" disabled={draftPeople <= 1}
+                  onClick={() => onDraftPeople(-1)} title="Manj ljudi" />
+                <circle cx={cx} cy={cy + 7} r={11} fill="#11171f" stroke={draftKind === 'attack' ? '#cc3333' : '#ffd84a'} strokeWidth="1.5" />
+                <text x={cx} y={cy + 7} textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold" fill="#fff" style={{ pointerEvents: 'none' }}>{draftPeople}</text>
+                <Btn x={cx + 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="plus" disabled={draftAddDisabled}
+                  onClick={() => onDraftPeople(1)} title="Več ljudi" />
+              </g>
               {/* vrsta 3: obroki + (izvidniki: raziskovanje/lootanje) + skrivanje (oboje) */}
               {(() => {
                 const isScout = draftKind === 'scout';
@@ -3071,21 +3075,21 @@ function HexMap({ tiles, draftPath, draftReturn, draftKind, plannedPaths, onPath
                 const stealthX = isScout ? cx + 22 : cx + 16;
                 return (
                   <>
-                    <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftRations(draftRations % 5 + 1); }}>
+                    <g className="dc-rations" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftRations(draftRations % 5 + 1); }}>
                       <title>{`Obroki: ${draftRations} — klikni za spremembo`}</title>
                       <circle cx={ratX} cy={cy + 30} r={9} fill="#0a1a0a" stroke="#668866" strokeWidth="1.5" />
                       <text x={ratX} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>{RATIONS_EMOJI[draftRations] ?? '🍞'}</text>
                     </g>
                     {isScout && (
                       /* Izvidniki: preklop raziskovanje (🔭) ↔ lootanje (🔨) */
-                      <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftLoot(!draftLoot); }}>
+                      <g className="dc-loot" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftLoot(!draftLoot); }}>
                         <title>{draftLoot ? 'Lootanje: nabira material (raziskava ×0.25)' : 'Raziskovanje: odkriva polja'}</title>
                         <circle cx={cx} cy={cy + 30} r={9} fill={draftLoot ? '#2a1f0a' : '#0a1a0a'} stroke={draftLoot ? '#cc8800' : '#ffd84a'} strokeWidth="1.5" />
                         <text x={cx} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>{draftLoot ? '🔨' : '🔭'}</text>
                       </g>
                     )}
                     {/* Skrivanje — za napadalce IN izvidnike (izvidniki v skrivanju ne rabijo orožja) */}
-                    <g style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftStealth(!draftStealth); }}>
+                    <g className="dc-stealth" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftStealth(!draftStealth); }}>
                       <title>{draftStealth ? (isScout ? 'Skrivanje: brez orožja, manj srečanj' : 'Skrivanje vklopljeno') : 'Skrivanje izklopljeno'}</title>
                       <circle cx={stealthX} cy={cy + 30} r={9} fill={draftStealth ? '#1a1a2e' : '#0a0a0a'} stroke={draftStealth ? '#8888ff' : '#555'} strokeWidth="1.5" />
                       <text x={stealthX} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none', opacity: draftStealth ? 1 : 0.65 }}>🌙</text>
@@ -3320,6 +3324,7 @@ type HelpAnchorDef = {
   side: 'below' | 'above' | 'left' | 'right' | 'over';
   title: string;
   text: string;
+  w?: number;                  // širina oblačka (privzeto 232)
 };
 
 const HELP_ANCHORS: HelpAnchorDef[] = [
@@ -3330,29 +3335,49 @@ const HELP_ANCHORS: HelpAnchorDef[] = [
   { sel: '.tr-group.tr-side', pick: 1, side: 'below', title: '🤖 Sovražnik',
     text: 'Število AI robotov · 🔭 koliko MI vemo o AI (odpira AI drevo) · 👁 koliko AI ve o nas — več ko ve, pogosteje napada kamp.' },
   { sel: '.ph-menu-btn:not(.ph-info-btn)', side: 'below', title: '☰ Meni',
-    text: 'Nova igra, pravila, predlogi. Gumb ⓘ levo vklopi/izklopi to pomoč.' },
+    text: 'Nova igra, pravila, predlogi. Gumb ⓘ levo vklopi/izklopi to pomoč.', w: 180 },
   { sel: '.side-menu', side: 'right', title: '🧭 Zavihki kampa',
-    text: 'Od zgoraj: 🛡 obramba · 🌾 prehrana · 🔨 delavnice · 🔬 raziskave · 🔭 izvidniki · ⚔️ napad. Klik ikone odpre panel z nastavitvami — isto pa lahko nastavljaš kar na mapi.' },
-  { sel: '.camp-zone', pick: 'union', side: 'right', title: '⌂ Tvoj kamp — 4 cone',
-    text: 'Vsak heks je ena cona: obramba / prehrana / delavnice / raziskave. Z gumbi +/− ob coni premikaš ljudi vanjo. Barvni obroč okoli kampa = verjetnost, da odbiješ napad AI.' },
+    text: 'Od zgoraj: 🛡 obramba · 🌾 prehrana · 🔨 delavnice · 🔬 raziskave · 🔭 izvidniki · ⚔️ napad. Klik ikone odpre panel — isto pa nastavljaš tudi kar na mapi.' },
+  // ── Kamp: vsaka cona (heks) posebej — vrstni red v DOM: raziskave, prehrana, delavnice, obramba ──
+  { sel: '.camp-zone', pick: 0, side: 'left', title: '🔬 Raziskave', w: 170,
+    text: 'Raziskovalci zbirajo intel, odpirajo AI drevo in odklepajo nadgradnje orožja/obzidja. +/− premika ljudi.' },
+  { sel: '.camp-zone', pick: 1, side: 'below', title: '🌾 Prehrana', w: 170,
+    text: 'Nabiralci zbirajo hrano. Kamp vsak mesec poje 🍞 — brez hrane ljudje umirajo.' },
+  { sel: '.camp-zone', pick: 2, side: 'below', title: '🔨 Delavnice', w: 170,
+    text: 'Delavci iz 🔨 materiala izdelujejo ⚔️ orožje, gradijo 🧱 obzidje ali 💎 artefakt (izberi cilj na gumbih ob coni).' },
+  { sel: '.camp-zone', pick: 3, side: 'right', title: '🛡 Obramba', w: 170,
+    text: 'Branilci (vsak rabi orožje) odbijajo napade AI. Barvni obroč okoli kampa = verjetnost odbitja.' },
   { sel: '.hex-map', side: 'over', title: '🗺 Operativna mapa',
-    text: 'Klikni KATEROKOLI polje → samodejno se nariše najkrajša pot tja (rumena/rdeča) in nazaj (turkizna). Točke poti lahko povlečeš in pot preoblikuješ. Na zadnjem polju poti se prikažejo gumbi odprave: 🔭/⚔️ tip · −N+ ljudje · 🍞 obroki · 🔭/🔨 raziskovanje ali lootanje · 🌙 skrivanje (izvidniki brez orožja) · ✓ potrdi. Oznake polj: A1… ime polja · ? neraziskano · ◆ šibka točka AI · ⛺ drug klan · ☣ AI jedro.' },
+    text: 'Klikni KATEROKOLI polje → najkrajša pot tja (rumena/rdeča) in nazaj (turkizna); točke lahko povlečeš. Oznake: A1… ime polja · ? neraziskano · ◆ šibka točka AI · ⛺ klan · ☣ AI jedro.' },
+  // ── Gumbi odprave na zadnjem polju poti (pomoč nariše demo pot, da so vidni) ──
+  { sel: '.dc-kind', side: 'above', title: '🔭/⚔️ Tip odprave', w: 170,
+    text: 'Izvidniki raziskujejo; napad udari ob prihodu na cilj.' },
+  { sel: '.dc-people', side: 'right', title: '− Ljudje +', w: 150,
+    text: 'Število članov odprave. Vsak (razen skritih izvidnikov) vzame ⚔️ orožje iz kampa.' },
+  { sel: '.dc-rations', side: 'left', title: '🍞 Obroki', w: 150,
+    text: 'Klik kroži 💀→🥩: več hrane = močnejši in varnejši, a dražje.' },
+  { sel: '.dc-loot', side: 'below', title: '🔭/🔨 Naloga', w: 160,
+    text: 'Raziskovanje odkriva polja; lootanje nabira material (raziskava ×0.25).' },
+  { sel: '.dc-stealth', side: 'right', title: '🌙 Skrivanje', w: 160,
+    text: 'Manj srečanj, pot +50 %. Skriti izvidniki ne rabijo orožja.' },
+  { sel: '.dc-confirm', side: 'above', title: '✓ Pošlji', w: 140,
+    text: 'Potrdi odpravo — krene ob naslednjem mesecu.' },
   { sel: '.right-col', side: 'left', title: '📜 Dnevnik dogodkov',
-    text: 'Kaj se je zgodilo vsak mesec: najdbe, srečanja, napadi, vrnitve odprav. Lokacije so navedene z oznako polja (npr. C4) — poišči jo na mapi.' },
+    text: 'Kaj se je zgodilo vsak mesec: najdbe, srečanja, napadi, vrnitve. Lokacije z oznako polja (npr. C4).' },
   { sel: '.right-col .exec-btn', side: 'left', title: '▶ Naslednji mesec',
-    text: 'Izvede potezo: odprave krenejo in korakajo, delavnice/raziskave napredujejo, AI odgovori. Cilj: uniči vse šibke točke AI ali vse robote, preden ti izumre klan.' },
+    text: 'Izvede potezo: odprave korakajo, delavnice/raziskave napredujejo, AI odgovori. Cilj: uniči vse šibke točke AI ali vse robote, preden klan izumre.' },
 ];
 
 function HelpOverlay({ onClose }: { onClose: () => void }) {
-  type Place = { rect: { x: number; y: number; w: number; h: number }; a: HelpAnchorDef; lx: number; ly: number };
+  type Place = { rect: { x: number; y: number; w: number; h: number }; a: HelpAnchorDef; lx: number; ly: number; w: number };
   const [places, setPlaces] = useState<Place[]>([]);
-  const LW = 232;  // širina oblačka
 
   useEffect(() => {
     const measure = () => {
       const W = window.innerWidth, H = window.innerHeight;
       const out: Place[] = [];
       for (const a of HELP_ANCHORS) {
+        const LW = a.w ?? 232;
         const els = Array.from(document.querySelectorAll(a.sel)) as HTMLElement[];
         if (!els.length) continue;
         let r: { x: number; y: number; w: number; h: number } | null = null;
@@ -3369,34 +3394,38 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
           const el = els[a.pick ?? 0];
           if (el) {
             const b = el.getBoundingClientRect();
-            if (b.width >= 24 && b.height >= 14) r = { x: b.left, y: b.top, w: b.width, h: b.height };
+            // tudi mali SVG gumbi (r≈8 → ~16 px) morajo skozi
+            if (b.width >= 10 && b.height >= 10) r = { x: b.left, y: b.top, w: b.width, h: b.height };
           }
         }
         if (!r) continue;
         let lx = r.x + r.w / 2 - LW / 2, ly = r.y + r.h + 10;
-        if (a.side === 'above')      { ly = Math.max(8, r.y - 96); }
+        if (a.side === 'above')      { ly = Math.max(8, r.y - 84); }
         else if (a.side === 'right') { lx = r.x + r.w + 12; ly = r.y + Math.min(r.h / 2, 120) - 30; }
         else if (a.side === 'left')  { lx = r.x - LW - 12;  ly = r.y + Math.min(r.h / 2, 120) - 30; }
-        else if (a.side === 'over')  { lx = r.x + r.w / 2 - LW / 2; ly = r.y + r.h * 0.30; }
+        else if (a.side === 'over')  { lx = r.x + r.w / 2 - LW / 2; ly = r.y + r.h * 0.26; }
         lx = Math.max(8, Math.min(W - LW - 8, lx));
         ly = Math.max(8, Math.min(H - 120, ly));
-        out.push({ rect: r, a, lx, ly });
+        out.push({ rect: r, a, lx, ly, w: LW });
       }
       setPlaces(out);
     };
     measure();
+    // Gumbi odprave se pojavijo šele, ko se demo pot izriše — izmeri še enkrat z zamikom.
+    const t1 = setTimeout(measure, 250);
+    const t2 = setTimeout(measure, 700);
     window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    return () => { clearTimeout(t1); clearTimeout(t2); window.removeEventListener('resize', measure); };
   }, []);
 
   // Točki povezovalne črte: od roba oblačka do roba cilja
   const lineFor = (p: Place): { x1: number; y1: number; x2: number; y2: number } | null => {
     const { rect: r, a } = p;
-    const lcx = p.lx + LW / 2;
+    const lcx = p.lx + p.w / 2;
     if (a.side === 'below') return { x1: lcx, y1: p.ly, x2: r.x + r.w / 2, y2: r.y + r.h };
-    if (a.side === 'above') return { x1: lcx, y1: p.ly + 60, x2: r.x + r.w / 2, y2: r.y };
+    if (a.side === 'above') return { x1: lcx, y1: p.ly + 56, x2: r.x + r.w / 2, y2: r.y };
     if (a.side === 'right') return { x1: p.lx, y1: p.ly + 26, x2: r.x + r.w, y2: r.y + Math.min(r.h / 2, 140) };
-    if (a.side === 'left')  return { x1: p.lx + LW, y1: p.ly + 26, x2: r.x, y2: r.y + Math.min(r.h / 2, 140) };
+    if (a.side === 'left')  return { x1: p.lx + p.w, y1: p.ly + 26, x2: r.x, y2: r.y + Math.min(r.h / 2, 140) };
     return null;  // 'over' — brez črte
   };
 
@@ -3413,7 +3442,7 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
           style={{ left: p.rect.x - 3, top: p.rect.y - 3, width: p.rect.w + 6, height: p.rect.h + 6 }} />
       ))}
       {places.map((p, i) => (
-        <div key={`l${i}`} className="hctx-label" style={{ left: p.lx, top: p.ly, width: LW }}
+        <div key={`l${i}`} className="hctx-label" style={{ left: p.lx, top: p.ly, width: p.w }}
           onClick={e => e.stopPropagation()}>
           <div className="hctx-title">{p.a.title}</div>
           <div className="hctx-text">{p.a.text}</div>
@@ -3616,6 +3645,27 @@ export default function App() {
     prevPhaseRef.current = game.phase;
     prevRunIdRef.current = game.runId;
   }, [game?.phase, game?.runId]);
+
+  // ⓘ pomoč: če ni narisane poti, nariši DEMO pot (2 polji od kampa), da so
+  // gumbi odprave vidni in jih overlay lahko razloži. Ob izklopu jo počisti.
+  const helpDemoPath = useRef(false);
+  useEffect(() => {
+    if (helpOverlay) {
+      if (game && draftPath.length < 2) {
+        const clan = game.mapTiles?.find(t => t.isClanCamp);
+        const target = clan ? game.mapTiles?.find(t => hexDistFE(t, clan) === 2) : undefined;
+        if (clan && target) {
+          helpDemoPath.current = true;
+          setDestination({ q: target.q, r: target.r });
+        }
+      }
+    } else if (helpDemoPath.current) {
+      helpDemoPath.current = false;
+      const clan = game?.mapTiles?.find(t => t.isClanCamp);
+      setDraftPath(clan ? [{ q: clan.q, r: clan.r }] : []);
+      setDraftReturn([]);
+    }
+  }, [helpOverlay]);
 
   // Pot vedno začni iz klanovega kampa
   useEffect(() => {
