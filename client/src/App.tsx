@@ -2174,6 +2174,18 @@ function expeditionImageHref(kind: Expedition['kind']): string {
   return kind === 'mission' ? '/assets/map/exp-attackers.png' : '/assets/map/exp-scouts.png';
 }
 
+function aiGuardImageHref(phase: AIWeakPoint['phase']): string {
+  if (phase === 'find') return '/assets/map/exp-scouts.png';
+  if (phase === 'understand') return '/assets/map/exp-attackers.png';
+  return '/assets/events/combat-people-killers-win.png';
+}
+
+function aiGuardLabel(phase: AIWeakPoint['phase']): string {
+  if (phase === 'find') return 'izvidniška straža';
+  if (phase === 'understand') return 'napadalna straža';
+  return 'people-killer straža';
+}
+
 function campZoneImage(adj: 'd' | 'f' | 'w' | 'r'): string {
   if (adj === 'f') return '/assets/map/camp-food.png';
   if (adj === 'w') return '/assets/map/camp-workshop.png';
@@ -2558,14 +2570,39 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                   ))}
                 </text>
               )}
-              {/* Garnizija — AI enote, ki stražijo šibko točko */}
-              {wpVisible && wp && !wp.exploited && wpGarrison > 0 && (
-                <text x={p.x} y={p.y + SIZE * 0.18 + wpLabelLines.length * 8 + 7} textAnchor="middle"
-                  fontSize="6.5" fill="#cc5544" fontFamily="'Courier New', monospace" fontWeight="bold"
-                  stroke="#050706" strokeWidth="2" paintOrder="stroke" style={{ pointerEvents: 'none' }}>
-                  🤖×{wpGarrison} straža
-                </text>
-              )}
+              {/* Garnizija — AI enota, ki straži šibko točko */}
+              {wpVisible && wp && !wp.exploited && wpGarrison > 0 && (() => {
+                const guardImg = aiGuardImageHref(wp.phase);
+                const guardLabel = aiGuardLabel(wp.phase);
+                const guardColor = wp.phase === 'find'
+                  ? '#3377cc'
+                  : wp.phase === 'understand'
+                    ? '#cc6633'
+                    : '#cc3344';
+                const guardSize = wp.phase === 'eliminate' ? 24 : 22;
+                const gy = p.y + SIZE * 0.18 + wpLabelLines.length * 8 + 14;
+                return (
+                  <g className="wp-guard" pointerEvents="none">
+                    <title>{`${guardLabel} · ${wpGarrison}`}</title>
+                    <circle cx={p.x} cy={gy} r={guardSize * 0.44} fill="#081014" stroke={guardColor} strokeWidth="1.3" opacity="0.96" />
+                    <image
+                      href={guardImg}
+                      x={p.x - guardSize / 2}
+                      y={gy - guardSize / 2}
+                      width={guardSize}
+                      height={guardSize}
+                      preserveAspectRatio="xMidYMid meet"
+                      opacity="0.98"
+                    />
+                    <circle cx={p.x + guardSize * 0.42} cy={gy + guardSize * 0.33} r="7.6" fill="#050706" stroke={guardColor} strokeWidth="1.2" />
+                    <text x={p.x + guardSize * 0.42} y={gy + guardSize * 0.33 + 2.5}
+                      textAnchor="middle" fontSize="7.5" fill={guardColor} fontWeight="bold"
+                      fontFamily="'Courier New', monospace" style={{ pointerEvents: 'none' }}>
+                      ×{wpGarrison}
+                    </text>
+                  </g>
+                );
+              })()}
               {clanVisible && clan && clanMeta && (
                 <text x={p.x} y={p.y + SIZE * 0.04} textAnchor="middle"
                   fontSize="6.6"
