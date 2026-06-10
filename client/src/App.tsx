@@ -3327,48 +3327,36 @@ type HelpAnchorDef = {
   w?: number;                  // širina oblačka (privzeto 232)
 };
 
-// VODENI OGLED: koraki si sledijo po pomembnosti (prikazan je EN oblaček naenkrat).
-// 1 prehrana → 2 delavnice → 3 raziskave → 4 obramba → 5 napad → 6 izvidniki → gumbi odprave → ostalo.
+// VODENI OGLED: koraki po pomembnosti, kratka besedila, gumbi se kažejo NA MAPI;
+// levi meni je omenjen le kot kažipot ("isto/več v zavihku … levo").
 const HELP_ANCHORS: HelpAnchorDef[] = [
   // ── Kamp-cone (DOM vrstni red con: raziskave, prehrana, delavnice, obramba) ──
-  { sel: '.camp-zone', pick: 1, side: 'below', title: '🌾 Prehrana', w: 210,
-    text: 'Nabiralci zbirajo hrano. Kamp vsak mesec poje 🍞 — brez hrane ljudje umirajo. Z gumbi +/− ob coni premikaš ljudi.' },
+  { sel: '.camp-zone', pick: 1, side: 'below', title: '🌾 Prehrana', w: 225,
+    text: 'Nabiralci zbirajo hrano; kamp jo vsak mesec poje. +/− = ljudje. 5 gumbov spodaj = obroki (💀→🥩): več hrane, močnejši ljudje. Isto = zavihek 🌾 levo.' },
   { sel: '.camp-zone', pick: 2, side: 'below', title: '🔨 Delavnice', w: 210,
-    text: 'Delavci iz 🔨 materiala izdelujejo ⚔️ orožje, gradijo 🧱 obzidje ali 💎 artefakt — cilj izbereš na gumbih ob coni.' },
+    text: 'Delavci iz 🔨 materiala delajo: ⚔️ orožje · 🧱 obzidje · 💎 artefakt — izbira na gumbih ob coni. Isto = zavihek 🔨 levo.' },
   { sel: '.camp-zone', pick: 0, side: 'right', title: '🔬 Raziskave', w: 210,
-    text: 'Raziskovalci zbirajo 👁 intel, odpirajo AI drevo in odklepajo nadgradnje orožja/obzidja (vsaka stopnja ×2).' },
-  { sel: '.camp-zone', pick: 3, side: 'right', title: '🛡 Obramba', w: 210,
-    text: 'Branilci (vsak rabi ⚔️ orožje) odbijajo napade AI na kamp. Barvni obroč okoli kampa = verjetnost odbitja.' },
-  { sel: '.side-menu .sm-btn', pick: 5, side: 'right', title: '⚔️ Napad', w: 220,
-    text: 'Nariši pot do odkrite ◆ šibke točke ali ☣ AI jedra. Spopad se sproži ob prihodu; napadalci vzamejo orožje s seboj. Uniči vse šibke točke ali vse robote = zmaga!' },
-  { sel: '.side-menu .sm-btn', pick: 4, side: 'right', title: '🔭 Izvidniki', w: 220,
-    text: 'Odkrivajo mapo: šibke točke AI, druge klane, najdbe. Odpravo sestaviš kar na mapi — klikni cilj in pokaže se meni odprave (naslednji koraki ↓).' },
-  // ── Gumbi odprave (pomoč nariše demo pot, da so vidni) ──
-  { sel: '.dc-kind', side: 'above', title: '🔭/⚔️ Tip odprave', w: 190,
-    text: 'Izvidniki raziskujejo; napad udari ob prihodu na cilj.' },
-  { sel: '.dc-people', side: 'right', title: '− Ljudje +', w: 190,
-    text: 'Število članov odprave. Vsak (razen skritih izvidnikov) vzame ⚔️ orožje iz kampa.' },
-  { sel: '.dc-rations', side: 'left', title: '🍞 Obroki', w: 180,
-    text: 'Klik kroži 💀→🥩: več hrane = močnejši in varnejši, a dražje.' },
-  { sel: '.dc-loot', side: 'below', title: '🔭/🔨 Naloga izvidnikov', w: 200,
-    text: 'Raziskovanje odkriva polja; lootanje nabira 🔨 material (raziskava ×0.25).' },
-  { sel: '.dc-stealth', side: 'right', title: '🌙 Skrivanje', w: 190,
-    text: 'Manj srečanj, pot +50 %. Skriti izvidniki ne rabijo orožja.' },
-  { sel: '.dc-confirm', side: 'above', title: '✓ Pošlji', w: 170,
-    text: 'Potrdi odpravo — krene ob naslednjem mesecu.' },
+    text: '👁 intel odpira AI drevo; 🤖 roboti odklenejo nadgradnje ⚔️/🧱 (×2 na stopnjo). Cilj = gumbi ob coni. Isto = zavihek 🔬 levo.' },
+  { sel: '.camp-zone', pick: 3, side: 'right', title: '🛡 Obramba', w: 200,
+    text: 'Branilci odbijajo napade AI (vsak rabi ⚔️). Obroč = verjetnost odbitja. Isto = zavihek 🛡 levo.' },
+  // ── Odprava + napad: EN korak, gumbi na mapi (demo pot jih pokaže) ──
+  { sel: '.draft-controls', side: 'right', title: '🔭/⚔️ Odprava & napad', w: 250,
+    text: 'Klikni cilj na mapi → pot tja in nazaj. Gumbi: 🔭/⚔️ tip · −N+ ljudje · 🍞 obroki · 🔭/🔨 naloga · 🌙 skrivanje (izvidniki brez orožja) · ✓ pošlji. Napad na ◆/☣ udari ob prihodu. Več = zavihka 🔭/⚔️ levo.' },
+  { sel: '.side-menu', side: 'right', title: '🧭 Levi meni = kažipot', w: 200,
+    text: 'Iste stvari kot na mapi: 🛡🌾🔨🔬 so cone kampa, 🔭/⚔️ odprave. Klik ikone = podrobnosti.' },
   // ── Mapa + zgornja vrstica + desni stolpec ──
-  { sel: '.hex-map', side: 'over', title: '🗺 Operativna mapa',
-    text: 'Klikni KATEROKOLI polje → najkrajša pot tja (rumena/rdeča) in nazaj (turkizna); točke poti lahko povlečeš. Oznake: A1… ime polja · ? neraziskano · ◆ šibka točka AI · ⛺ klan · ☣ AI jedro.' },
-  { sel: '.tr-group.tr-main', side: 'below', title: '📦 Viri kampa',
-    text: '🍞 hrana (porabi se vsak mesec) · ⚔️ orožje (rabi ga vsak branilec/odprava) · 🔨 material (za delavnice) · 👁 intel · 💎 artefakt (uniči eno šibko točko AI).' },
-  { sel: '.tr-group.tr-side', pick: 0, side: 'below', title: '👥 Ljudje',
-    text: 'Klan skupaj · v kampu · na odpravi · 💤 prosti = še nerazporejeni. Razporedi jih v cone kampa ali na odprave.' },
-  { sel: '.tr-group.tr-side', pick: 1, side: 'below', title: '🤖 Sovražnik',
-    text: 'Število AI robotov · 🔭 koliko MI vemo o AI (odpira AI drevo) · 👁 koliko AI ve o nas — več ko ve, pogosteje napada.' },
-  { sel: '.right-col', side: 'left', title: '📜 Dnevnik dogodkov',
-    text: 'Kaj se je zgodilo vsak mesec: najdbe, srečanja, napadi, vrnitve. Lokacije z oznako polja (npr. C4).' },
-  { sel: '.right-col .exec-btn', side: 'left', title: '▶ Naslednji mesec',
-    text: 'Izvede potezo: odprave korakajo, delavnice/raziskave napredujejo, AI odgovori. Cilj: uniči vse šibke točke AI ali vse robote, preden klan izumre.' },
+  { sel: '.hex-map', side: 'over', title: '🗺 Mapa', w: 220,
+    text: 'Klik polje = pot tja in nazaj; točke lahko povlečeš. A1 = ime polja · ? neraziskano · ◆ šibka točka · ⛺ klan · ☣ AI jedro.' },
+  { sel: '.tr-group.tr-main', side: 'below', title: '📦 Viri', w: 210,
+    text: '🍞 hrana · ⚔️ orožje · 🔨 material · 👁 intel · 💎 artefakt (uniči šibko točko AI).' },
+  { sel: '.tr-group.tr-side', pick: 0, side: 'below', title: '👥 Ljudje', w: 190,
+    text: 'Klan / v kampu / na odpravi / 💤 prosti — razporedi jih!' },
+  { sel: '.tr-group.tr-side', pick: 1, side: 'below', title: '🤖 AI', w: 190,
+    text: 'Roboti · 🔭 mi vemo · 👁 AI ve — več ko ve, več napadov.' },
+  { sel: '.right-col', side: 'left', title: '📜 Dnevnik', w: 180,
+    text: 'Mesečni dogodki; lokacije z oznako polja (npr. C4).' },
+  { sel: '.right-col .exec-btn', side: 'left', title: '▶ Naslednji mesec', w: 200,
+    text: 'Izvede potezo. Cilj: uniči vse ◆ šibke točke ali vse robote, preden klan izumre.' },
 ];
 
 function HelpOverlay({ onClose }: { onClose: () => void }) {
