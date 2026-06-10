@@ -275,10 +275,16 @@ export const RAID_BREACH_AREAS: Record<'victory' | 'partial' | 'defeat' | 'annih
   defeat: 2,         // več prebije → dve območji
   annihilation: 4,   // zelo prebije → vsa območja
 };
-// Žrtve med ljudmi v prebitem območju (delež dodeljenih tej vlogi), po izidu
-export const RAID_AREA_PEOPLE_LOSS: Record<'partial' | 'defeat' | 'annihilation', number> = {
-  partial: 0.20, defeat: 0.40, annihilation: 0.70,
+// Žrtve so ZVEZNE: skalirajo z MOČJO PREBOJA (1 − verjetnost odbitja = AI premoč).
+// Močnejša obramba → manjši preboj → manj žrtev; šibka obramba → AI "tolče naprej".
+// Množitelji premoči po izidu (delež = mult × premoč, omejeno na ljudi v coni):
+export const RAID_FRONT_LOSS_MULT: Record<'victory' | 'partial' | 'defeat', number> = {
+  victory: 0.10, partial: 0.55, defeat: 1.20,   // annihilation = vsi branilci (dominacija)
 };
+export const RAID_AREA_LOSS_MULT: Record<'partial' | 'defeat', number> = {
+  partial: 0.40, defeat: 0.85,                  // annihilation = fiksno spodaj
+};
+export const RAID_AREA_LOSS_ANNIHILATION = 0.70; // AI dominacija: 70 % ljudi v vsaki coni
 // Delež uničenega vira na prebito območje
 export const RAID_DESTROY_FOOD_PCT     = 0.25; // prehrana → hrana
 export const RAID_DESTROY_WEAPONS_PCT  = 0.20; // delavnice → orožje

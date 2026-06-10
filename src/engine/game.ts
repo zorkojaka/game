@@ -26,7 +26,7 @@ import {
   LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION, LOGICAL_WEAKNESS_LETHALITY_REDUCTION,
   RAID_BASE_CHANCE, RAID_POP_SCALING_MAX, RAID_POP_REFERENCE, RAID_AI_KNOWLEDGE_BONUS,
   RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT, RAID_FORCE_FLOOR, wpGarrisonMult,
-  RAID_BREACH_AREAS, RAID_AREA_PEOPLE_LOSS,
+  RAID_BREACH_AREAS, RAID_FRONT_LOSS_MULT, RAID_AREA_LOSS_MULT, RAID_AREA_LOSS_ANNIHILATION,
   RAID_DESTROY_FOOD_PCT, RAID_DESTROY_WEAPONS_PCT, RAID_DESTROY_MATERIAL_PCT, RAID_DESTROY_WALL_LEVELS,
   SCOUT_BASE_SUCCESS, SCOUT_INTEL_BONUS_PER_100, SCOUT_ESPIONAGE_BONUS,
   SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_AI_KNOWLEDGE_BONUS,
@@ -229,13 +229,15 @@ function resolveRaid(
   const pkReduction = logical.peopleKillers ? LOGICAL_WEAKNESS_LETHALITY_REDUCTION : 0;
   const lethality = (1 + PEOPLEKILLER_LETHALITY_PER_UNIT * aiUnits.peopleKillers) * (1 - pkReduction);
 
-  // Front-line žrtve branilcev + uničenje AI po izidu
-  // DOMINACIJA: skrajni izid izniči poraženca v celoti —
-  //  'victory' (odločilna obramba) → uničeni VSI napadalni roboti, AI ne dobi NOBENE informacije;
+  // Žrtve so ZVEZNE: skalirajo z MOČJO PREBOJA (premoč = 1 − p). Močnejša obramba
+  // → manjši preboj → manj žrtev. DOMINACIJA ostane skrajna:
+  //  'victory' (odločilna obramba) → uničeni VSI napadalni roboti, AI brez informacij;
   //  'annihilation' (AI dominacija) → padejo vsi branilci, AI odnese največ informacij.
-  const frontFrac:   Record<typeof outcome, number> = { victory: 0.05, partial: 0.25, defeat: 0.60, annihilation: 1.00 };
+  const breachPower = Math.max(0, Math.min(1, 1 - p));  // AI premoč ob preboju
   const destroyFrac: Record<typeof outcome, number> = { victory: 1.00, partial: 0.35, defeat: 0.12, annihilation: 0.03 };
-  let defendersLost = outcome === 'annihilation' ? defenders : Math.floor(defenders * frontFrac[outcome] * lethality);
+  let defendersLost = outcome === 'annihilation'
+    ? defenders
+    : Math.floor(defenders * RAID_FRONT_LOSS_MULT[outcome] * breachPower * lethality);
   const aiRobotsDestroyed = Math.floor(aiForce * destroyFrac[outcome]);
   const domination: 'defense' | 'ai' | null =
     outcome === 'victory' ? 'defense' : outcome === 'annihilation' ? 'ai' : null;
@@ -259,9 +261,12 @@ function resolveRaid(
   scored.sort((x, y) => x.r - y.r);
   const breachedAreas = scored.slice(0, breachCount).map(s => s.a);
 
-  // Žrtve med ljudmi v prebitih območjih (delež dodeljenih tej vlogi)
-  const peopleLossFrac = (outcome === 'partial' || outcome === 'defeat' || outcome === 'annihilation')
-    ? RAID_AREA_PEOPLE_LOSS[outcome] * lethality : 0;
+  // Žrtve med ljudmi v prebitih območjih — zvezno z močjo preboja
+  const peopleLossFrac =
+    outcome === 'annihilation' ? RAID_AREA_LOSS_ANNIHILATION * lethality
+    : (outcome === 'partial' || outcome === 'defeat')
+      ? RAID_AREA_LOSS_MULT[outcome] * breachPower * lethality
+      : 0;
   // Žrtve v coni so omejene s številom ljudi v TISTI coni (lethality je lahko > 1 v pozni igri).
   const forAssigned = assignment.foragers ?? 0;
   const wrkAssigned = assignment.workers ?? 0;

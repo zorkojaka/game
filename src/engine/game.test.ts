@@ -585,3 +585,21 @@ describe('dominacija v raidu', () => {
     expect(sawAiDom).toBe(true);
   });
 });
+
+describe('zvezne žrtve raida — moč preboja določa izgube', () => {
+  it('žrtve so omejene z (mult × premoč); močnejša obramba → manj izgub', () => {
+    let checked = 0;
+    for (let seed = 1; seed <= 600 && checked < 8; seed++) {
+      const g = newGame(seed);  // faza 1 → lethality = 1
+      const r = processRound(g, action({ defenders: 10, foragers: 20, workers: 8, researchers: 6 }));
+      const raid = r.lastRoundLog?.raid;
+      if (!raid?.occurred || raid.outcome !== 'partial') continue;
+      checked++;
+      const breach = 1 - raid.successProbability;
+      // branilci: prva linija (0.55×premoč) + morebitni preboj obrambne cone (0.40×premoč)
+      expect(raid.defendersLost).toBeLessThanOrEqual(Math.floor(10 * 0.55 * breach) + Math.floor(10 * 0.40 * breach));
+      expect(raid.foragersLost).toBeLessThanOrEqual(Math.floor(20 * 0.40 * breach));
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+});
