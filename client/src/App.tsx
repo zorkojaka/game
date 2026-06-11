@@ -8,6 +8,7 @@ import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_
 import { missionSuccessProbability } from '../../src/engine/game';
 import { logicalWeaknessBonus, logicalWeaknessByRobot } from '../../src/engine/combat';
 import { MAP_COLS, MAP_ROWS, collapseCampRuns } from '../../src/engine/map';
+import { DIFFICULTIES, type DifficultyId } from '../../src/engine/difficulty';
 
 // ─── Konstante ───────────────────────────────────────────────────────────────
 
@@ -3612,8 +3613,9 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
   );
 }
 
-function StartScreen({ onNew, loading }: { onNew: (tactic: StartTacticId) => void; loading: boolean }) {
+function StartScreen({ onNew, loading }: { onNew: (tactic: StartTacticId, difficulty: DifficultyId) => void; loading: boolean }) {
   const [selectedTactic, setSelectedTactic] = useState<StartTacticId>('food');
+  const [difficulty, setDifficulty] = useState<DifficultyId>('normal');
   const tactic = START_TACTICS.find(t => t.id === selectedTactic) ?? START_TACTICS[0];
   const alloc = [
     { key: 'foragers', label: 'Prehrana', value: tactic.allocation.foragers, color: '#66aa44' },
@@ -3649,7 +3651,16 @@ function StartScreen({ onNew, loading }: { onNew: (tactic: StartTacticId) => voi
         <div className="start-legend dim small">
           12 mesecev na fazo · 36 skupaj · Vsaka odločitev šteje · Izumrli ne vstanejo
         </div>
-        <button className="start-btn" onClick={() => onNew(selectedTactic)} disabled={loading}>
+        {/* Izbira težavnosti — multiplikatorji v engine/difficulty.ts */}
+        <div className="diff-row">
+          {(Object.values(DIFFICULTIES)).map(d => (
+            <button key={d.id} className={`diff-btn ${d.id}${difficulty === d.id ? ' on' : ''}`}
+              onClick={() => setDifficulty(d.id)} title={d.desc}>
+              {d.id === 'easy' ? '🌱' : d.id === 'normal' ? '⚖️' : '💀'} {d.label}
+            </button>
+          ))}
+        </div>
+        <button className="start-btn" onClick={() => onNew(selectedTactic, difficulty)} disabled={loading}>
           {loading ? '⟳ Nalagam…' : '▶  ZAČNI IGRO'}
         </button>
       </div>
@@ -3988,11 +3999,11 @@ export default function App() {
     if (normalized !== researchObj) setResearchObj(normalized);
   }, [game?.robotsResearchLevel, game?.weaponResearchLevel, game?.wallResearchLevel, researchObj, game]);
 
-  const handleNew = async (startTactic: StartTacticId = 'food') => {
+  const handleNew = async (startTactic: StartTacticId = 'food', difficulty: DifficultyId = 'normal') => {
     const tactic = START_TACTICS.find(t => t.id === startTactic) ?? START_TACTICS[0];
     setLoading(true);
     try {
-      const g = await createGame();
+      const g = await createGame(undefined, difficulty);
       setGame(g);
       setShowStart(false);
       localStorage.setItem(STORAGE_KEY, g.runId);

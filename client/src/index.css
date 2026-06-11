@@ -2929,3 +2929,16 @@ input[type=range].cz-slider::-moz-range-track { height: 6px; border-radius: 3px;
 @media (max-width: 820px) {
   .hctx-foot span { display: none; }  /* na telefonu samo gumb Zapri */
 }
+
+/* ─── Izbira težavnosti (start screen) ─── */
+.diff-row { display: flex; gap: 8px; }
+.diff-btn {
+  flex: 1; padding: .55rem .8rem; border-radius: 9px;
+  background: #0d1218; border: 1px solid #2a3340; color: #8aa0b6;
+  font-family: var(--font); font-size: .8rem; font-weight: 700; cursor: pointer;
+  transition: border-color .12s, background .12s, color .12s;
+}
+.diff-btn:hover { border-color: #3a536e; }
+.diff-btn.easy.on   { background: #0e2113; border-color: #4caf50; color: #a5e8a8; }
+.diff-btn.normal.on { background: #1a2030; border-color: #6aa6d9; color: #cfe6ff; }
+.diff-btn.hard.on   { background: #2a0d0d; border-color: #cc3333; color: #ffb0a8; }

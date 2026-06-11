@@ -2,11 +2,11 @@ import type { GameState, Assignment, OddsPreview } from './types';
 
 const BASE = '/api';
 
-export async function createGame(seed?: number): Promise<GameState> {
+export async function createGame(seed?: number, difficulty?: 'easy' | 'normal' | 'hard'): Promise<GameState> {
   const res = await fetch(`${BASE}/game/new`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(seed !== undefined ? { seed } : {}),
+    body: JSON.stringify({ ...(seed !== undefined ? { seed } : {}), ...(difficulty ? { difficulty } : {}) }),
   });
   const data = await res.json();
   return data.state;

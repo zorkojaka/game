@@ -229,6 +229,9 @@ export interface PhaseEvent {
 // ─── Full game state (deterministic) ─────────────────────────────────────────
 
 export interface GameState {
+  // Težavnost — multiplikatorji v engine/difficulty.ts (manjkajoče = 'normal')
+  difficulty?: 'easy' | 'normal' | 'hard';
+
   // Čas
   round: number;       // 1–12 znotraj faze
   phase: AIPhase;

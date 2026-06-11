@@ -616,3 +616,28 @@ describe('straža šibke točke slabi z napadi', () => {
     expect(pWorn).toBeGreaterThan(pFresh);
   });
 });
+
+describe('težavnost — multiplikatorji', () => {
+  it('hard ima več raidov in močnejši AI kot easy', () => {
+    const e = newGame(7, 'easy');
+    const n = newGame(7, 'normal');
+    const h = newGame(7, 'hard');
+    expect(raidProbability(h)).toBeGreaterThan(raidProbability(n));
+    expect(raidProbability(n)).toBeGreaterThan(raidProbability(e));
+    const a = { axis: 'obzidje' as const, combatants: 0, defenders: 15, foragers: 20, workers: 5, researchers: 5, rations: 3 };
+    expect(raidRepelProbability(e, a)).toBeGreaterThan(raidRepelProbability(n, a));
+    expect(raidRepelProbability(n, a)).toBeGreaterThan(raidRepelProbability(h, a));
+  });
+  it('easy nabira več hrane, hard manj (isti seed, isti foragerji)', () => {
+    const act = action({ foragers: 20 });
+    const re = processRound(newGame(3, 'easy'), act);
+    const rn = processRound(newGame(3, 'normal'), act);
+    const rh = processRound(newGame(3, 'hard'), act);
+    expect(re.resources.survival).toBeGreaterThanOrEqual(rn.resources.survival);
+    expect(rn.resources.survival).toBeGreaterThanOrEqual(rh.resources.survival);
+  });
+  it('neznana težavnost pade na normal', () => {
+    const g = newGame(1, undefined);
+    expect(g.difficulty).toBe('normal');
+  });
+});

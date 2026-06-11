@@ -135,6 +135,7 @@ export function tickExpedition(
   aiKnowledge: number,
   rng: RNGState,
   aiScouts: number = ENCOUNTER_SCOUT_REFERENCE,
+  mods: { encMult?: number; findMult?: number } = {},  // težavnost: multiplikatorja srečanj/najdb
 ): { exp: Expedition; tiles: HexTile[]; rng: RNGState; populationDelta: number; events: string[]; finds: ExpeditionFinds } {
   // Premikamo se na ODHODNEM ('traveling') in POVRATNEM ('returning') legu — oba raziskujeta polja po poti.
   if (exp.status !== 'traveling' && exp.status !== 'returning') return { exp, tiles, rng, populationDelta: 0, events: [], finds: { material: 0, weapons: 0, artifacts: 0 } };
@@ -170,9 +171,9 @@ export function tickExpedition(
     const newProg = Math.min(1, tile.researchProgress + addProg);
     newTiles[tIdx] = { ...tile, researchProgress: newProg, visibility: visibilityFromProgress(newProg) };
 
-    // Srečanje — skrivanje razpolovi verjetnost
-    const pEncBase = tileEncounterProbability(newTiles[tIdx], assignedNow, aiKnowledge, aiScouts);
-    const pEnc = stealth ? pEncBase * 0.5 : pEncBase;
+    // Srečanje — skrivanje razpolovi verjetnost; težavnost jo skalira
+    const pEncBase = tileEncounterProbability(newTiles[tIdx], assignedNow, aiKnowledge, aiScouts) * (mods.encMult ?? 1);
+    const pEnc = Math.min(0.9, stealth ? pEncBase * 0.5 : pEncBase);
     const [encRoll, rng2] = rngNext(rng); rng = rng2;
     if (encRoll < pEnc) {
       const [pctRoll, rng3] = rngInt(rng, SCOUT_CAPTURED_LOSS_MIN * 100, SCOUT_CAPTURED_LOSS_MAX * 100);
@@ -190,9 +191,10 @@ export function tickExpedition(
     // Najdbe — samo na poljih, ki še niso bila popolnoma raziskana
     if (wasUnresearched) {
       // V načinu lootanja so verjetnosti najdb večje (material pogost, orožje redko, artefakt zelo redko).
-      const aC = FIND_ARTIFACT_CHANCE * (loot ? LOOT_ARTIFACT_MULT : 1);
-      const wC = FIND_WEAPON_CHANCE   * (loot ? LOOT_WEAPON_MULT   : 1);
-      const mC = FIND_MATERIAL_CHANCE * (loot ? LOOT_MATERIAL_MULT : 1);
+      const fM = mods.findMult ?? 1;  // težavnost
+      const aC = FIND_ARTIFACT_CHANCE * (loot ? LOOT_ARTIFACT_MULT : 1) * fM;
+      const wC = FIND_WEAPON_CHANCE   * (loot ? LOOT_WEAPON_MULT   : 1) * fM;
+      const mC = FIND_MATERIAL_CHANCE * (loot ? LOOT_MATERIAL_MULT : 1) * fM;
       const [findRoll, rngF] = rngNext(rng); rng = rngF;
       // Sestavi prag po prioriteti: prva najdba ki preseže prag
       if (findRoll < aC) {
