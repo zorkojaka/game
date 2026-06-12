@@ -1389,6 +1389,57 @@ input[type=range]::-moz-range-thumb {
 .rec-stat.stat-good b { color: #22cc88; }
 .rec-stat.stat-bad b  { color: #cc4444; }
 .rec-stat.stat-info b { color: #66aacc; }
+.rec-research-next {
+  margin: 0 18px 12px;
+  padding: 10px;
+  border: 1px solid #2b2a1a;
+  background: #0b0b08;
+}
+.rrn-title {
+  color: #d6c46a;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.rrn-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.rrn-btn {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 9px;
+  border: 1px solid #303030;
+  background: #0f1010;
+  color: #c8c8c8;
+  font-family: var(--font);
+  cursor: pointer;
+  text-align: left;
+}
+.rrn-btn:hover:not(:disabled) { background: #171817; border-color: #555; }
+.rrn-btn.selected { border-color: #66ccaa; box-shadow: 0 0 0 1px rgba(102,204,170,.24) inset; }
+.rrn-btn.completed { border-color: #ffd84a; box-shadow: 0 0 0 2px rgba(255,216,74,.28); }
+.rrn-btn:disabled { opacity: .56; cursor: not-allowed; }
+.rrn-icon { font-size: 1rem; }
+.rrn-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: .78rem;
+}
+.rrn-level {
+  color: #888;
+  font-size: .68rem;
+  white-space: nowrap;
+}
 .rec-dots { display: flex; gap: 6px; align-items: center; }
 .rec-dots span {
   width: 7px; height: 7px; border-radius: 50%; background: #333;
@@ -1578,6 +1629,7 @@ input[type=range]::-moz-range-thumb {
   .round-event-card { width: 100%; max-height: 96vh; }
   .rec-scene { height: 210px; }
   .rec-stats { grid-template-columns: 1fr; }
+  .rrn-buttons { grid-template-columns: 1fr; }
   .rec-copy h2 { font-size: 1.35rem; }
 }
 
@@ -3195,6 +3247,13 @@ input[type=range]::-moz-range-thumb {
 .def-upgrade-btn:disabled { opacity: .4; cursor: default; }
 
 .def-ally-head { display: flex; justify-content: space-between; align-items: center; gap: .4rem; margin-bottom: .25rem; font-size: .82rem; }
+.ally-action {
+  margin-top: .35rem;
+  color: #33cc88;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
 
 /* Sleek slider za cone kampa na karti — barvno polnjenje (inline) + okrogel thumb */
 input[type=range].cz-slider {

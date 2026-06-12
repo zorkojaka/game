@@ -1381,6 +1381,7 @@ interface RoundEventCardData {
   title: string;
   body: string;
   stats: RoundEventStat[];
+  researchCompleted?: ResearchObjective;
 }
 
 const AREA_LABELS: Record<string, string> = {
@@ -1628,6 +1629,8 @@ function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardD
         stats: [{ label: 'Učinek', value: 'AI oslabljena', tone: 'good' }],
       });
     } else if (/Raziskava .*dokončana|Mehanska šibkost razkrita/.test(line)) {
+      const researchCompleted: ResearchObjective =
+        /orožja/.test(line) ? 'weapon' : /obzidja/.test(line) ? 'wall' : 'robots';
       add({
         id: `research-${log.round}-${idx}`,
         kind: 'research',
@@ -1636,6 +1639,7 @@ function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardD
         title: /orožja/.test(line) ? 'Orožje nadgrajeno' : /obzidja/.test(line) ? 'Obramba nadgrajena' : 'Nova šibkost razkrita',
         body: line.replace(/^[^\s]+ /, ''),
         stats: [{ label: 'Napredek', value: 'odklenjeno', tone: 'good' }],
+        researchCompleted,
       });
     } else if (/Odprava se je vrnila|ZAVEZNIŠTVO|Napad uspešen|Napad odbit|Odprava izgubljena/.test(line)) {
       const lost = /izgubljena|odbit/.test(line);
@@ -1915,7 +1919,52 @@ function RoundEventScene({ card }: { card: RoundEventCardData }) {
   );
 }
 
-function RoundEventOverlay({ cards, onClose }: { cards: RoundEventCardData[]; onClose: () => void }) {
+type ResearchOverlayControls = {
+  value: ResearchObjective;
+  onChange: (o: ResearchObjective) => void;
+  robotsLevel: number;
+  weaponLevel: number;
+  wallLevel: number;
+};
+
+function ResearchContinuationChooser({
+  completed,
+  controls,
+}: {
+  completed: ResearchObjective;
+  controls: ResearchOverlayControls;
+}) {
+  const opts: Array<{ id: ResearchObjective; icon: string; label: string; color: string; lvl: number; locked: boolean }> = [
+    { id: 'robots', icon: '🤖', label: RESEARCH_LEVEL_NAMES.robots[Math.min(controls.robotsLevel, 2)] ?? 'Roboti', color: '#cc8800', lvl: controls.robotsLevel, locked: false },
+    { id: 'weapon', icon: '⚔️', label: RESEARCH_LEVEL_NAMES.weapon[Math.min(controls.weaponLevel, 2)] ?? 'Orožje', color: '#cc4433', lvl: controls.weaponLevel, locked: controls.weaponLevel >= controls.robotsLevel },
+    { id: 'wall', icon: '🛡️', label: RESEARCH_LEVEL_NAMES.wall[Math.min(controls.wallLevel, 2)] ?? 'Obzidje', color: '#aabb88', lvl: controls.wallLevel, locked: controls.wallLevel >= controls.robotsLevel },
+  ];
+  const visible = opts.filter(o => !o.locked || o.id === completed);
+  return (
+    <div className="rec-research-next">
+      <div className="rrn-title">Kje nadaljujemo raziskave:</div>
+      <div className="rrn-buttons">
+        {visible.map(o => {
+          const selected = controls.value === o.id;
+          const justCompleted = completed === o.id;
+          return (
+            <button key={o.id}
+              className={`rrn-btn${selected ? ' selected' : ''}${justCompleted ? ' completed' : ''}`}
+              disabled={o.locked}
+              onClick={() => { if (!o.locked) controls.onChange(o.id); }}
+              title={o.locked ? `${o.label} je trenutno zaklenjeno za nadaljevanje.` : `Nadaljuj: ${o.label} Lv${o.lvl}`}>
+              <span className="rrn-icon">{o.icon}</span>
+              <span className="rrn-label">{o.label}</span>
+              <span className="rrn-level">Lv{o.lvl}{o.locked ? ' 🔒' : ''}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RoundEventOverlay({ cards, onClose, researchControls }: { cards: RoundEventCardData[]; onClose: () => void; researchControls?: ResearchOverlayControls }) {
   const [idx, setIdx] = useState(0);
   const card = cards[idx];
   useEffect(() => setIdx(0), [cards]);
@@ -1947,6 +1996,9 @@ function RoundEventOverlay({ cards, onClose }: { cards: RoundEventCardData[]; on
               </div>
             ))}
           </div>
+        )}
+        {card.researchCompleted && researchControls && (
+          <ResearchContinuationChooser completed={card.researchCompleted} controls={researchControls} />
         )}
         <div className="rec-actions">
           <div className="rec-dots">
@@ -1995,10 +2047,10 @@ function HumanMissionsPlaceholder() {
 /** Zavezniki — drugi človeški klani na mapi */
 function AlliesPanel({ clans }: { clans: OtherClan[] }) {
   const specInfo: Record<string, { icon: string; label: string; gift: string }> = {
-    food:     { icon: '🌾', label: 'hrana',    gift: '+8 hrane / mesec' },
-    material: { icon: '🔨', label: 'material',  gift: '+4 materiala / mesec' },
-    weapons:  { icon: '⚔️', label: 'orožje',    gift: '+2 orožja / mesec' },
-    people:   { icon: '👥', label: 'okrepitve', gift: '+1 oseba / mesec' },
+    food:     { icon: '🌾', label: 'hrana',    gift: '+8 🌾' },
+    material: { icon: '🔨', label: 'material',  gift: '+4 🔨' },
+    weapons:  { icon: '⚔️', label: 'orožje',    gift: '+2 ⚔️' },
+    people:   { icon: '👥', label: 'okrepitve', gift: '+1 👥' },
   };
   const discovered = clans.filter(c => c.discovered);
   const allied = clans.filter(c => c.allied);
@@ -2020,11 +2072,14 @@ function AlliesPanel({ clans }: { clans: OtherClan[] }) {
             </div>
             <div className="def-stat-note" style={{ fontSize: '.68rem' }}>
               {c.allied
-                ? `🤝 Zaveznik — ${s.icon} ${s.gift}.`
+                ? `🤝 Zaveznik — ${s.gift}`
                 : c.discovered
-                  ? `Specialnost: ${s.icon} ${s.label}. Pošlji odpravo na ${hexLabel(c)} za zavezništvo.`
+                  ? `Specialnost: ${s.icon} ${s.label}.`
                   : 'Neznana lokacija — razišči mapo, da ga najdeš.'}
             </div>
+            {c.discovered && !c.allied && (
+              <div className="def-stat-note ally-action">Skleni zavezništvo</div>
+            )}
           </div>
         );
       })}
@@ -2344,10 +2399,10 @@ function splitMapLabel(text: string, maxChars = 14): string[] {
 }
 
 function clanSpecialtyMeta(specialty: OtherClan['specialty']): { label: string; gift: string; color: string } {
-  if (specialty === 'food') return { label: 'HRANA', gift: '+8 hrane/m', color: '#8fbf45' };
-  if (specialty === 'material') return { label: 'MATERIAL', gift: '+4 mat./m', color: '#c58b45' };
-  if (specialty === 'weapons') return { label: 'OROŽJE', gift: '+2 orož./m', color: '#d46850' };
-  return { label: 'LJUDJE', gift: '+1 oseba/m', color: '#6fcaa0' };
+  if (specialty === 'food') return { label: 'HRANA', gift: '+8 🌾', color: '#8fbf45' };
+  if (specialty === 'material') return { label: 'MATERIAL', gift: '+4 🔨', color: '#c58b45' };
+  if (specialty === 'weapons') return { label: 'OROŽJE', gift: '+2 ⚔️', color: '#d46850' };
+  return { label: 'LJUDJE', gift: '+1 👥', color: '#6fcaa0' };
 }
 
 /** Heks barvanje glede na researchProgress. */
@@ -4598,7 +4653,14 @@ export default function App() {
   if (!game) return null;
   if (game.status !== 'active') return (
     <>
-      {roundCards.length > 0 && <RoundEventOverlay cards={roundCards} onClose={() => setRoundCards([])} />}
+      {roundCards.length > 0 && <RoundEventOverlay cards={roundCards} onClose={() => setRoundCards([])}
+        researchControls={{
+          value: researchObj,
+          onChange: setResearchObj,
+          robotsLevel: game.robotsResearchLevel ?? 0,
+          weaponLevel: game.weaponResearchLevel ?? 0,
+          wallLevel: game.wallResearchLevel ?? 0,
+        }} />}
       <GameOverScreen game={game} onNew={openStartScreen} loading={loading} />
     </>
   );
@@ -4667,7 +4729,14 @@ export default function App() {
 
   return (
     <div className={`app-shell mob-tab-${tab}`}>
-      {roundCards.length > 0 && <RoundEventOverlay cards={roundCards} onClose={() => setRoundCards([])} />}
+      {roundCards.length > 0 && <RoundEventOverlay cards={roundCards} onClose={() => setRoundCards([])}
+        researchControls={{
+          value: researchObj,
+          onChange: setResearchObj,
+          robotsLevel: game.robotsResearchLevel ?? 0,
+          weaponLevel: game.weaponResearchLevel ?? 0,
+          wallLevel: game.wallResearchLevel ?? 0,
+        }} />}
       {phaseTrans && (
         <PhaseTransitionBanner
           toPhase={phaseTrans.to}
