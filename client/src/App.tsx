@@ -8,7 +8,7 @@ import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_
 import { missionSuccessProbability } from '../../src/engine/game';
 import { logicalWeaknessBonus, logicalWeaknessByRobot } from '../../src/engine/combat';
 import { MAP_COLS, MAP_ROWS, collapseCampRuns } from '../../src/engine/map';
-import { DIFFICULTIES, type DifficultyId } from '../../src/engine/difficulty';
+import { DIFFICULTIES, difficultyProfile, weaponEffectMult, type DifficultyId } from '../../src/engine/difficulty';
 
 // ─── Konstante ───────────────────────────────────────────────────────────────
 
@@ -1085,15 +1085,16 @@ function probColor(p: number): string {
 }
 
 function defenseContributionBreakdown(game: GameState, defenders: number, rations: number, intelBonus: number): { people: number; walls: number; missing: number } {
+  const prof = difficultyProfile(game.difficulty);
   const wallMult = researchMult(game.wallResearchLevel ?? 0);
-  const wallProtection = Math.max(0, Math.min(1, 0.02 * wallMult * (game.wallsBuilt ?? 0)));
+  const wallProtection = Math.max(0, Math.min(1, prof.wallDefensePct * wallMult * (game.wallsBuilt ?? 0)));
   if (defenders <= 0) return { people: 0, walls: wallProtection, missing: Math.max(0, 1 - wallProtection) };
   const tier = RATIONS_LEVELS[rations] ?? RATIONS_LEVELS[3];
-  const weaponMult = researchMult(game.weaponResearchLevel ?? 0);
+  const weaponMult = weaponEffectMult(game.difficulty, game.weaponResearchLevel ?? 0);
   const base = defenders * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult;
   const equip = Math.min(game.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT * weaponMult;
   const peopleStr = (base + equip) * (1 + intelBonus);
-  const wallBonus = 1 + 0.02 * wallMult * (game.wallsBuilt ?? 0);
+  const wallBonus = 1 + prof.wallDefensePct * wallMult * (game.wallsBuilt ?? 0);
   const logical = logicalWeaknessByRobot(game);
   const units = game.aiUnits ?? { scouts: game.aiRobots ?? 0, attackers: 0, peopleKillers: 0 };
   const raidAttack =
@@ -3684,10 +3685,18 @@ function StartScreen({ onNew, loading }: { onNew: (tactic: StartTacticId, diffic
           {(Object.values(DIFFICULTIES)).map(d => (
             <button key={d.id} className={`diff-btn ${d.id}${difficulty === d.id ? ' on' : ''}`}
               onClick={() => setDifficulty(d.id)} title={d.desc}>
-              {d.id === 'easy' ? '🌱' : d.id === 'normal' ? '⚖️' : '💀'} {d.label}
+              {d.id === 'easy' ? '🌱' : d.id === 'normal' ? '⚖️' : d.id === 'hard' ? '💀' : '🔥'} {d.label}
             </button>
           ))}
         </div>
+        {/* Težavnost spreminja VIDNE vhodne moči — igralec točno ve, kaj ga čaka */}
+        {(() => { const p = DIFFICULTIES[difficulty]; return (
+          <div className="diff-facts dim small">
+            👥 {p.startPopulation} ljudi · 🍞 {p.startFood} hrane · ⚔️ {p.startWeapons} orožja
+            · 🤖 {p.aiScouts}→{p.aiScouts + p.aiAttackers}→{p.aiScouts + p.aiAttackers + p.aiPeopleKillers} robotov (po fazah)
+            · 🧱 +{(p.wallDefensePct * 100).toFixed(1).replace('.0', '')} %/zid · ⚔️ ×{p.weaponResearchMult}/stopnjo
+          </div>
+        ); })()}
         <button className="start-btn" onClick={() => onNew(selectedTactic, difficulty)} disabled={loading}>
           {loading ? '⟳ Nalagam…' : '▶  ZAČNI IGRO'}
         </button>
@@ -4608,7 +4617,7 @@ export default function App() {
                 <div className="def-card">
                   <div className="def-card-title">🏰 OBZIDJE</div>
                   <div className="def-wall-lvl">STOPNJA {wallLvl}</div>
-                  <div className="def-stat-note">+{wallLvl * 2}% k obrambi</div>
+                  <div className="def-stat-note">+{Math.round(wallLvl * difficultyProfile(game.difficulty).wallDefensePct * researchMult(game.wallResearchLevel ?? 0) * 100)}% k obrambi</div>
                   <div className="def-seg">{Array.from({ length: 12 }).map((_, i) => <span key={i} className={`def-seg-cell ${i < wallProg ? 'fill' : ''}`} />)}</div>
                   <button className="def-upgrade-btn" onClick={() => { setWorkshopObj('wall'); setTab('workshop'); }}>🧱 GRADI OBZIDJE</button>
                 </div>
@@ -4870,7 +4879,7 @@ export default function App() {
                 ? Math.min(0.98, missionSuccessProbability(game, wp!.id, draftPeople, draftRations) * stealthBonus)
                 : (() => {
                     const hStr = draftPeople * COMBAT_BASE_HUMAN_MULTIPLIER * draftRTier.strengthMult
-                      * stealthBonus * researchMult(game.weaponResearchLevel ?? 0) * (1 + logicalWeaknessBonus(game));
+                      * stealthBonus * weaponEffectMult(game.difficulty, game.weaponResearchLevel ?? 0) * (1 + logicalWeaknessBonus(game));
                     const aStr = Math.max(1, aiDefensePower(aiUnits) * 0.05);
                     return hStr / (hStr + aStr);
                   })();

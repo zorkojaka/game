@@ -8,7 +8,7 @@ import { resolveCombat } from './combat.js';
 import { revealTreeByInsight, revealNodeRetroactive } from './fog.js';
 import { generateMap, generateOtherClans, randomizePlacements, isCampHex } from './map.js';
 import { tickExpedition, roundTripMonths, pathToCamp } from './expedition.js';
-import { difficultyProfile, type DifficultyId } from './difficulty.js';
+import { difficultyProfile, weaponEffectMult, type DifficultyId } from './difficulty.js';
 import type { Expedition } from './types.js';
 import { hexLabel } from './types.js';
 import { calcAISurveillanceGain, generateAITree, generateAIWeakPoints, DEFAULT_GENOME } from './ai-brain.js';
@@ -143,7 +143,6 @@ export function raidProbability(state: GameState): number {
   // Šibkejša sila → manj raidov, a s spodnjo mejo: raidi se dogajajo SKOZI CELO igro
   // (tudi v fazi 1 s samimi izvidniki), le redkejši so.
   p *= Math.max(RAID_FORCE_FLOOR, Math.min(1, attackPow / AI_FULL_ATTACK_POWER));
-  p *= difficultyProfile(state.difficulty).raidChanceMult;
   return Math.max(0, Math.min(1, p));
 }
 
@@ -153,15 +152,15 @@ export function raidRepelProbability(state: GameState, assignment: Assignment): 
   if (defenders <= 0) return 0;
   const tier = RATIONS_LEVELS[assignment.rations ?? DEFAULT_RATIONS] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
   const intelB = intelCombatBonus(state);
-  const weaponMult = researchMult(state.weaponResearchLevel ?? 0);  // raziskava orožja ×2/level
+  const weaponMult = weaponEffectMult(state.difficulty, state.weaponResearchLevel ?? 0);  // učinek orožja (po težavnosti)
   const wallMult = researchMult(state.wallResearchLevel ?? 0);      // raziskava obzidja ×2/level
-  const wallBonus = 1 + 0.02 * wallMult * (state.wallsBuilt ?? 0);  // vsak zid: +2 % (× raziskava)
+  // vsak zid: +X % obrambne moči (X po težavnosti, × raziskava obzidja)
+  const wallBonus = 1 + difficultyProfile(state.difficulty).wallDefensePct * wallMult * (state.wallsBuilt ?? 0);
   const base = defenders * COMBAT_BASE_HUMAN_MULTIPLIER * tier.strengthMult;
   const equip = Math.min(state.resources.combat, defenders) * DEFENDER_EQUIPMENT_MULT * weaponMult;
   const defStr = (base + equip) * (1 + intelB) * wallBonus;
   // Raid izvaja vsa AI sila (vsi tipi enot napadajo) — moč po njihovem napadu
-  const aiStr = effectiveRaidAttackPower(state) * RAID_AI_FORCE_PCT
-    * difficultyProfile(state.difficulty).aiStrengthMult;
+  const aiStr = effectiveRaidAttackPower(state) * RAID_AI_FORCE_PCT;
   return defStr / (defStr + Math.max(1, aiStr));
 }
 
@@ -206,7 +205,7 @@ export function missionEncounterProbability(state: GameState, assigned: number):
 /** Efektivna straža šibke točke: bazna garnizija (po prisotnih AI enotah) − tam pobite enote. */
 export function wpEffectiveGarrison(state: GameState, weakPointId: string): number {
   const wp = state.aiWeakPoints.find(w => w.id === weakPointId);
-  const base = Math.round(wpGarrisonUnits(readAIUnits(state)) * difficultyProfile(state.difficulty).garrisonMult);
+  const base = wpGarrisonUnits(readAIUnits(state));
   return Math.max(0, base - (wp?.garrisonLoss ?? 0));
 }
 
@@ -217,7 +216,7 @@ export function missionSuccessProbability(state: GameState, weakPointId: string,
   const diff = (MISSION_WP_DIFFICULTY[weakPointId] ?? 100) * (1 + wpEffectiveGarrison(state, weakPointId) / 20);
   const tier = RATIONS_LEVELS[rationsLevel] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
   const equip = Math.min(state.resources.combat, assigned);
-  const wMult = researchMult(state.weaponResearchLevel ?? 0);
+  const wMult = weaponEffectMult(state.difficulty, state.weaponResearchLevel ?? 0);
   const teamPower = (Math.sqrt(assigned) * COMBAT_BASE_HUMAN_MULTIPLIER * 8 + equip * 1.2 * wMult) * tier.strengthMult;
   const intelB = intelCombatBonus(state);
   return (teamPower * (1 + intelB)) / (teamPower * (1 + intelB) + diff);
@@ -237,8 +236,7 @@ function resolveRaid(
   // People-killer enote (faza 3) povečajo smrtnost med ljudmi
   const logical = logicalWeaknessByRobot(state);
   const pkReduction = logical.peopleKillers ? LOGICAL_WEAKNESS_LETHALITY_REDUCTION : 0;
-  const lethality = (1 + PEOPLEKILLER_LETHALITY_PER_UNIT * aiUnits.peopleKillers) * (1 - pkReduction)
-    * difficultyProfile(state.difficulty).lethalityMult;
+  const lethality = (1 + PEOPLEKILLER_LETHALITY_PER_UNIT * aiUnits.peopleKillers) * (1 - pkReduction);
 
   // Žrtve so ZVEZNE: skalirajo z MOČJO PREBOJA (premoč = 1 − p). Močnejša obramba
   // → manjši preboj → manj žrtev. DOMINACIJA ostane skrajna:
@@ -317,18 +315,18 @@ export function newGame(seed?: number, difficulty?: DifficultyId): GameState {
     round: 1,
     phase: 'find',
     totalRounds: 1,
-    population: INITIAL_POPULATION,
-    maxPopulation: INITIAL_POPULATION,
+    population: difficultyProfile(difficulty).startPopulation,
+    maxPopulation: difficultyProfile(difficulty).startPopulation,
     resources: {
-      survival: INITIAL_SURVIVAL,
-      combat: INITIAL_COMBAT,
+      survival: difficultyProfile(difficulty).startFood,
+      combat: difficultyProfile(difficulty).startWeapons,
       intelligence: INITIAL_INTELLIGENCE,
       material: INITIAL_MATERIAL,
       artifacts: 0,
     },
     aiPhaseProgress: 0,
-    aiRobots: AI_SCOUTS_INITIAL,
-    aiUnits: { scouts: AI_SCOUTS_INITIAL, attackers: 0, peopleKillers: 0 },
+    aiRobots: difficultyProfile(difficulty).aiScouts,
+    aiUnits: { scouts: difficultyProfile(difficulty).aiScouts, attackers: 0, peopleKillers: 0 },
     aiKnowledge: INITIAL_AI_KNOWLEDGE,
     aiTree: generateAITree(),
     aiWeakPoints: generateAIWeakPoints(),
@@ -408,8 +406,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   let survival = state.resources.survival - survivalCost;
 
   // 2. Forageri zbirajo preživetvene vire (učinkovitost skalirana z močjo iz obrokov)
-  const foraged = Math.floor(assignment.foragers * FORAGER_YIELD * rations.strengthMult
-    * difficultyProfile(state.difficulty).forageMult);
+  const foraged = Math.floor(assignment.foragers * FORAGER_YIELD * rations.strengthMult);
   survival += foraged;
   survival = Math.max(0, survival);
 
@@ -446,7 +443,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       // Roboti: ustvarjajo intel in insight, ki razkrije AI enote/šibkosti.
       const intelBonus = Math.floor(researchers * SCOUT_INTEL_YIELD * rations.strengthMult);
       intelligence += intelBonus;
-      robotsResearchProgress += Math.round(researchers * difficultyProfile(state.difficulty).researchSpeedMult);
+      robotsResearchProgress += researchers;
       while (robotsResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && robotsResearchLevel < 3) {
         robotsResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
         robotsResearchLevel += 1;
@@ -457,7 +454,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       if (weaponResearchLevel >= unlocked) {
         workshopEvents.push(`🔒 Orožje ${weaponResearchLevel + 1} zaklenjeno — najprej razkrij mehansko šibkost AI stopnje ${weaponResearchLevel + 1}.`);
       } else {
-        weaponResearchProgress += Math.round(researchers * difficultyProfile(state.difficulty).researchSpeedMult);
+        weaponResearchProgress += researchers;
         while (weaponResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && weaponResearchLevel < unlocked) {
           weaponResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
           weaponResearchLevel += 1;
@@ -469,7 +466,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       if (wallResearchLevel >= unlocked) {
         workshopEvents.push(`🔒 Obzidje ${wallResearchLevel + 1} zaklenjeno — najprej razkrij mehansko šibkost AI stopnje ${wallResearchLevel + 1}.`);
       } else {
-        wallResearchProgress += Math.round(researchers * difficultyProfile(state.difficulty).researchSpeedMult);
+        wallResearchProgress += researchers;
         while (wallResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && wallResearchLevel < unlocked) {
           wallResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
           wallResearchLevel += 1;
@@ -533,7 +530,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
           wallsBuilt += made;
           material -= made * WALL_MATERIAL_COST;
           wallProgress -= made * WALL_WORKER_MONTHS;
-          workshopEvents.push(`🧱 Obrambno obzidje dograjeno! +${made} obzidje (−${made * WALL_MATERIAL_COST} materiala). Skupaj ${wallsBuilt}, +${2*made} % obrambe. Napredek: ${wallProgress}/${WALL_WORKER_MONTHS}.`);
+          workshopEvents.push(`🧱 Obrambno obzidje dograjeno! +${made} obzidje (−${made * WALL_MATERIAL_COST} materiala). Skupaj ${wallsBuilt}, +${Math.round(difficultyProfile(state.difficulty).wallDefensePct * 100) * made} % obrambe. Napredek: ${wallProgress}/${WALL_WORKER_MONTHS}.`);
         } else {
           workshopEvents.push(`🧱 Gradnja obzidja: ${wallProgress}/${WALL_WORKER_MONTHS} delavec-mesecev.`);
         }
@@ -740,9 +737,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
 
   for (const e of [...oldExps, ...newlyCreated]) {
     const scoutEncounterUnits = Math.round(aiUnits.scouts * (1 - (logicalWeaknessByRobot({ ...state, aiTree } as GameState).scouts ? LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION : 0)));
-    const diffP = difficultyProfile(state.difficulty);
-    const r = tickExpedition(e, mapTiles, aiKnowledge, rng, scoutEncounterUnits,
-      { encMult: diffP.encounterMult, findMult: diffP.findChanceMult });
+    const r = tickExpedition(e, mapTiles, aiKnowledge, rng, scoutEncounterUnits);
     rng = r.rng;
     mapTiles = r.tiles;
 
@@ -843,7 +838,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
           } else {
             // Splošni napad na AI robote — naša moč raste z orožjem in razkritimi logičnimi šibkostmi
             const humanStr = survivors * 1.2 * aTier.strengthMult * stealthBonus
-              * researchMult(state.weaponResearchLevel ?? 0) * (1 + logicalWeaknessBonus(state));
+              * weaponEffectMult(state.difficulty, state.weaponResearchLevel ?? 0) * (1 + logicalWeaknessBonus(state));
             const aiStr = Math.max(1, aiDefensePower(aiUnits) * 0.05);
             const p = humanStr / (humanStr + aiStr);
             const [roll, rngA] = rngNext(rng); rng = rngA;
@@ -1017,13 +1012,13 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   // Fazni prihod novih AI enot (ob prehodu v novo fazo)
   if (phaseComplete) {
     if (phase === 'understand') {
-      aiUnits = { ...aiUnits, attackers: aiUnits.attackers + AI_ATTACKERS_PHASE2 };
+      aiUnits = { ...aiUnits, attackers: aiUnits.attackers + difficultyProfile(state.difficulty).aiAttackers };
       aiRobots = totalAIRobots(aiUnits);
-      expeditionEvents.push(`🤖 AI je pripeljal ${AI_ATTACKERS_PHASE2} napadalnih enot — pričakuj napade na kamp.`);
+      expeditionEvents.push(`🤖 AI je pripeljal ${difficultyProfile(state.difficulty).aiAttackers} napadalnih enot — pričakuj napade na kamp.`);
     } else if (phase === 'eliminate') {
-      aiUnits = { ...aiUnits, peopleKillers: aiUnits.peopleKillers + AI_PEOPLEKILLERS_PHASE3 };
+      aiUnits = { ...aiUnits, peopleKillers: aiUnits.peopleKillers + difficultyProfile(state.difficulty).aiPeopleKillers };
       aiRobots = totalAIRobots(aiUnits);
-      expeditionEvents.push(`☠ AI je pripeljal ${AI_PEOPLEKILLERS_PHASE3} people-killer enot — napadi so zdaj smrtonosnejši.`);
+      expeditionEvents.push(`☠ AI je pripeljal ${difficultyProfile(state.difficulty).aiPeopleKillers} people-killer enot — napadi so zdaj smrtonosnejši.`);
     }
   }
 
@@ -1187,7 +1182,7 @@ function buildNarrative(
 // Izračun obeta za dano dodelitev — UI prikaže pred akcijo
 export function previewOdds(state: GameState, assignment: Assignment) {
   const intelB = intelCombatBonus(state);
-  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase, researchMult(state.weaponResearchLevel ?? 0)) * (1 + intelB) * (1 + logicalWeaknessBonus(state));
+  const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase, weaponEffectMult(state.difficulty, state.weaponResearchLevel ?? 0)) * (1 + intelB) * (1 + logicalWeaknessBonus(state));
   const aiStr = calcAIStrength(state, state.phase);
   const p = calcSuccessProbability(humanStr, aiStr);
 
