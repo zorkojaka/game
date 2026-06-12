@@ -211,9 +211,11 @@ function TopResourcesCompact({
       <div className="rc-item" title={`${label}: zdaj ${roundedNow}, po potezi ${roundedNext}`}>
         <span className="rc-icon">{icon}</span>
         <span className="rc-now">{roundedNow}</span>
-        <span className={`rc-next ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}`} style={{ color }}>
-          {roundedNext}
-        </span>
+        {delta !== 0 && (
+          <span className={`rc-next ${delta > 0 ? 'up' : 'down'}`} style={{ color }}>
+            {roundedNext}
+          </span>
+        )}
       </div>
     );
   };
@@ -2436,7 +2438,7 @@ function respliceWaypoint(original: Hex[], index: number, y: Hex): Hex[] {
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, rationsLocked, onRations, workshopObj, onWorkshop, researchObj, onResearch, researchHighlight, workshop, research, pop, draftPeople, draftRations, draftStealth, draftLoot, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onDraftLoot, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
+function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, artifactCount, artifactTargetWpId, onArtifactTarget, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, rationsLocked, onRations, workshopObj, onWorkshop, researchObj, onResearch, researchHighlight, workshop, research, pop, draftPeople, draftRations, draftStealth, draftLoot, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onDraftLoot, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   draftReturn: Array<{ q: number; r: number }>;
@@ -2447,6 +2449,9 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
   onWaypointMove: (kind: 'out' | 'ret', index: number, hexY: { q: number; r: number }, original: Array<{ q: number; r: number }>) => void;
   onWpSelect: (wpId: string) => void;
   selectedWpId: string;
+  artifactCount: number;
+  artifactTargetWpId: string;
+  onArtifactTarget: (wpId: string) => void;
   expeditions: Expedition[];
   wps: AIWeakPoint[];
   otherClans: OtherClan[];
@@ -3392,8 +3397,12 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
               {/* vrsta 3: obroki + (izvidniki: raziskovanje/lootanje) + skrivanje (oboje) */}
               {(() => {
                 const isScout = draftKind === 'scout';
-                const ratX = isScout ? cx - 22 : cx - 16;
-                const stealthX = isScout ? cx + 22 : cx + 16;
+                const artifactWp = !isScout && selectedWpId
+                  ? wps.find(w => w.id === selectedWpId && w.discovered && !w.exploited)
+                  : undefined;
+                const canUseArtifact = !!artifactWp && artifactCount > 0;
+                const ratX = isScout || canUseArtifact ? cx - 22 : cx - 16;
+                const stealthX = isScout || canUseArtifact ? cx + 22 : cx + 16;
                 return (
                   <>
                     <g className="dc-rations" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftRations(draftRations % 5 + 1); }}>
@@ -3407,6 +3416,20 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                         <title>{draftLoot ? 'Lootanje: nabira material (raziskava ×0.25)' : 'Raziskovanje: odkriva polja'}</title>
                         <circle cx={cx} cy={cy + 30} r={9} fill={draftLoot ? '#2a1f0a' : '#0a1a0a'} stroke={draftLoot ? '#cc8800' : '#ffd84a'} strokeWidth="1.5" />
                         <text x={cx} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>{draftLoot ? '🔨' : '🔭'}</text>
+                      </g>
+                    )}
+                    {canUseArtifact && (
+                      <g className="dc-artifact" style={{ cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onArtifactTarget(artifactTargetWpId === selectedWpId ? '' : selectedWpId);
+                        }}>
+                        <title>{artifactTargetWpId === selectedWpId ? 'Artefakt izbran: klikni za preklic' : `Uniči ${artifactWp!.label} z artefaktom`}</title>
+                        <circle cx={cx} cy={cy + 30} r={9}
+                          fill={artifactTargetWpId === selectedWpId ? '#2a2308' : '#0a0a0a'}
+                          stroke={artifactTargetWpId === selectedWpId ? '#ffd84a' : '#806a25'}
+                          strokeWidth="1.5" />
+                        <text x={cx} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>💎</text>
                       </g>
                     )}
                     {/* Skrivanje — za napadalce IN izvidnike (izvidniki v skrivanju ne rabijo orožja) */}
@@ -5209,6 +5232,9 @@ export default function App() {
             onWaypointMove={onWaypointMove}
             onWpSelect={(id) => setTargetWP(targetWP === id ? '' : id)}
             selectedWpId={targetWP}
+            artifactCount={game.resources.artifacts ?? 0}
+            artifactTargetWpId={artifactTargetWp}
+            onArtifactTarget={setArtifactTargetWp}
             expeditions={game.expeditions ?? []}
             wps={game.aiWeakPoints} otherClans={game.otherClans ?? []} drawingMode={true}
             camp={{ defenders, researchers, workers, foragers }}
