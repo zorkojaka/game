@@ -94,8 +94,20 @@ export const DECISIVE_MARGIN = 0.25;
  * sicer neuspeh (defeat/annihilation). S tem `successProbability` res pomeni roll,
  * ne deterministične mejne vrednosti. Še vedno seedan/deterministicen za isti seed.
  */
+// TAKTIKA > SREČA: kocka je stisnjena okoli sredine. Roll vedno pade v
+// [0.5−LUCK_BAND/2, 0.5+LUCK_BAND/2] = [0.25, 0.75], zato:
+//  • prepričljiva premoč (p ≥ 0.75) VEDNO uspe,
+//  • šibek poskus (p ≤ 0.25) VEDNO pade,
+//  • le v vmesnem pasu odloča naključje boja.
+// Strategija (moč obeh strani) torej določa izid; sreča le maje rob.
+export const LUCK_BAND = 0.5;
+export function tacticalRoll(rng: RNGState): [number, RNGState] {
+  const [r, next] = rngNext(rng);
+  return [0.5 + (r - 0.5) * LUCK_BAND, next];
+}
+
 export function rollOutcome(p: number, rng: RNGState): { outcome: Outcome; rng: RNGState } {
-  const [roll, next] = rngNext(rng);
+  const [roll, next] = tacticalRoll(rng);
   let outcome: Outcome;
   if (roll < p) {
     outcome = (p - roll) >= DECISIVE_MARGIN ? 'victory' : 'partial';

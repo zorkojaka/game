@@ -561,13 +561,12 @@ describe('vojna megla — poročilo odprave šele ob vrnitvi', () => {
 
 describe('dominacija v raidu', () => {
   it('ob dominaciji obrambe (victory) so uničeni VSI roboti in AI ne dobi informacij; ob AI dominaciji padejo vsi branilci', () => {
+    // S taktičnim rollom dominacijo doseže le PREPRIČLJIVA premoč → ločena scenarija.
     let sawDefDom = false, sawAiDom = false;
-    for (let seed = 1; seed <= 600 && !(sawDefDom && sawAiDom); seed++) {
-      const base = newGame(seed);
-      const g: GameState = { ...base, phase: 'eliminate', population: 80, clanActivity: 0,
-        aiUnits: { scouts: 100, attackers: 75, peopleKillers: 25 }, aiRobots: 200,
-        aiKnowledge: 0.4 };
-      const r = processRound(g, action({ defenders: 15, foragers: 20 }));
+    // 1) Močna obramba proti izvidnikom (faza 1) → dominacija obrambe
+    for (let seed = 1; seed <= 400 && !sawDefDom; seed++) {
+      const g = newGame(seed);  // 100 izvidnikov, šibek napad
+      const r = processRound(g, action({ defenders: 40, foragers: 20 }));
       const raid = r.lastRoundLog?.raid;
       if (!raid?.occurred) continue;
       if (raid.domination === 'defense') {
@@ -575,12 +574,21 @@ describe('dominacija v raidu', () => {
         expect(raid.aiInfoGained).toBe(0);
         expect(r.aiKnowledge).toBeLessThanOrEqual(g.aiKnowledge + 0.011);  // surveillance ~0, raid 0
         expect(raid.aiRobotsDestroyed).toBeGreaterThan(0);
-      } else if (raid.domination === 'ai') {
+      }
+    }
+    // 2) Skoraj gola obramba proti polni vojski (faza 3) → AI dominacija
+    for (let seed = 1; seed <= 400 && !sawAiDom; seed++) {
+      const base = newGame(seed);
+      const g: GameState = { ...base, phase: 'eliminate', population: 80, clanActivity: 0,
+        aiUnits: { scouts: 100, attackers: 75, peopleKillers: 25 }, aiRobots: 200,
+        aiKnowledge: 0.4, resources: { ...base.resources, combat: 3 } };
+      const r = processRound(g, action({ defenders: 3, foragers: 20 }));
+      const raid = r.lastRoundLog?.raid;
+      if (!raid?.occurred) continue;
+      if (raid.domination === 'ai') {
         sawAiDom = true;
-        expect(raid.defendersLost).toBe(15);             // vsi branilci padli
+        expect(raid.defendersLost).toBe(3);              // vsi branilci padli
         expect(raid.aiInfoGained).toBeCloseTo(0.15, 5);  // AI odnese največ informacij
-      } else {
-        expect(raid.aiInfoGained).toBeGreaterThan(0);
       }
     }
     expect(sawDefDom).toBe(true);
@@ -647,5 +655,32 @@ describe('težavnost — VIDNE vhodne moči (ne množenje izidov)', () => {
     const g = newGame(1, undefined);
     expect(g.difficulty).toBe('normal');
     expect(g.population).toBe(80);
+  });
+});
+
+describe('taktika > sreča + rok AI-ja', () => {
+  it('prepričljiva premoč (p ≥ 0.8) VEDNO uspe; šibek poskus (p ≤ 0.2) VEDNO pade', () => {
+    let rng = createRNG(42);
+    for (let i = 0; i < 300; i++) {
+      const w = rollOutcome(0.8, rng); rng = w.rng;
+      expect(['victory', 'partial']).toContain(w.outcome);
+      const l = rollOutcome(0.2, rng); rng = l.rng;
+      expect(['defeat', 'annihilation']).toContain(l.outcome);
+    }
+  });
+  it('konec 3. faze brez uničenih šibkih točk = poraz (AI dokonča načrt)', () => {
+    const base = newGame(4);
+    const g: GameState = { ...base, phase: 'eliminate', aiPhaseProgress: 11, round: 12,
+      aiUnits: { scouts: 50, attackers: 40, peopleKillers: 20 }, aiRobots: 110 };
+    const r = processRound(g, action({ defenders: 15, foragers: 30 }));
+    expect(r.status).toBe('defeat_overwhelmed');
+  });
+  it('zmaga isti mesec PREGLASI rok (uniči zadnjo točko v 36. mesecu)', () => {
+    const base = newGame(4);
+    const g: GameState = { ...base, phase: 'eliminate', aiPhaseProgress: 11, round: 12,
+      aiWeakPoints: base.aiWeakPoints.map(w => ({ ...w, discovered: true, exploited: true })),
+      aiUnits: { scouts: 50, attackers: 40, peopleKillers: 20 }, aiRobots: 110 };
+    const r = processRound(g, action({ defenders: 15, foragers: 30 }));
+    expect(r.status).toBe('victory');
   });
 });

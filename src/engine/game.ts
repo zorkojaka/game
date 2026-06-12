@@ -38,7 +38,7 @@ import {
   MISSION_DURATION_MONTHS, MISSION_ENCOUNTER_BASE, MISSION_ENCOUNTER_PER_PERSON,
   MISSION_ENCOUNTER_AI_KNOW, MISSION_WP_DIFFICULTY, MISSION_MIN_TEAM,
 } from './constants.js';
-import { calcHumanStrength, calcAIStrength, calcSuccessProbability, rollOutcome, logicalWeaknessBonus, logicalWeaknessByRobot } from './combat.js';
+import { calcHumanStrength, calcAIStrength, calcSuccessProbability, rollOutcome, tacticalRoll, logicalWeaknessBonus, logicalWeaknessByRobot } from './combat.js';
 
 // ─── Pomožne funkcije za nove mehanike ───────────────────────────────────────
 
@@ -812,7 +812,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
               { ...state, resources: { ...state.resources, intelligence } },
               r.exp.weakPointId, survivors, r.exp.rations);
             const p = Math.min(0.98, pBase * stealthBonus);
-            const [roll, rngA] = rngNext(rng); rng = rngA;
+            const [roll, rngA] = tacticalRoll(rng); rng = rngA;
             const wpLabel = wpIdx >= 0 ? aiWeakPoints[wpIdx].label : 'šibka točka';
             // Straža te točke: napad jo vedno redči — neuspešen napad olajša naslednjega.
             const effG = wpIdx >= 0
@@ -841,7 +841,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
               * weaponEffectMult(state.difficulty, state.weaponResearchLevel ?? 0) * (1 + logicalWeaknessBonus(state));
             const aiStr = Math.max(1, aiDefensePower(aiUnits) * 0.05);
             const p = humanStr / (humanStr + aiStr);
-            const [roll, rngA] = rngNext(rng); rng = rngA;
+            const [roll, rngA] = tacticalRoll(rng); rng = rngA;
             if (roll < p) {
               const destroyed = Math.min(aiRobots, Math.round(survivors * (1 + p)));
               applyDestroy(destroyed);
@@ -1015,10 +1015,15 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       aiUnits = { ...aiUnits, attackers: aiUnits.attackers + difficultyProfile(state.difficulty).aiAttackers };
       aiRobots = totalAIRobots(aiUnits);
       expeditionEvents.push(`🤖 AI je pripeljal ${difficultyProfile(state.difficulty).aiAttackers} napadalnih enot — pričakuj napade na kamp.`);
-    } else if (phase === 'eliminate') {
+    } else if (phase === 'eliminate' && state.phase === 'understand') {
       aiUnits = { ...aiUnits, peopleKillers: aiUnits.peopleKillers + difficultyProfile(state.difficulty).aiPeopleKillers };
       aiRobots = totalAIRobots(aiUnits);
       expeditionEvents.push(`☠ AI je pripeljal ${difficultyProfile(state.difficulty).aiPeopleKillers} people-killer enot — napadi so zdaj smrtonosnejši.`);
+    } else if (state.phase === 'eliminate') {
+      // ROK: konec 3. faze (36. mesec). Če AI šibke točke še stojijo, je AI
+      // dokončal svoj načrt — igralec, ki je "delal vse po malem", izgubi.
+      expeditionEvents.push(`⏳ AI je dokončal fazo iztrebljanja — njegov načrt je izveden do konca.`);
+      status = 'defeat_overwhelmed';
     }
   }
 
