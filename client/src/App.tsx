@@ -1395,6 +1395,17 @@ function aiNodeLabel(game: GameState, id: string): string {
   return game.aiTree?.find(n => n.id === id)?.label ?? id;
 }
 
+function aiUnitWeaknessLabel(level: number): string {
+  if (level <= 1) return 'izvidniških enot';
+  if (level === 2) return 'napadalnih enot';
+  return 'people-killer enot';
+}
+
+function researchLevelFromLine(line: string, fallback: number): number {
+  const m = line.match(/(?:stopnja|točke)\s+(\d+)/i);
+  return m ? Number(m[1]) : fallback;
+}
+
 const ROUND_EVENT_IMAGES = {
   raidAttack: '/assets/events/raid-ai-attack.png',
   raidDefense: '/assets/events/raid-defense-holds.png',
@@ -1631,14 +1642,30 @@ function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardD
     } else if (/Raziskava .*dokončana|Mehanska šibkost razkrita/.test(line)) {
       const researchCompleted: ResearchObjective =
         /orožja/.test(line) ? 'weapon' : /obzidja/.test(line) ? 'wall' : 'robots';
+      const level = researchLevelFromLine(line, researchCompleted === 'weapon'
+        ? (game.weaponResearchLevel ?? 1)
+        : researchCompleted === 'wall'
+          ? (game.wallResearchLevel ?? 1)
+          : (game.robotsResearchLevel ?? 1));
+      const unitWeakness = aiUnitWeaknessLabel(level);
+      const title = researchCompleted === 'robots'
+        ? `Raziskava končana: odkrili smo šibko točko ${unitWeakness}`
+        : researchCompleted === 'weapon'
+          ? `Raziskava končana: orožje prilagojeno šibkosti ${unitWeakness}`
+          : `Raziskava končana: obramba prilagojena šibkosti ${unitWeakness}`;
+      const body = researchCompleted === 'robots'
+        ? `Raziskovalci so našli ranljiv vzorec v zgradbi ${unitWeakness}. Zdaj lahko to šibko točko uporabimo pri nadgradnji orožja ali obzidja.`
+        : researchCompleted === 'weapon'
+          ? `Delavnice lahko izdelujejo orožje, ki cilja to ranljivo mesto. Napadi imajo zdaj boljši oprijem proti temu tipu robotov.`
+          : `Obrambni načrti zdaj izkoriščajo to ranljivost. Zidovi in branilci lažje ustavijo ta tip robotov pri preboju kampa.`;
       add({
         id: `research-${log.round}-${idx}`,
         kind: 'research',
         tone: 'good',
-        eyebrow: 'Tehnološki preboj',
-        title: /orožja/.test(line) ? 'Orožje nadgrajeno' : /obzidja/.test(line) ? 'Obramba nadgrajena' : 'Nova šibkost razkrita',
-        body: line.replace(/^[^\s]+ /, ''),
-        stats: [{ label: 'Napredek', value: 'odklenjeno', tone: 'good' }],
+        eyebrow: 'Raziskava končana',
+        title,
+        body,
+        stats: [{ label: 'Šibkost', value: unitWeakness, tone: 'good' }],
         researchCompleted,
       });
     } else if (/Odprava se je vrnila|ZAVEZNIŠTVO|Napad uspešen|Napad odbit|Odprava izgubljena/.test(line)) {
@@ -2860,6 +2887,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                     <tspan key={line} x={p.x} dy={i === 0 ? 0 : 8}>{line}</tspan>
                   ))}
                   <tspan x={p.x} dy="9">{clanMeta.gift}</tspan>
+                  {!clan.allied && <tspan x={p.x} dy="9" fill="#33cc88">SKLENI ZAVEZ.</tspan>}
                 </text>
               )}
               {/* UNIČENO badge nad ikono ko je wp exploited */}
@@ -3585,9 +3613,9 @@ function WorkshopSelector({ value, onChange, weaponLevel, wallLevel }: { value: 
 /** Izbira cilja raziskave (raziskovalci) */
 function ResearchSelector({ value, onChange, robotsLevel, weaponLevel, wallLevel, highlight }: { value: ResearchObjective; onChange: (o: ResearchObjective) => void; robotsLevel: number; weaponLevel: number; wallLevel: number; highlight?: ResearchObjective | null }) {
   const opts: Array<{ id: ResearchObjective; icon: string; label: string; color: string; desc: string; lvl: number; locked: boolean }> = [
-    { id: 'robots', icon: '🤖', label: RESEARCH_LEVEL_NAMES.robots[Math.min(robotsLevel, 2)] ?? 'Roboti', color: '#cc8800', desc: 'Raziskave ustvarjajo intel in odpirajo AI drevo. Mehanske šibkosti odklenejo tehnologijo.', lvl: robotsLevel, locked: false },
-    { id: 'weapon', icon: '⚔️', label: RESEARCH_LEVEL_NAMES.weapon[Math.min(weaponLevel, 2)] ?? 'Orožje', color: '#cc4433', desc: 'Vsaka stopnja podvoji prispevek orožja. Zaklenjeno z mehanskimi šibkostmi AI.', lvl: weaponLevel, locked: weaponLevel >= robotsLevel },
-    { id: 'wall',   icon: '🛡️', label: RESEARCH_LEVEL_NAMES.wall[Math.min(wallLevel, 2)] ?? 'Obzidje', color: '#aabb88', desc: 'Vsaka stopnja podvoji učinek obzidja. Zaklenjeno z mehanskimi šibkostmi AI.', lvl: wallLevel, locked: wallLevel >= robotsLevel },
+    { id: 'robots', icon: '🤖', label: RESEARCH_LEVEL_NAMES.robots[Math.min(robotsLevel, 2)] ?? 'Roboti', color: '#cc8800', desc: 'Raziskave berejo AI enote in iščejo ranljiva mesta, ki jih lahko uporabimo v orožju ali obzidju.', lvl: robotsLevel, locked: false },
+    { id: 'weapon', icon: '⚔️', label: RESEARCH_LEVEL_NAMES.weapon[Math.min(weaponLevel, 2)] ?? 'Orožje', color: '#cc4433', desc: 'Orožje prilagodimo odkritim ranljivostim robotov, da napadi bolje zadenejo šibke dele.', lvl: weaponLevel, locked: weaponLevel >= robotsLevel },
+    { id: 'wall',   icon: '🛡️', label: RESEARCH_LEVEL_NAMES.wall[Math.min(wallLevel, 2)] ?? 'Obzidje', color: '#aabb88', desc: 'Obrambo prilagodimo odkritim ranljivostim robotov, da kamp lažje zdrži preboj.', lvl: wallLevel, locked: wallLevel >= robotsLevel },
   ];
   const sel = opts.find(o => o.id === value);
   return (

@@ -62,6 +62,12 @@ export function currentAxis(state: GameState): HumanAxis {
   return 'roboti';
 }
 
+function researchedAIUnitLabel(level: number): string {
+  if (level <= 1) return 'izvidniških enot';
+  if (level === 2) return 'napadalnih enot';
+  return 'people-killer enot';
+}
+
 /** Vsota vseh AI enot = skupno robotov. */
 export function totalAIRobots(u: AIUnits): number {
   return (u?.scouts ?? 0) + (u?.attackers ?? 0) + (u?.peopleKillers ?? 0);
@@ -465,7 +471,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       while (robotsResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && robotsResearchLevel < 3) {
         robotsResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
         robotsResearchLevel += 1;
-        workshopEvents.push(`🔬 Raziskava robotov dokončana — stopnja ${robotsResearchLevel}! Odklenjena stopnja za orožje in obzidje.`);
+        workshopEvents.push(`🔬 Raziskava robotov dokončana — odkrili smo šibko točko ${researchedAIUnitLabel(robotsResearchLevel)}. To znanje lahko zdaj uporabimo pri razvoju orožja ali obzidja.`);
       }
     } else if (researchObj === 'weapon') {
       const unlocked = Math.max(state.robotsResearchLevel ?? 0, mechanicalTechUnlockLevel(state));
@@ -476,7 +482,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         while (weaponResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && weaponResearchLevel < unlocked) {
           weaponResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
           weaponResearchLevel += 1;
-          workshopEvents.push(`🔬 Raziskava orožja dokončana — stopnja ${weaponResearchLevel}! Napad orožja ×${researchMult(weaponResearchLevel)}.`);
+          workshopEvents.push(`🔬 Raziskava orožja dokončana — orožje smo prilagodili šibkosti ${researchedAIUnitLabel(weaponResearchLevel)}. Napadalci lahko zdaj bolje zadenejo ranljive dele robotov.`);
         }
       }
     } else if (researchObj === 'wall') {
@@ -488,7 +494,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         while (wallResearchProgress >= RESEARCH_LEVEL_WORKER_MONTHS && wallResearchLevel < unlocked) {
           wallResearchProgress -= RESEARCH_LEVEL_WORKER_MONTHS;
           wallResearchLevel += 1;
-          workshopEvents.push(`🔬 Raziskava obzidja dokončana — stopnja ${wallResearchLevel}! Obramba obzidja ×${researchMult(wallResearchLevel)}.`);
+          workshopEvents.push(`🔬 Raziskava obzidja dokončana — obrambo smo prilagodili šibkosti ${researchedAIUnitLabel(wallResearchLevel)}. Zidovi in branilci zdaj bolje ustavljajo ta tip napada.`);
         }
       }
     }
@@ -507,7 +513,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     const unlockedLevels = unlockedTechLevel - robotsResearchLevel;
     robotsResearchLevel = unlockedTechLevel;
     robotsResearchProgress = Math.max(0, robotsResearchProgress - RESEARCH_LEVEL_WORKER_MONTHS * unlockedLevels);
-    workshopEvents.push(`🔓 Mehanska šibkost razkrita — odklenjena stopnja ${unlockedTechLevel} za orožje in obzidje.`);
+    workshopEvents.push(`🔓 Mehanska šibkost razkrita — odkrili smo šibko točko ${researchedAIUnitLabel(unlockedTechLevel)}. To znanje lahko zdaj uporabimo pri razvoju orožja ali obzidja.`);
   }
 
   // 4. DELAVCI — delavnica (delavec-meseci; napredek se ohrani ob preklopu)
