@@ -3013,9 +3013,9 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
               {z.adj === 'd' ? (
                 <g pointerEvents="none">
                   <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="21">🛡️</text>
-                  <text x={p.x} y={p.y - SIZE * 0.44} textAnchor="middle" dominantBaseline="central"
-                    fontSize="8" fill="#06110c" fontWeight="900" fontFamily="'Courier New', monospace">
-                    {Math.round(Math.max(0, Math.min(1, repelProbability)) * 100)}
+                  <text x={p.x} y={p.y - SIZE * 0.56} textAnchor="middle" dominantBaseline="middle"
+                    fontSize="7" fill="#06110c" fontWeight="900" fontFamily="'Courier New', monospace">
+                    {Math.round(Math.max(0, Math.min(1, repelProbability)) * 100)}%
                   </text>
                 </g>
               ) : (
