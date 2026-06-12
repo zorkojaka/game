@@ -6,7 +6,7 @@ import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
 import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT, wpGarrisonUnits, RESEARCH_LEVEL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS } from '../../src/engine/constants';
 import { missionSuccessProbability } from '../../src/engine/game';
-import { TILES_PER_MONTH as TILES_PER_MONTH_ENGINE } from '../../src/engine/expedition';
+import { expeditionMonthsForSteps } from '../../src/engine/expedition';
 import { logicalWeaknessBonus, logicalWeaknessByRobot } from '../../src/engine/combat';
 import { MAP_COLS, MAP_ROWS, collapseCampRuns } from '../../src/engine/map';
 import { DIFFICULTIES, difficultyProfile, weaponEffectMult, type DifficultyId } from '../../src/engine/difficulty';
@@ -1756,6 +1756,18 @@ function BalanceTrend({ entries }: { entries: EventEntry[] }) {
   );
 }
 
+function withResourceIcons(text: string): string {
+  return text
+    .replace(/(?<![🍞🌾])\b(hrane|hrana)\b/gi, '🍞 $1')
+    .replace(/(?<!⚔️ )\b(orožja|orožje)\b/gi, '⚔️ $1')
+    .replace(/(?<!🔨 )\b(materiala|material)\b/gi, '🔨 $1')
+    .replace(/(?<!👁 )\b(intel|informacije|informacij)\b/gi, '👁 $1')
+    .replace(/(?<!🧱 )\b(obzidja|obzidje)\b/gi, '🧱 $1')
+    .replace(/(?<!🤖 )\b(robotov|roboti|robot)\b/gi, '🤖 $1')
+    .replace(/(?<!💎 )\b(artefaktov|artefakt)\b/gi, '💎 $1')
+    .replace(/(?<!👥 )\b(ljudi|oseba|osebe|populacija)\b/gi, '👥 $1');
+}
+
 function EventLog({ entries }: { entries: EventEntry[] }) {
   const [openTs, setOpenTs] = useState<number | null>(entries[0]?.ts ?? null);
   // Avto-odpri najnovejši dogodek, ko se pojavi
@@ -1818,7 +1830,7 @@ function EventLog({ entries }: { entries: EventEntry[] }) {
                 <div className="tl-row-detail">
                   <ul className="ee-events">
                     {e.narrative.split('\n').filter(Boolean).map((line, li) => (
-                      <li key={li} className="ee-event-line">{line}</li>
+                      <li key={li} className="ee-event-line">{withResourceIcons(line)}</li>
                     ))}
                   </ul>
                   {e.ledger.length > top.length && (
@@ -1939,12 +1951,11 @@ function ResearchContinuationChooser({
     { id: 'weapon', icon: '⚔️', label: RESEARCH_LEVEL_NAMES.weapon[Math.min(controls.weaponLevel, 2)] ?? 'Orožje', color: '#cc4433', lvl: controls.weaponLevel, locked: controls.weaponLevel >= controls.robotsLevel },
     { id: 'wall', icon: '🛡️', label: RESEARCH_LEVEL_NAMES.wall[Math.min(controls.wallLevel, 2)] ?? 'Obzidje', color: '#aabb88', lvl: controls.wallLevel, locked: controls.wallLevel >= controls.robotsLevel },
   ];
-  const visible = opts.filter(o => !o.locked || o.id === completed);
   return (
     <div className="rec-research-next">
       <div className="rrn-title">Kje nadaljujemo raziskave:</div>
       <div className="rrn-buttons">
-        {visible.map(o => {
+        {opts.map(o => {
           const selected = controls.value === o.id;
           const justCompleted = completed === o.id;
           return (
@@ -2246,7 +2257,7 @@ function RoundLog({ log }: { log: RoundLog }) {
       <div className="rl-head">
         <h3>MESEC {log.round} · {PHASE[log.phase].full}</h3>
       </div>
-      <p className="rl-narrative">{log.narrative}</p>
+      <p className="rl-narrative">{withResourceIcons(log.narrative)}</p>
       <div className="rl-cols">
         {c && (
           <div className="rl-section">
@@ -3508,7 +3519,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
         const tile = exp.path[exp.currentIndex];
         const target = exp.path[exp.path.length - 1];
         const stepsLeft = exp.path.length - 1 - exp.currentIndex;
-        const monthsLeft = Math.ceil(stepsLeft / TILES_PER_MONTH_ENGINE);
+        const monthsLeft = expeditionMonthsForSteps(stepsLeft, exp.rations);
         const color = exp.kind === 'mission' ? COL_ATK : COL_EXP;
         // Pozicija popupa: nad heksom kjer je odprava
         const p = shift(hexToPixel(tile.q, tile.r, SIZE));
@@ -4501,24 +4512,34 @@ export default function App() {
   }
 
   // Statistike za draft pot (mesecev + tveganje) — hitrost iz enginea (en vir resnice)
-  const TILES_PER_MONTH_FE = TILES_PER_MONTH_ENGINE;
   const draftPathTiles = Math.max(0, draftPath.length - 1);
+  const expeditionMonthsFE = (steps: number, rationsLevel: number, stealth = false) => {
+    const base = expeditionMonthsForSteps(Math.max(0, steps), rationsLevel);
+    return stealth ? Math.ceil(base * 1.5) : base;
+  };
   const draftPathMonths = draftStealth
-    ? Math.ceil((draftPathTiles / TILES_PER_MONTH_FE) * 1.5)  // skrivanje: +50 % trajanja
-    : Math.max(0, Math.ceil(draftPathTiles / TILES_PER_MONTH_FE));
+    ? expeditionMonthsFE(draftPathTiles, draftRations, true)  // skrivanje: +50 % trajanja
+    : expeditionMonthsFE(draftPathTiles, draftRations);
   // Povratek = dolžina izbrane povratne poti (cilj → kamp).
   const draftReturnMonths = (() => {
     if (draftPath.length < 2) return 0;
     if (draftReturn.length >= 2) {
       const steps = draftReturn.length - 1;
-      return draftStealth ? Math.ceil((steps / TILES_PER_MONTH_FE) * 1.5) : Math.ceil(steps / TILES_PER_MONTH_FE);
+      return expeditionMonthsFE(steps, draftRations, draftStealth);
     }
     // rezerva: če povratna pot (še) ni nastavljena
     const clan = game?.mapTiles?.find(t => t.isClanCamp);
     const last = draftPath[draftPath.length - 1];
-    return clan ? Math.ceil(hexDistFE({ q: last.q, r: last.r }, { q: clan.q, r: clan.r }) / TILES_PER_MONTH_FE) : draftPath.length - 1;
+    return clan ? expeditionMonthsFE(hexDistFE({ q: last.q, r: last.r }, { q: clan.q, r: clan.r }), draftRations, draftStealth) : draftPath.length - 1;
   })();
   const draftTotalMonths = draftPathMonths + draftReturnMonths;
+  const draftFoodMonths = Math.max(0, draftPathTiles + (draftReturn.length >= 2
+    ? draftReturn.length - 1
+    : (() => {
+        const clan = game?.mapTiles?.find(t => t.isClanCamp);
+        const last = draftPath[draftPath.length - 1];
+        return clan && last ? hexDistFE({ q: last.q, r: last.r }, { q: clan.q, r: clan.r }) : 0;
+      })()));
   function tileEncounterMultFE(p: number, distFromCamp: number): number {
     let m = p < 0.25 ? 1.5 : p < 0.50 ? 1.2 : p < 1.0 ? 0.7 : 0.3;
     if (distFromCamp <= 1) m *= 0.5;
@@ -4669,24 +4690,36 @@ export default function App() {
   // Aktivne misije/odprave: ne jedo iz kampa (so vzele upfront)
   // Nove odprave/misije, ki bodo poslane TA mesec, vzamejo hrano s seboj iz kampa
   const clanTile = game.mapTiles?.find(t => t.isClanCamp);
-  const roundTripMonthsFE = (path: { q: number; r: number }[]) => {
+  const roundTripMonthsFE = (path: { q: number; r: number }[], rationsLevel = 3, returnPath?: { q: number; r: number }[]) => {
     const oneWayTiles = Math.max(0, path.length - 1);
     if (path.length < 2) return 0;
+    if (returnPath && returnPath.length >= 2) {
+      return expeditionMonthsForSteps(oneWayTiles, rationsLevel)
+        + expeditionMonthsForSteps(Math.max(0, returnPath.length - 1), rationsLevel);
+    }
     const last = path[path.length - 1];
-    const outM = Math.ceil(oneWayTiles / TILES_PER_MONTH_ENGINE);
+    const outM = expeditionMonthsForSteps(oneWayTiles, rationsLevel);
     const retM = clanTile
-      ? Math.min(outM, Math.ceil(hexDistFE({ q: last.q, r: last.r }, { q: clanTile.q, r: clanTile.r }) / TILES_PER_MONTH_ENGINE))
+      ? Math.min(outM, expeditionMonthsForSteps(hexDistFE({ q: last.q, r: last.r }, { q: clanTile.q, r: clanTile.r }), rationsLevel))
       : outM;
     return outM + retM;
   };
+  const roundTripFoodMonthsFE = (path: { q: number; r: number }[], returnPath?: { q: number; r: number }[]) => {
+    const out = Math.max(0, path.length - 1);
+    if (path.length < 2) return 0;
+    if (returnPath && returnPath.length >= 2) return out + Math.max(0, returnPath.length - 1);
+    const last = path[path.length - 1];
+    const ret = clanTile ? Math.min(out, hexDistFE({ q: last.q, r: last.r }, { q: clanTile.q, r: clanTile.r })) : out;
+    return out + ret;
+  };
   const pendingExpFood = pendingExpeditions.reduce((s, e) => {
-    const months = Math.max(1, roundTripMonthsFE(e.path));
+    const months = Math.max(1, roundTripFoodMonthsFE(e.path, e.returnPath));
     const t = RATIONS[e.rations] ?? RATIONS[3];
     return s + Math.round(e.assigned * months * t.foodMult);
   }, 0);
   const draftRTier = RATIONS[draftRations];
   const draftExpFood = (draftPath.length >= 2 && draftPeople > 0)
-    ? Math.round(draftPeople * Math.max(1, (draftPath.length - 1) + draftReturnMonths) * draftRTier.foodMult) : 0;
+    ? Math.round(draftPeople * Math.max(1, draftFoodMonths) * draftRTier.foodMult) : 0;
   const newMissionFood = Object.entries(missions).reduce((s, [wpId, ppl]) => {
     // misije imajo fiksno trajanje per wp
     const dur = wpId === 'wp_power' ? 4 : wpId === 'wp_comm' ? 5 : wpId === 'wp_core' ? 6 : 4;
@@ -5122,7 +5155,7 @@ export default function App() {
                     <input type="checkbox" checked={draftStealth} onChange={e => setDraftStealth(e.target.checked)} />
                     <span>🌙 Skrivanje — brez orožja, srečanja ×0.5, pot +50 %</span>
                   </label>
-                  <div className="def-stat-note">🍞 vzamejo <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane · moč ×{draftRTier.strengthMult}</div>
+                  <div className="def-stat-note">🍞 vzamejo <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane · {draftFoodMonths} hex-m · moč ×{draftRTier.strengthMult}</div>
                   <button className="def-upgrade-btn" disabled={!canConfirmDraft} onClick={confirmDraftExpedition}>✓ Potrdi odpravo</button>
                 </div>
               </>
@@ -5131,12 +5164,13 @@ export default function App() {
               <div className="pending-exps">
                 <div className="dim small" style={{ marginBottom: 4 }}>Potrjene odprave (sproži ob izvedbi meseca):</div>
                 {pendingExpeditions.map((e, i) => e.kind === 'scout' && (() => {
-                  const months = roundTripMonthsFE(e.path);
+                  const months = roundTripMonthsFE(e.path, e.rations, e.returnPath);
+                  const foodMonths = roundTripFoodMonthsFE(e.path, e.returnPath);
                   const t = RATIONS[e.rations] ?? RATIONS[3];
-                  const food = Math.round(e.assigned * months * t.foodMult);
+                  const food = Math.round(e.assigned * Math.max(1, foodMonths) * t.foodMult);
                   return (
                     <div key={i} className="pending-exp-row">
-                      <span>🔭 {e.assigned} · {months}m tja+nazaj · {t.emoji} 🍞{food}{e.lootMode ? ' · 🔨' : ''}{e.stealth ? ' · 🌙' : ''}</span>
+                      <span>🔭 {e.assigned} · {months}m tja+nazaj · {t.emoji} 🍞{food} ({foodMonths} hex-m){e.lootMode ? ' · 🔨' : ''}{e.stealth ? ' · 🌙' : ''}</span>
                       <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
                     </div>
                   );
@@ -5203,7 +5237,7 @@ export default function App() {
                       <input type="checkbox" checked={draftStealth} onChange={e => setDraftStealth(e.target.checked)} />
                       <span>🌙 Skrivanje — pot +50 %, srečanja ×0.5, boj +20 %</span>
                     </label>
-                    <div className="def-stat-note">🍞 vzamejo <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane · moč ×{draftRTier.strengthMult}</div>
+                    <div className="def-stat-note">🍞 vzamejo <b style={{ color: '#cc8800' }}>{draftExpFood}</b> hrane · {draftFoodMonths} hex-m · moč ×{draftRTier.strengthMult}</div>
                     <button className="def-upgrade-btn weapon" disabled={!canConfirmDraft} onClick={() => confirmDraft('attack')}>⚔️ Pošlji napad</button>
                   </div>
                 </>
@@ -5257,10 +5291,11 @@ export default function App() {
               <div className="pending-exps">
                 <div className="dim small" style={{ marginBottom: 4 }}>Potrjeni napadi (sproži ob izvedbi meseca):</div>
                 {pendingExpeditions.map((e, i) => e.kind === 'mission' && (() => {
-                  const months = roundTripMonthsFE(e.path);
+                  const months = roundTripMonthsFE(e.path, e.rations, e.returnPath);
+                  const foodMonths = roundTripFoodMonthsFE(e.path, e.returnPath);
                   return (
                     <div key={i} className="pending-exp-row">
-                      <span>⚔️ {e.assigned} · {months}m tja+nazaj{e.weakPointId ? ' · ◆ šibka točka' : ''}{e.stealth ? ' · 🌙' : ''}</span>
+                      <span>⚔️ {e.assigned} · {months}m tja+nazaj · {foodMonths} hex-m hrane{e.weakPointId ? ' · ◆ šibka točka' : ''}{e.stealth ? ' · 🌙' : ''}</span>
                       <button className="pa-btn" onClick={() => removePendingExpedition(i)}>✕</button>
                     </div>
                   );
@@ -5388,7 +5423,7 @@ export default function App() {
                     <div className="exp-events dim small">
                       {returning
                         ? (remaining === 0 ? 'prihod v kamp ta mesec' : `↩ še ${remaining} polj(e) do kampa`)
-                        : remaining === 0 ? 'prihod ta mesec' : `še ${Math.ceil(remaining / TILES_PER_MONTH_ENGINE)} mesec(ev) do cilja`}
+                        : remaining === 0 ? 'prihod ta mesec' : `še ${expeditionMonthsForSteps(remaining, e.rations)} mesec(ev) do cilja`}
                       {' · poročilo ob vrnitvi'}
                     </div>
                   </div>

@@ -14,6 +14,7 @@ import {
   neighbors, MAP_COLS, MAP_ROWS, isCampHex, collapseCampRuns,
 } from './map.js';
 import {
+  DEFAULT_RATIONS,
   SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_AI_KNOWLEDGE_BONUS,
   SCOUT_CAPTURED_LOSS_MIN, SCOUT_CAPTURED_LOSS_MAX,
   ENCOUNTER_SCOUT_REFERENCE, ENCOUNTER_MIN_FACTOR,
@@ -23,6 +24,25 @@ import {
 export const TILES_PER_MONTH = 1;  // berljiva motorika: ena odprava napreduje za en heks na mesec
 
 const CLAN_POS = { q: 0, r: 4 };
+
+/** Hrana 4 pospeši odpravo na povprečno 1.5 heksa/mesec, hrana 5 na 2 heksa/mesec. */
+export function expeditionStepsThisMonth(rationsLevel: number = DEFAULT_RATIONS, monthsElapsed = 0): number {
+  if (rationsLevel >= 5) return TILES_PER_MONTH * 2;
+  if (rationsLevel >= 4) return TILES_PER_MONTH + (monthsElapsed % 2 === 0 ? 1 : 0);
+  return TILES_PER_MONTH;
+}
+
+export function expeditionMonthsForSteps(steps: number, rationsLevel: number = DEFAULT_RATIONS): number {
+  const safeSteps = Math.max(0, steps);
+  if (safeSteps <= 0) return 0;
+  if (rationsLevel >= 5) return Math.ceil(safeSteps / 2);
+  if (rationsLevel >= 4) {
+    const pairs = Math.floor(safeSteps / 3);
+    const rem = safeSteps % 3;
+    return pairs * 2 + (rem === 0 ? 0 : 1);
+  }
+  return Math.ceil(safeSteps / TILES_PER_MONTH);
+}
 
 /**
  * Faktor srečanj glede na število izvidniških enot AI.
@@ -65,9 +85,13 @@ export function pathEncounterProbability(
 }
 
 /** Mesecev potrebnih za izvedbo poti (one-way). */
-export function pathMonths(path: Array<{ q: number; r: number }>): number {
+export function pathMonths(path: Array<{ q: number; r: number }>, rationsLevel: number = DEFAULT_RATIONS): number {
   const steps = Math.max(0, path.length - 1);  // brez kampa
-  return Math.ceil(steps / TILES_PER_MONTH);
+  return expeditionMonthsForSteps(steps, rationsLevel);
+}
+
+export function pathFoodMonths(path: Array<{ q: number; r: number }>): number {
+  return Math.max(0, path.length - 1);
 }
 
 /**
@@ -75,18 +99,29 @@ export function pathMonths(path: Array<{ q: number; r: number }>): number {
  * Če zadnji heks meji na kamp (ali je kamp), se vrnejo neposredno (0–1 mesec).
  * Sicer se vrnejo po isti poti nazaj (toliko mesecev kot je trajala pot tja).
  */
-export function returnMonths(path: Array<{ q: number; r: number }>): number {
+export function returnMonths(path: Array<{ q: number; r: number }>, rationsLevel: number = DEFAULT_RATIONS): number {
   if (path.length < 2) return 0;
   const last = path[path.length - 1];
   // Vrnejo se naravnost domov od zadnjega heksa; nikoli dlje kot retrace cele poti.
   // Krožna pot, ki se konča ob kampu → kratek povratek; ravna pot ven → enako kot retrace.
   const home = hexDistance({ q: last.q, r: last.r }, CLAN_POS);
-  return Math.min(pathMonths(path), Math.ceil(home / TILES_PER_MONTH));
+  return Math.min(pathMonths(path, rationsLevel), expeditionMonthsForSteps(home, rationsLevel));
 }
 
 /** Skupni čas odprave: pot tja + povratek. */
-export function roundTripMonths(path: Array<{ q: number; r: number }>): number {
-  return pathMonths(path) + returnMonths(path);
+export function roundTripMonths(path: Array<{ q: number; r: number }>, rationsLevel: number = DEFAULT_RATIONS): number {
+  return pathMonths(path, rationsLevel) + returnMonths(path, rationsLevel);
+}
+
+export function returnFoodMonths(path: Array<{ q: number; r: number }>): number {
+  if (path.length < 2) return 0;
+  const last = path[path.length - 1];
+  const home = hexDistance({ q: last.q, r: last.r }, CLAN_POS);
+  return Math.min(pathFoodMonths(path), home);
+}
+
+export function roundTripFoodMonths(path: Array<{ q: number; r: number }>): number {
+  return pathFoodMonths(path) + returnFoodMonths(path);
 }
 
 /**
@@ -150,7 +185,8 @@ export function tickExpedition(
   const stealth = !!exp.stealth;
   const skipThisMonth = stealth && (exp.monthsElapsed % 3 === 2);
 
-  for (let stepsThisMonth = 0; stepsThisMonth < TILES_PER_MONTH; stepsThisMonth++) {
+  const moveStepsThisMonth = expeditionStepsThisMonth(exp.rations, exp.monthsElapsed);
+  for (let stepsThisMonth = 0; stepsThisMonth < moveStepsThisMonth; stepsThisMonth++) {
     if (skipThisMonth) {
       events.push(`🌙 Skrivanje — počitek/obhod (mesec preskočen).`);
       break;

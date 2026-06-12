@@ -1,7 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability, missionSuccessProbability } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus } from './combat.js';
-import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp, tileEncounterProbability } from './expedition.js';
+import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp, tileEncounterProbability, expeditionMonthsForSteps } from './expedition.js';
 import { wpGarrisonMult } from './constants.js';
 import { weaponEffectMult } from './difficulty.js';
 import { isCampHex, collapseCampRuns, researchPerVisit, generateMap } from './map.js';
@@ -298,6 +298,56 @@ describe('odprava se vrne in raziskuje nazaj grede', () => {
 
     expect(r.exp.currentIndex).toBe(1);
     expect(r.exp.path[r.exp.currentIndex]).toEqual(path[1]);
+  });
+
+  it('boljši obroki pospešijo odpravo, hrana pa se računa po hexih poti', () => {
+    expect(expeditionMonthsForSteps(4, 5)).toBe(2); // zrezek: 2 heksa/mesec
+    expect(expeditionMonthsForSteps(4, 4)).toBe(3); // solata: hitreje od normalnega
+    expect(expeditionMonthsForSteps(4, 3)).toBe(4);
+
+    const tiles = generateMap();
+    const path = [{ q: 2, r: 4 }, { q: 3, r: 4 }, { q: 4, r: 4 }, { q: 5, r: 4 }];
+    const steak = tickExpedition({
+      id: 'exp_steak',
+      kind: 'scout',
+      path,
+      currentIndex: 0,
+      assigned: 3,
+      rations: 5,
+      status: 'traveling',
+      monthsElapsed: 0,
+      encountersLog: [],
+    }, tiles, 0, createRNG(18), 0);
+    expect(steak.exp.currentIndex).toBe(2);
+
+    const saladFirst = tickExpedition({
+      id: 'exp_salad',
+      kind: 'scout',
+      path,
+      currentIndex: 0,
+      assigned: 3,
+      rations: 4,
+      status: 'traveling',
+      monthsElapsed: 0,
+      encountersLog: [],
+    }, tiles, 0, createRNG(19), 0);
+    expect(saladFirst.exp.currentIndex).toBe(2);
+
+    const saladSecond = tickExpedition(saladFirst.exp, tiles, 0, createRNG(20), 0);
+    expect(saladSecond.exp.currentIndex).toBe(3);
+  });
+
+  it('zrezek skrajša trajanje, a plača hrano za vse hexe tja in nazaj', () => {
+    const base = newGame(22);
+    const g: GameState = { ...base, population: 20, resources: { ...base.resources, survival: 500 } };
+    const path = [{ q: 0, r: 4 }, { q: 1, r: 4 }, { q: 2, r: 4 }, { q: 3, r: 4 }];
+    const returnPath = [{ q: 3, r: 4 }, { q: 2, r: 4 }, { q: 1, r: 4 }, { q: 0, r: 4 }];
+    const r = processRound(g, action({
+      foragers: 0,
+      newExpeditions: [{ kind: 'scout', path, returnPath, assigned: 2, rations: 5 }],
+    }));
+    expect(r.lastRoundLog?.narrative).toMatch(/2 ljudi, 4m tja\+nazaj, hrana za 6 hex-m/);
+    expect(r.lastRoundLog?.narrative).toMatch(/vzela 60 hrane/);
   });
 });
 

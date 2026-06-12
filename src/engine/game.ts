@@ -7,7 +7,7 @@ import { rngInt, rngNext, seedFromString } from './rng.js';
 import { resolveCombat } from './combat.js';
 import { revealTreeByInsight, revealNodeRetroactive } from './fog.js';
 import { generateMap, generateOtherClans, randomizePlacements, isCampHex } from './map.js';
-import { tickExpedition, roundTripMonths, pathToCamp } from './expedition.js';
+import { tickExpedition, pathMonths, returnMonths, pathFoodMonths, returnFoodMonths, pathToCamp } from './expedition.js';
 import { difficultyProfile, weaponEffectMult, type DifficultyId } from './difficulty.js';
 import type { Expedition } from './types.js';
 import { hexLabel } from './types.js';
@@ -749,12 +749,20 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     const stealthScout = inp.kind === 'scout' && !!inp.stealth;
     const equippedWeapons = stealthScout ? 0 : Math.min(take, Math.max(0, combat));
     combat -= equippedWeapons;
-    // Hrana za celotno pot TJA IN NAZAJ, vzeta iz zalog upfront
-    const months = Math.max(1, roundTripMonths(inp.path));
     const eTier = RATIONS_LEVELS[inp.rations] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
-    const foodPack = Math.round(take * months * eTier.foodMult);
+    // Hrana se plača po dolžini poti v hexih, ne po pospešenem trajanju.
+    const target = inp.path[inp.path.length - 1];
+    const retEnd = inp.returnPath?.[inp.returnPath.length - 1];
+    const retValid = !!inp.returnPath && inp.returnPath.length >= 2
+      && inp.returnPath[0].q === target.q && inp.returnPath[0].r === target.r
+      && !!retEnd && isCampHex(retEnd);
+    const months = Math.max(1,
+      pathMonths(inp.path, inp.rations) + (retValid ? pathMonths(inp.returnPath!, inp.rations) : returnMonths(inp.path, inp.rations)));
+    const foodMonths = Math.max(1,
+      pathFoodMonths(inp.path) + (retValid ? pathFoodMonths(inp.returnPath!) : returnFoodMonths(inp.path)));
+    const foodPack = Math.round(take * foodMonths * eTier.foodMult);
     survival = Math.max(0, survival - foodPack);
-    expeditionEvents.push(`🎒 Odprava (${take} ljudi, ${months}m tja+nazaj) vzela ${foodPack} hrane${equippedWeapons > 0 ? ` in ${equippedWeapons} orožja` : ''} s seboj.`);
+    expeditionEvents.push(`🎒 Odprava (${take} ljudi, ${months}m tja+nazaj, hrana za ${foodMonths} hex-m) vzela ${foodPack} hrane${equippedWeapons > 0 ? ` in ${equippedWeapons} orožja` : ''} s seboj.`);
     newlyCreated.push({
       id: `exp_${state.totalRounds}_${idRoll}`,
       kind: inp.kind,
