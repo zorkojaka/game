@@ -2605,10 +2605,13 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
           </div>
         </div>
       )}
-      <div className="map-free-hex" title={`Prosti ljudje: ${pop.free}`}>
-        <span className="mfh-icon">💤</span>
+      <div className="map-free-hex" title={`Skriti prosti člani v bunkerju: ${pop.free}`}>
+        <span className="mfh-bunker" aria-hidden="true">
+          <span className="mfh-bunker-roof" />
+          <span className="mfh-bunker-door" />
+        </span>
         <span className="mfh-value">{pop.free}</span>
-        <span className="mfh-label">prosti</span>
+        <span className="mfh-label">skriti</span>
       </div>
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="hex-svg"
         onPointerMove={moveDotDrag} onPointerUp={endDotDrag} onPointerCancel={endDotDrag}>
