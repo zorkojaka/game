@@ -161,6 +161,109 @@ function BigStat({ icon, label, value, color, unit, note, noteColor, title }: { 
   );
 }
 
+function TopPeopleCompact({ total, camp, away, free }: { total: number; camp: number; away: number; free: number }) {
+  const assigned = Math.max(0, camp - free);
+  const segments = [
+    { key: 'assigned', label: 'razporejeni', value: assigned, color: '#9ec0ad' },
+    { key: 'free', label: 'prosti', value: free, color: '#66cc88' },
+    { key: 'away', label: 'odprave', value: away, color: '#d6a96a' },
+  ].filter(s => s.value > 0);
+  return (
+    <div className="top-compact people-compact" title={`Klan skupaj: ${total} · V kampu: ${camp} · Na odpravi: ${away} · Prosti: ${free}`}>
+      <div className="tc-head">
+        <span className="tc-icon">👥</span>
+        <span className="tc-main">{total}</span>
+      </div>
+      <div className="pc-counts">
+        <span title="V kampu">🏠 {camp}</span>
+        <span title="Na odpravi">🎯 {away}</span>
+        <span title="Prosti">💤 {free}</span>
+      </div>
+      <div className="pc-split" aria-hidden="true">
+        {segments.map(s => (
+          <span key={s.key} style={{ flex: s.value, background: s.color }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TopResourcesCompact({
+  resources,
+  survivalNext,
+  combatNext,
+  materialNext,
+  intelligenceNext,
+  wallsBuilt,
+}: {
+  resources: GameState['resources'];
+  survivalNext: number;
+  combatNext: number;
+  materialNext: number;
+  intelligenceNext: number;
+  wallsBuilt: number;
+}) {
+  const item = (icon: string, label: string, now: number, next: number, color: string) => {
+    const roundedNow = Math.max(0, Math.round(now));
+    const roundedNext = Math.max(0, Math.round(next));
+    const delta = roundedNext - roundedNow;
+    return (
+      <div className="rc-item" title={`${label}: zdaj ${roundedNow}, po potezi ${roundedNext}`}>
+        <span className="rc-icon">{icon}</span>
+        <span className="rc-now">{roundedNow}</span>
+        <span className={`rc-next ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}`} style={{ color }}>
+          {roundedNext}
+        </span>
+      </div>
+    );
+  };
+  return (
+    <div className="top-compact resources-compact" aria-label="Resourci kampa">
+      {item('🍞', 'Hrana', resources.survival, survivalNext, '#cc8800')}
+      {item('⚔️', 'Orožje', resources.combat, combatNext, '#cc4433')}
+      {item('🔨', 'Material', resources.material ?? 0, materialNext, '#88aabb')}
+      {item('👁', 'Intel', resources.intelligence, intelligenceNext, '#3388cc')}
+      {(resources.artifacts ?? 0) > 0 && item('💎', 'Artefakti', resources.artifacts, resources.artifacts, '#ffd84a')}
+      {(wallsBuilt ?? 0) > 0 && item('🧱', 'Obzidje', wallsBuilt, wallsBuilt, '#aabb88')}
+    </div>
+  );
+}
+
+function TopAICompact({ robots, units }: { robots: number; units?: AIUnits }) {
+  const dominant = dominantAIUnit(units);
+  const title = units
+    ? `AI roboti: ${robots} · Izvidniške: ${units.scouts} · Napadalne: ${units.attackers} · People-killer: ${units.peopleKillers}`
+    : `AI roboti: ${robots}`;
+  return (
+    <div className="top-compact ai-compact" title={title}>
+      <img className="tc-img" src={aiUnitIconHref(dominant)} alt="" draggable={false} />
+      <span className="tc-main ai-total">{robots}</span>
+      <AIUnitPips units={units} />
+    </div>
+  );
+}
+
+function TopKnowledgeCompact({ ourK, aiK }: { ourK: number; aiK: number }) {
+  const ourPct = Math.max(0, Math.min(100, Math.round(ourK * 100)));
+  const aiPct = Math.max(0, Math.min(100, Math.round(aiK * 100)));
+  const ourColor = ourK >= 0.6 ? '#22cc88' : ourK >= 0.3 ? '#3377cc' : '#5a7a99';
+  const aiColor = aiK >= 0.7 ? '#cc2222' : aiK >= 0.4 ? '#cc7700' : '#aa5a5a';
+  return (
+    <div className="top-compact knowledge-compact" title={`Mi vemo ${ourPct}% · AI ve ${aiPct}%`}>
+      <div className="kc-row">
+        <span className="kc-label">MI</span>
+        <span className="kc-track"><span style={{ width: `${ourPct}%`, background: ourColor }} /></span>
+        <span className="kc-value" style={{ color: ourColor }}>{ourPct}%</span>
+      </div>
+      <div className="kc-row">
+        <span className="kc-label">AI</span>
+        <span className="kc-track"><span style={{ width: `${aiPct}%`, background: aiColor }} /></span>
+        <span className="kc-value" style={{ color: aiColor }}>{aiPct}%</span>
+      </div>
+    </div>
+  );
+}
+
 /** Krožni merilnik (odstotek) — SVG obroč. */
 function Gauge({ pct, color }: { pct: number; color: string }) {
   const r = 28, c = 2 * Math.PI * r;
@@ -4444,18 +4547,7 @@ export default function App() {
       <header className="top-bar">
         <div className="top-spacer" />
         <div className="top-res">
-          {/* LEVO — ljudje (stranska metrika) */}
-          <div className="tr-group tr-side">
-            <BigStat icon="👥" label="Klan skupaj" value={totalClan}  color="#d8d8d8" />
-            <BigStat icon="🏠" label="V kampu"     value={campPop}    color="#9ec0ad" />
-            <BigStat icon="🎯" label="Na odpravi"  value={inMissions} color="#d6a96a" />
-            <BigStat icon="💤" label="Prosti"      value={freePeople}
-              color={freePeople > 0 ? '#66cc88' : '#7a8a82'} />
-          </div>
-
-          {/* SREDINA — viri (poudarjeni) */}
           {(() => {
-            const foodDelta = foodNextMonth - game.resources.survival;
             const matAvail = game.resources.material ?? 0;
             // Napoved naslednjega meseca po cilju delavnice (delavec-mesecev model)
             const wpProg = (game.weaponWorkshopProgress ?? 0) + (workshopObj === 'weapon' ? workers : 0);
@@ -4467,44 +4559,22 @@ export default function App() {
             const weaponDelta = wpMade;
             const materialDelta = -(wpMade * 1 + wlMade * 4 + arMade * 20);
             const intelDelta = researchIntel;
-            const fmt = (n: number) => n > 0 ? `+${n}` : n < 0 ? `${n}` : '';
-            const col = (n: number) => n > 0 ? '#22cc88' : n < 0 ? '#cc4444' : '#888';
-            return (
-              <div className="tr-group tr-main">
-                <BigStat icon="🍞" label="Hrana"      value={game.resources.survival} color="#cc8800"
-                  note={fmt(foodDelta) || '±0'} noteColor={col(foodDelta)} />
-                <BigStat icon="⚔️"  label="Orožje"     value={game.resources.combat}   color="#cc4433"
-                  note={fmt(weaponDelta) || (workshopObj === 'weapon' && workers > 0 ? `${game.weaponWorkshopProgress ?? 0}/6 dm` : '')}
-                  noteColor={col(weaponDelta)} />
-                <BigStat icon="🔨"  label="Material"   value={game.resources.material ?? 0} color="#88aabb"
-                  note={fmt(materialDelta)} noteColor={col(materialDelta)} />
-                <BigStat icon="👁"  label="Intel"      value={game.resources.intelligence} color="#3388cc"
-                  note={fmt(intelDelta)} noteColor={col(intelDelta)} />
-                {(game.resources.artifacts ?? 0) > 0 && (
-                  <BigStat icon="💎" label="Artefakti" value={game.resources.artifacts} color="#ffd84a" />
-                )}
-                {(game.wallsBuilt ?? 0) > 0 && (
-                  <BigStat icon="🧱" label="Obzidje"   value={game.wallsBuilt}         color="#aabb88" />
-                )}
-              </div>
-            );
-          })()}
-
-          {/* DESNO — AI / situacija (stranska metrika) */}
-          {(() => {
             const ourK = game.aiInsight ?? calcOurKnowledge(game.aiTree);
             const aiK  = game.aiKnowledge;
-            const ourColor = ourK >= 0.6 ? '#22cc88' : ourK >= 0.3 ? '#3377cc' : '#5a7a99';
-            const aiColor  = aiK  >= 0.7 ? '#cc2222' : aiK  >= 0.4 ? '#cc7700' : '#aa5a5a';
             return (
-              <div className="tr-group tr-side">
-                <BigStat icon={aiUnitIconHref(dominantAIUnit(game.aiUnits))} label="AI roboti" value={game.aiRobots} color="#cc3333"
-                  note={<AIUnitPips units={game.aiUnits} />}
-                  noteColor="#aa8888"
-                  title={(() => { const u = game.aiUnits; return u ? `Izvidniške: ${u.scouts} · Napadalne: ${u.attackers} · People-killer: ${u.peopleKillers}` : ''; })()} />
-                <BigStat icon="🔭" label="Mi vemo"   value={Math.round(ourK * 100)} color={ourColor} unit="%" />
-                <BigStat icon="👁" label="AI ve"     value={Math.round(aiK * 100)}  color={aiColor}  unit="%" />
-              </div>
+              <>
+                <TopPeopleCompact total={totalClan} camp={campPop} away={inMissions} free={freePeople} />
+                <TopResourcesCompact
+                  resources={game.resources}
+                  survivalNext={foodNextMonth}
+                  combatNext={game.resources.combat + weaponDelta}
+                  materialNext={(game.resources.material ?? 0) + materialDelta}
+                  intelligenceNext={game.resources.intelligence + intelDelta}
+                  wallsBuilt={game.wallsBuilt ?? 0}
+                />
+                <TopAICompact robots={game.aiRobots} units={game.aiUnits} />
+                <TopKnowledgeCompact ourK={ourK} aiK={aiK} />
+              </>
             );
           })()}
         </div>
