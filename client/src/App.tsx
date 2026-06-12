@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan, AIUnits } from './types';
+import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan, AIUnits, TacticsAgg } from './types';
 import { tileId, hexLabel } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
@@ -4022,65 +4022,110 @@ function endScreenImage(status: GameState['status']): string {
   return '/assets/screens/end-overwhelmed.png';
 }
 
-// Referenčna strategija — NAJBOLJŠA, ki jo je našla evolucija (scripts/evolve.mjs, normal).
-// Pregled ob koncu igre primerja igralčevo dejansko taktiko s to in svetuje popravke.
-const EVOLVED_BENCHMARK: Record<'find' | 'understand' | 'eliminate' | 'assault',
-  { label: string; def: number; forag: number; wrk: number; res: number; hint: string }> = {
-  find:       { label: 'FAZA 1 — IŠČI',       def: 10, forag: 38, wrk: 16, res: 27, hint: 'malo obrambe, veliko hrane in raziskav, izvidnice ven' },
-  understand: { label: 'FAZA 2 — PRIPRAVI',   def: 24, forag: 35, wrk: 14, res: 19, hint: 'dvigni obrambo, gradi obzidje, raziskuj orožje' },
-  eliminate:  { label: 'FAZA 3 — NAPADI',     def: 28, forag: 33, wrk: 18, res: 13, hint: 'trdna obramba + napadi na šibke točke (15+ ljudi)' },
-  assault:    { label: 'TOTALNI NAPAD (37+)', def: 27, forag: 18, wrk: 28, res: 20, hint: 'trdnjava: obramba in delavnice, zmelji robote' },
-};
-
-/** Pregled taktike po obdobjih + namigi (primerjava z evolucijsko strategijo). */
+/** Pregled ob koncu igre: ŠTIRI STRATEGIJE, vsaka s svojo metriko —
+ *  koliko si vanjo VLOŽIL in koliko je dejansko PRINESLA. */
 function TacticsReview({ game }: { game: GameState }) {
   const t = game.tacticsByPhase;
   if (!t || Object.keys(t).length === 0) return null;
-  const order: Array<'find' | 'understand' | 'eliminate' | 'assault'> = ['find', 'understand', 'eliminate', 'assault'];
+  // vsota čez vsa obdobja
+  const sum = (Object.values(t) as TacticsAgg[]).reduce((s, a) => ({
+    months: s.months + a.months, pop: s.pop + a.pop, def: s.def + a.def, forag: s.forag + a.forag,
+    wrk: s.wrk + a.wrk, res: s.res + a.res, scoutsSent: s.scoutsSent + a.scoutsSent,
+    attacksSent: s.attacksSent + a.attacksSent, raidsFaced: s.raidsFaced + a.raidsFaced,
+    raidsRepelled: s.raidsRepelled + a.raidsRepelled, wpDestroyed: s.wpDestroyed + a.wpDestroyed,
+  }), { months: 0, pop: 0, def: 0, forag: 0, wrk: 0, res: 0, scoutsSent: 0, attacksSent: 0, raidsFaced: 0, raidsRepelled: 0, wpDestroyed: 0 });
+  const c01 = (x: number) => Math.max(0, Math.min(100, Math.round(x)));
+  const pctOfPop = (x: number) => sum.pop > 0 ? (x / sum.pop) * 100 : 0;
+
+  const prof = difficultyProfile(game.difficulty);
+  // AI vojska, ki je sploh prišla (po fazah, ki jih je igra dosegla)
+  const arrived = prof.aiScouts
+    + (game.totalRounds > 12 ? prof.aiAttackers : 0)
+    + (game.totalRounds > 24 ? prof.aiPeopleKillers : 0);
+  const robotsKilledPct = c01(((arrived - Math.max(0, game.aiRobots)) / Math.max(1, arrived)) * 100);
+  const repelPct = sum.raidsFaced > 0 ? c01((sum.raidsRepelled / sum.raidsFaced) * 100) : 0;
+  const crafted = game.artifactsCrafted ?? 0;
+  const used = game.artifactsUsed ?? 0;
+  const wpTotal = game.aiWeakPoints.length;
+  const wpByAttack = Math.max(0, sum.wpDestroyed - used);
+  const grade = (s: number) => s >= 75 ? ['ODLIČNO', '#22cc66'] : s >= 50 ? ['DOBRO', '#88cc44']
+    : s >= 25 ? ['ŠIBKO', '#cc8800'] : ['NEIZKORIŠČENO', '#778'] as const;
+
+  // ── 4 STRATEGIJE: vložek (koliko si vanjo dal) + izkupiček (kaj je prinesla) ──
+  const strategies = [
+    {
+      icon: '🌾', name: '1 · RAST', what: 'hrana → več ljudi → več moči',
+      invest: c01(pctOfPop(sum.forag) * 2.5),  // ~40 % nabiralcev = poln vložek
+      investLbl: `${Math.round(pctOfPop(sum.forag))} % ljudi je nabiralo hrano`,
+      score: c01(((game.maxPopulation - prof.startPopulation) / (prof.startPopulation * 0.4)) * 100),
+      facts: `ljudje: začetek ${prof.startPopulation} → vrh ${game.maxPopulation} → konec ${Math.max(0, game.population)}`,
+    },
+    {
+      icon: '🛡', name: '2 · TRDNJAVA', what: 'obramba + obzidje → zmelji robote',
+      invest: c01(pctOfPop(sum.def) * 3 + (game.wallsBuilt ?? 0) * 5),  // ~25 % branilcev + zidovi
+      investLbl: `${Math.round(pctOfPop(sum.def))} % ljudi v obrambi · ${game.wallsBuilt ?? 0} obzidij`,
+      score: c01(repelPct * 0.5 + robotsKilledPct * 0.5),
+      facts: `odbitih ${sum.raidsRepelled}/${sum.raidsFaced} napadov · pobitih ${robotsKilledPct} % AI vojske`,
+    },
+    {
+      icon: '⚔️', name: '3 · NAPAD', what: 'orožje + najdi šibke točke + udari',
+      invest: c01((game.weaponResearchLevel ?? 0) * 25 + sum.attacksSent * 12 + sum.scoutsSent * 4),
+      investLbl: `orožje Lv${game.weaponResearchLevel ?? 0} · 🔭${sum.scoutsSent} izvidnic · ⚔️${sum.attacksSent} napadov`,
+      score: c01((wpByAttack / wpTotal) * 100),
+      facts: `z napadi uničene ${wpByAttack}/${wpTotal} šibke točke`,
+    },
+    {
+      icon: '💎', name: '4 · ARTEFAKTI', what: 'izdelaj artefakt → instant uniči točko',
+      invest: c01(((game.artifactWorkshopProgress ?? 0) / 120) * 60 + crafted * 50),
+      investLbl: crafted > 0 ? `izdelanih ${crafted}` : `napredek ${game.artifactWorkshopProgress ?? 0}/120 delavec-mes.`,
+      score: c01((used / wpTotal) * 100),
+      facts: `z artefakti uničene ${used}/${wpTotal} šibke točke`,
+    },
+  ];
+  const main = strategies.reduce((a, b) => (b.invest > a.invest ? b : a));
+
+  // namigi — kje je zmanjkalo
   const tips: string[] = [];
-  const rows = order.filter(k => t[k] && t[k]!.months > 0).map(k => {
-    const a = t[k]!;
-    const bench = EVOLVED_BENCHMARK[k];
-    const pct = (x: number) => a.pop > 0 ? Math.round((x / a.pop) * 100) : 0;
-    const mine = { def: pct(a.def), forag: pct(a.forag), wrk: pct(a.wrk), res: pct(a.res) };
-    // namigi: odstopanje ≥ 10 točk od evolucijske strategije
-    const roleLbl = { def: 'obrambo', forag: 'hrano', wrk: 'delavnice', res: 'raziskave' } as const;
-    (Object.keys(roleLbl) as Array<keyof typeof roleLbl>).forEach(r => {
-      const d = mine[r] - bench[r];
-      if (d <= -10) tips.push(`${bench.label}: premalo za ${roleLbl[r]} (${mine[r]} % proti priporočenim ${bench[r]} %).`);
-      else if (d >= 12) tips.push(`${bench.label}: preveč za ${roleLbl[r]} (${mine[r]} % proti priporočenim ${bench[r]} %).`);
-    });
-    if (k === 'find' && a.scoutsSent < 3) tips.push('FAZA 1: premalo izvidnic — mapa mora biti raziskana do faze 2 (pošlji jih več vzporedno).');
-    if (k === 'eliminate' && a.attacksSent === 0) tips.push('FAZA 3: nobenega napada na šibke točke — brez tega ni zmage.');
-    return { k, a, bench, mine };
-  });
+  const find = t.find;
+  if (find && find.scoutsSent < 3) tips.push('Faza 1: pošlji VEČ izvidnic vzporedno — mapa mora biti raziskana, da sploh najdeš šibke točke.');
+  if (sum.raidsFaced > 0 && repelPct < 60) tips.push(`Obramba je padla v ${100 - repelPct} % napadov — več branilcev/orožja/obzidja, preden pridejo napadalci (13. mesec).`);
+  if (sum.wpDestroyed === 0 && game.status !== 'victory') tips.push('Nisi uničil nobene šibke točke — to je glavna pot do zmage (napad ⚔️ ali artefakt 💎).');
+  if (main.invest < 45) tips.push('Vložek je bil razpršen — izberi GLAVNO strategijo in jo izpelji do konca: kdor dela vse po malem, AI zaključi prej.');
+  if (main.invest >= 45 && main.score < 40) tips.push(`Tvoja glavna pot (${main.icon} ${main.name.split('·')[1].trim()}) ni obrodila — vložek je bil, izkupiček ne. Izpelji jo močneje ali zamenjaj pristop.`);
+
   return (
     <div className="go-tactics">
-      <h3 className="go-tac-title">📊 PREGLED TVOJE TAKTIKE <span className="dim small">(tvoja % proti 🧬 evolucijsko najdeni strategiji)</span></h3>
-      {rows.map(({ k, a, bench, mine }) => (
-        <div key={k} className="go-tac-row">
-          <div className="go-tac-head">
-            <b>{bench.label}</b>
-            <span className="dim small">{a.months} mes. · raidi {a.raidsRepelled}/{a.raidsFaced} odbiti · 🔭{a.scoutsSent} · ⚔️{a.attacksSent} · ◆{a.wpDestroyed}</span>
-          </div>
-          <div className="go-tac-bars">
-            {([['def', '🛡', '#66aabb'], ['forag', '🌾', '#6aa630'], ['wrk', '🔨', '#cc7733'], ['res', '🔬', '#3377cc']] as const).map(([r, ic, col]) => (
-              <div key={r} className="go-tac-bar" title={`${ic} ti: ${mine[r]} % · 🧬 ${bench[r]} %`}>
-                <span className="go-tac-ic">{ic}</span>
-                <div className="go-tac-track">
-                  <div className="go-tac-fill" style={{ width: `${Math.min(100, mine[r])}%`, background: col }} />
-                  <div className="go-tac-mark" style={{ left: `${Math.min(100, bench[r])}%` }} />
-                </div>
-                <span className="go-tac-num">{mine[r]}<span className="dim">/{bench[r]}%</span></span>
+      <h3 className="go-tac-title">📊 TVOJA POT DO {game.status === 'victory' ? 'ZMAGE' : 'PORAZA'}
+        <span className="dim small"> — 4 strategije: koliko si vložil in kaj je prineslo</span></h3>
+      <div className="go-strat-main">Glavna pot: <b>{main.icon} {main.name.split('·')[1].trim()}</b> — {(() => { const [g, col] = grade(main.score); return <span style={{ color: col }}>{g}</span>; })()}</div>
+      {strategies.map(s => {
+        const [g, col] = grade(s.score);
+        return (
+          <div key={s.name} className={`go-strat${s === main ? ' main' : ''}`}>
+            <div className="go-strat-head">
+              <span className="go-strat-name">{s.icon} <b>{s.name}</b> <span className="dim small">{s.what}</span></span>
+              <span className="go-strat-grade" style={{ color: col }}>{g}</span>
+            </div>
+            <div className="go-strat-metrics">
+              <div className="go-strat-m">
+                <span className="go-strat-lbl">VLOŽEK</span>
+                <div className="go-strat-track"><div className="go-strat-fill invest" style={{ width: `${s.invest}%` }} /></div>
+                <span className="go-strat-val">{s.invest}</span>
               </div>
-            ))}
+              <div className="go-strat-m">
+                <span className="go-strat-lbl">IZKUPIČEK</span>
+                <div className="go-strat-track"><div className="go-strat-fill" style={{ width: `${s.score}%`, background: col }} /></div>
+                <span className="go-strat-val">{s.score}</span>
+              </div>
+            </div>
+            <div className="go-strat-facts dim small">{s.investLbl} → {s.facts}</div>
           </div>
-        </div>
-      ))}
+        );
+      })}
       {tips.length > 0 && (
         <div className="go-tac-tips">
           <b>💡 Za naslednjič:</b>
-          <ul>{[...new Set(tips)].slice(0, 5).map((tip, i) => <li key={i}>{tip}</li>)}</ul>
+          <ul>{[...new Set(tips)].slice(0, 4).map((tip, i) => <li key={i}>{tip}</li>)}</ul>
         </div>
       )}
     </div>
