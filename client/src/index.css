@@ -2363,10 +2363,23 @@ input[type=range]::-moz-range-thumb {
   min-width: 110px; flex: 1;
 }
 .bs-icon { font-size: 1.4rem; line-height: 1; width: 1.7rem; height: 1.7rem; display: inline-flex; align-items: center; justify-content: center; }
+.bs-icon-img { width: 1.7rem; height: 1.7rem; object-fit: contain; display: block; }
 .bs-body { flex: 1; min-width: 0; }
 .bs-label { font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; line-height: 1; margin-bottom: 3px; }
 .bs-val { font-size: 1.3rem; font-weight: bold; line-height: 1; }
 .bs-unit { font-size: .8rem; font-weight: normal; margin-left: 2px; }
+.bs-note { display: inline-flex; vertical-align: middle; }
+.ai-unit-pips { display: inline-flex; align-items: center; gap: 4px; margin-left: 2px; transform: translateY(-1px); }
+.ai-unit-pip {
+  display: inline-flex; align-items: center; gap: 1px;
+  color: #b9a2a2;
+  font-size: .58rem; font-weight: bold; line-height: 1;
+}
+.ai-unit-pip img {
+  width: 15px; height: 15px;
+  object-fit: contain;
+  display: block;
+}
 
 /* ResourceRow tighter padding because no bars anymore */
 .resource-row { padding: 6px 10px; gap: 8px; }

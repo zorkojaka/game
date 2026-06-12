@@ -139,10 +139,13 @@ function Bar({ ratio, color, height = 6 }: { ratio: number; color?: string; heig
 }
 
 /** Velika grafična kartica za en resurs: ikona + oznaka + številka (brez bar-a) */
-function BigStat({ icon, label, value, color, unit, note, noteColor, title }: { icon: string; label: string; value: number | string; color: string; unit?: string; note?: string; noteColor?: string; title?: string }) {
+function BigStat({ icon, label, value, color, unit, note, noteColor, title }: { icon: string; label: string; value: number | string; color: string; unit?: string; note?: React.ReactNode; noteColor?: string; title?: string }) {
+  const iconIsImage = icon.startsWith('/assets/');
   return (
     <div className="big-stat" style={{ borderColor: color }} title={title}>
-      <div className="bs-icon" style={{ color }}>{icon}</div>
+      <div className="bs-icon" style={{ color }}>
+        {iconIsImage ? <img className="bs-icon-img" src={icon} alt="" draggable={false} /> : icon}
+      </div>
       <div className="bs-body">
         <div className="bs-label dim small">{label}</div>
         <div className="bs-val" style={{ color }}>
@@ -318,7 +321,8 @@ function ResourceRow({ game, eventLog }: { game: GameState; eventLog: EventEntry
   return (
     <div className="resource-row">
       <div className="res-group enemy">
-        <BigStat icon="🤖" label="AI roboti"    value={game.aiRobots}                      color="#cc3333" />
+        <BigStat icon={aiUnitIconHref(dominantAIUnit(game.aiUnits))} label="AI roboti" value={game.aiRobots}
+          color="#cc3333" note={<AIUnitPips units={game.aiUnits} />} />
       </div>
       <div className="res-divider" />
       <CompactBalanceTrend entries={eventLog} />
@@ -1327,6 +1331,32 @@ function unitEventImage(prefix: 'raid' | 'combat' | 'phase', unit: AIRobotType, 
   return suffix ? `${base}-${suffix}.png` : `${base}.png`;
 }
 
+function aiUnitIconHref(unit: AIRobotType): string {
+  if (unit === 'scouts') return '/assets/map/ai-scouts.svg';
+  if (unit === 'attackers') return '/assets/map/ai-attackers.svg';
+  return '/assets/map/ai-people-killers.svg';
+}
+
+function aiUnitFromPhase(phase: AIWeakPoint['phase']): AIRobotType {
+  if (phase === 'find') return 'scouts';
+  if (phase === 'understand') return 'attackers';
+  return 'peopleKillers';
+}
+
+function AIUnitPips({ units }: { units?: AIUnits }) {
+  const u = units ?? { scouts: 0, attackers: 0, peopleKillers: 0 };
+  return (
+    <span className="ai-unit-pips">
+      {(['scouts', 'attackers', 'peopleKillers'] as AIRobotType[]).map(unit => (
+        <span key={unit} className="ai-unit-pip" title={`${ROBOT_UNIT_LABEL[unit]}: ${u[unit] ?? 0}`}>
+          <img src={aiUnitIconHref(unit)} alt="" draggable={false} />
+          <span>{u[unit] ?? 0}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 function signed(value: number): string {
   return value > 0 ? `+${value}` : `${value}`;
 }
@@ -2176,9 +2206,7 @@ function expeditionImageHref(kind: Expedition['kind']): string {
 }
 
 function aiGuardImageHref(phase: AIWeakPoint['phase']): string {
-  if (phase === 'find') return '/assets/map/exp-scouts.png';
-  if (phase === 'understand') return '/assets/map/exp-attackers.png';
-  return '/assets/events/combat-people-killers-win.png';
+  return aiUnitIconHref(aiUnitFromPhase(phase));
 }
 
 function aiGuardLabel(phase: AIWeakPoint['phase']): string {
@@ -4448,8 +4476,8 @@ export default function App() {
             const aiColor  = aiK  >= 0.7 ? '#cc2222' : aiK  >= 0.4 ? '#cc7700' : '#aa5a5a';
             return (
               <div className="tr-group tr-side">
-                <BigStat icon="🤖" label="AI roboti" value={game.aiRobots}                       color="#cc3333"
-                  note={(() => { const u = game.aiUnits; return u ? `🔭${u.scouts} ⚔️${u.attackers} ☠${u.peopleKillers}` : ''; })()}
+                <BigStat icon={aiUnitIconHref(dominantAIUnit(game.aiUnits))} label="AI roboti" value={game.aiRobots} color="#cc3333"
+                  note={<AIUnitPips units={game.aiUnits} />}
                   noteColor="#aa8888"
                   title={(() => { const u = game.aiUnits; return u ? `Izvidniške: ${u.scouts} · Napadalne: ${u.attackers} · People-killer: ${u.peopleKillers}` : ''; })()} />
                 <BigStat icon="🔭" label="Mi vemo"   value={Math.round(ourK * 100)} color={ourColor} unit="%" />
