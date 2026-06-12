@@ -9,7 +9,8 @@
     "deploy": "npm run build && cp -r client/dist/. /var/www/ai-vs-humanity/",
     "start": "node dist/server/index.js",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
-    "sim": "npm run build >/dev/null && node scripts/simulate.mjs"
+    "sim": "npm run build >/dev/null && node scripts/simulate.mjs",
+    "evolve": "npm run build >/dev/null && node scripts/evolve.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
