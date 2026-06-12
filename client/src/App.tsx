@@ -2622,7 +2622,8 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
               <path d={hexPath(0, 0, FREE_MARKER_SIZE)} className="mfh-hex-shape" />
               <text className="mfh-free-icon" x={0} y={-11} textAnchor="middle">💤</text>
               <text className="mfh-svg-value" x={0} y={8} textAnchor="middle">{pop.free}</text>
-              <text className="mfh-svg-label" x={0} y={24} textAnchor="middle">prosti</text>
+              <text className="mfh-svg-label" x={0} y={22} textAnchor="middle">prosti</text>
+              <text className="mfh-svg-label" x={0} y={31} textAnchor="middle">skriti</text>
             </g>
           );
         })()}
