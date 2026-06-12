@@ -259,16 +259,17 @@ describe('pathToCamp — povratek se ustavi ob vstopu v kamp-grozd', () => {
 describe('odprava se vrne in raziskuje nazaj grede', () => {
   it('izvidnica preide v status returning, se premika po povratni poti in se na koncu vrne v kamp', () => {
     let s: GameState = newGame(7);
-    const path = [{ q: 0, r: 4 }, { q: 0, r: 3 }, { q: 0, r: 2 }];
+    // daljša pot (4 koraki), da je povratni leg viden tudi pri hitrosti 2 polji/mesec
+    const path = [{ q: 0, r: 4 }, { q: 1, r: 3 }, { q: 2, r: 3 }, { q: 3, r: 2 }, { q: 3, r: 1 }];
     s = processRound(s, action({ foragers: 30, rations: 4, newExpeditions: [
       { kind: 'scout', path, assigned: 3, rations: 4 },
     ] }));
     expect((s.expeditions ?? []).length).toBe(1);
 
-    let sawReturning = false;
+    let sawReturning = (s.expeditions ?? []).some(e => e.status === 'returning');
     const returnIdx: number[] = [];
     let guard = 0;
-    while ((s.expeditions ?? []).length > 0 && guard++ < 12 && s.status === 'active') {
+    while ((s.expeditions ?? []).length > 0 && guard++ < 14 && s.status === 'active') {
       s = processRound(s, action({ foragers: 30, rations: 4 }));
       const ret = (s.expeditions ?? []).find(e => e.status === 'returning');
       if (ret) { sawReturning = true; returnIdx.push(ret.currentIndex); }

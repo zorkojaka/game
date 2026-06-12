@@ -20,7 +20,7 @@ import {
   GUARD_TILE_ENCOUNTER_MULT, NEAR_CORE_ENCOUNTER_MULT,
 } from './constants.js';
 
-export const TILES_PER_MONTH = 1;  // en korak = en mesec
+export const TILES_PER_MONTH = 2;  // odprave prepotujejo 2 polji na mesec — da je mapo MOGOČE raziskati v fazi 1 (predviden lok igre)
 
 const CLAN_POS = { q: 0, r: 4 };
 
@@ -81,7 +81,7 @@ export function returnMonths(path: Array<{ q: number; r: number }>): number {
   // Vrnejo se naravnost domov od zadnjega heksa; nikoli dlje kot retrace cele poti.
   // Krožna pot, ki se konča ob kampu → kratek povratek; ravna pot ven → enako kot retrace.
   const home = hexDistance({ q: last.q, r: last.r }, CLAN_POS);
-  return Math.min(pathMonths(path), home);
+  return Math.min(pathMonths(path), Math.ceil(home / TILES_PER_MONTH));
 }
 
 /** Skupni čas odprave: pot tja + povratek. */
