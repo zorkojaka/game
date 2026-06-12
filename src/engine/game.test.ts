@@ -3,6 +3,7 @@ import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, 
 import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus } from './combat.js';
 import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp, tileEncounterProbability } from './expedition.js';
 import { wpGarrisonMult } from './constants.js';
+import { weaponEffectMult } from './difficulty.js';
 import { isCampHex, collapseCampRuns, researchPerVisit, generateMap } from './map.js';
 import { tickExpedition } from './expedition.js';
 import { hexLabel } from './types.js';
@@ -617,27 +618,33 @@ describe('straža šibke točke slabi z napadi', () => {
   });
 });
 
-describe('težavnost — multiplikatorji', () => {
-  it('hard ima več raidov in močnejši AI kot easy', () => {
-    const e = newGame(7, 'easy');
-    const n = newGame(7, 'normal');
-    const h = newGame(7, 'hard');
-    expect(raidProbability(h)).toBeGreaterThan(raidProbability(n));
-    expect(raidProbability(n)).toBeGreaterThan(raidProbability(e));
-    const a = { axis: 'obzidje' as const, combatants: 0, defenders: 15, foragers: 20, workers: 5, researchers: 5, rations: 3 };
-    expect(raidRepelProbability(e, a)).toBeGreaterThan(raidRepelProbability(n, a));
-    expect(raidRepelProbability(n, a)).toBeGreaterThan(raidRepelProbability(h, a));
+describe('težavnost — VIDNE vhodne moči (ne množenje izidov)', () => {
+  it('začetne moči: easy > normal > hard > brutal (ljudje, hrana, orožje); AI vojska obratno', () => {
+    const e = newGame(7, 'easy'), n = newGame(7, 'normal'), h = newGame(7, 'hard'), b = newGame(7, 'brutal');
+    expect(e.population).toBeGreaterThan(n.population);
+    expect(n.population).toBeGreaterThan(h.population);
+    expect(h.population).toBeGreaterThan(b.population);
+    expect(e.resources.survival).toBeGreaterThan(b.resources.survival);
+    expect(e.resources.combat).toBeGreaterThan(b.resources.combat);
+    expect(b.aiUnits.scouts).toBeGreaterThan(h.aiUnits.scouts);
+    expect(h.aiUnits.scouts).toBeGreaterThan(n.aiUnits.scouts);
+    expect(n.aiUnits.scouts).toBeGreaterThan(e.aiUnits.scouts);
   });
-  it('easy nabira več hrane, hard manj (isti seed, isti foragerji)', () => {
-    const act = action({ foragers: 20 });
-    const re = processRound(newGame(3, 'easy'), act);
-    const rn = processRound(newGame(3, 'normal'), act);
-    const rh = processRound(newGame(3, 'hard'), act);
-    expect(re.resources.survival).toBeGreaterThanOrEqual(rn.resources.survival);
-    expect(rn.resources.survival).toBeGreaterThanOrEqual(rh.resources.survival);
+  it('obramba: enaka formula, razlika pride iz velikosti AI vojske in doprinosa obzidja', () => {
+    const a = { axis: 'obzidje' as const, combatants: 0, defenders: 15, foragers: 20, workers: 5, researchers: 5, rations: 3 };
+    const e = newGame(7, 'easy'), h = newGame(7, 'hard');
+    // ista obramba, večja AI vojska na hard → nižja verjetnost odbitja
+    expect(raidRepelProbability(e, a)).toBeGreaterThan(raidRepelProbability(h, a));
+  });
+  it('učinek nadgradnje orožja po težavnosti: easy ×2.25, normal ×2, brutal ×1.6', () => {
+    expect(weaponEffectMult('easy', 1)).toBeCloseTo(2.25, 5);
+    expect(weaponEffectMult('normal', 1)).toBeCloseTo(2, 5);
+    expect(weaponEffectMult('brutal', 1)).toBeCloseTo(1.6, 5);
+    expect(weaponEffectMult('normal', 2)).toBeCloseTo(4, 5);
   });
   it('neznana težavnost pade na normal', () => {
     const g = newGame(1, undefined);
     expect(g.difficulty).toBe('normal');
+    expect(g.population).toBe(80);
   });
 });

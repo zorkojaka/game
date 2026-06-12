@@ -4,6 +4,7 @@
 
 import type { CombatResult, GameState, Assignment, AIPhase } from './types.js';
 import type { RNGState } from './rng.js';
+import { weaponEffectMult } from './difficulty.js';
 import { rngNext } from './rng.js';
 import {
   COMBAT_BASE_HUMAN_MULTIPLIER,
@@ -154,7 +155,7 @@ export function resolveCombat(
   exploitingWeakPoint: boolean = false
 ): { result: CombatResult; rng: RNGState } {
   const intelMult = intelCombatMultiplier(state.resources.intelligence);
-  const weaponMult = researchMult(state.weaponResearchLevel ?? 0);
+  const weaponMult = weaponEffectMult(state.difficulty, state.weaponResearchLevel ?? 0);
   const logicalMult = 1 + logicalWeaknessBonus(state);
   const humanStr = calcHumanStrength(assignment, state.resources.combat, state.phase, weaponMult) * intelMult * logicalMult;
   const aiStr = calcAIStrength(state, state.phase);
