@@ -254,6 +254,8 @@ export interface GameState {
   // Agregat igralčeve TAKTIKE po obdobjih — za pregled ob koncu igre
   // (primerjava z evolucijsko najdeno strategijo; "kaj popraviti naslednjič").
   tacticsByPhase?: Partial<Record<'find' | 'understand' | 'eliminate' | 'assault', TacticsAgg>>;
+  artifactsCrafted?: number;  // skupno izdelanih artefaktov
+  artifactsUsed?: number;     // skupno uporabljenih artefaktov
 
   // Čas
   round: number;       // 1–12 znotraj faze

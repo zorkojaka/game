@@ -429,6 +429,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   let combat = state.resources.combat;
   let material = state.resources.material ?? 0;
   let artifacts = state.resources.artifacts ?? 0;
+  let artifactsCrafted = state.artifactsCrafted ?? 0;  // skupno izdelanih (za pregled taktike)
+  let artifactsUsed = state.artifactsUsed ?? 0;        // skupno uporabljenih
 
   // 3. RAZISKOVALCI — intel boost + raziskave nadgradenj (orožje/obzidje)
   const researchers = assignment.researchers ?? assignment.scouts ?? 0;
@@ -557,6 +559,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         const made = Math.min(possible, Math.floor(material / ARTIFACT_MATERIAL_COST));
         if (made > 0) {
           artifacts += made;
+          artifactsCrafted += made;
           material -= made * ARTIFACT_MATERIAL_COST;
           artifactWorkshopProgress -= made * ARTIFACT_WORKER_MONTHS;
           workshopEvents.push(`💎 ARTEFAKT IZDELAN! +${made} artefakt (−${made * ARTIFACT_MATERIAL_COST} materiala). Napredek: ${artifactWorkshopProgress}/${ARTIFACT_WORKER_MONTHS}.`);
@@ -701,6 +704,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       const wpLabel = aiWeakPoints[idx].label;
       aiWeakPoints[idx] = { ...aiWeakPoints[idx], exploited: true, discovered: true };
       expeditionEvents.push(`💎 ARTEFAKT UPORABLJEN: ${wpLabel} — instant uničena!`);
+      artifactsUsed += 1;
     }
   }
 
@@ -1115,6 +1119,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     round,
     phase,
     raidPlan,
+    artifactsCrafted,
+    artifactsUsed,
     tacticsByPhase,
     totalRounds: state.totalRounds + 1,
     population: finalPopulation,
