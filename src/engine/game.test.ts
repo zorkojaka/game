@@ -327,7 +327,9 @@ describe('legacy missions disabled', () => {
     };
     const r = processRound(old, action({ foragers: 20 }));
     expect(r.activeMissions).toEqual([]);
-    expect(r.population).toBeGreaterThan(70);
+    // primerjava z enako igro BREZ legacy misij (isti seed/rng): migracija doda natanko 10 ljudi
+    const ref = processRound({ ...base, population: 70 }, action({ foragers: 20 }));
+    expect(r.population).toBe(ref.population + 10);
   });
 });
 
@@ -668,12 +670,36 @@ describe('taktika > sreča + rok AI-ja', () => {
       expect(['defeat', 'annihilation']).toContain(l.outcome);
     }
   });
-  it('konec 3. faze brez uničenih šibkih točk = poraz (AI dokonča načrt)', () => {
+  it('konec 3. faze NI poraz — sledi era totalnega napada (igra se nadaljuje)', () => {
     const base = newGame(4);
-    const g: GameState = { ...base, phase: 'eliminate', aiPhaseProgress: 11, round: 12,
-      aiUnits: { scouts: 50, attackers: 40, peopleKillers: 20 }, aiRobots: 110 };
-    const r = processRound(g, action({ defenders: 15, foragers: 30 }));
-    expect(r.status).toBe('defeat_overwhelmed');
+    const g: GameState = { ...base, phase: 'eliminate', aiPhaseProgress: 11, round: 12, totalRounds: 36,
+      aiUnits: { scouts: 50, attackers: 40, peopleKillers: 20 }, aiRobots: 110,
+      resources: { ...base.resources, survival: 3000 }, population: 120 };
+    const r = processRound(g, action({ defenders: 30, foragers: 40 }));
+    expect(r.status).toBe('active');
+  });
+  it('tempo raidov: faza 1 ima 1–3 napade; era totalnega napada 8–10/leto', () => {
+    // faza 1: odigraj 12 mesecev z močnim kampom in preštej raide
+    let s: GameState = { ...newGame(6), resources: { ...newGame(6).resources, survival: 2000 } };
+    let raids = 0;
+    for (let m = 0; m < 12 && s.status === 'active'; m++) {
+      s = processRound(s, action({ defenders: 30, foragers: 30 }));
+      if (s.lastRoundLog?.raid?.occurred) raids++;
+    }
+    expect(raids).toBeGreaterThanOrEqual(1);
+    expect(raids).toBeLessThanOrEqual(3);
+    // era totalnega napada: leto od 37. meseca
+    const base = newGame(9);
+    let a: GameState = { ...base, phase: 'eliminate', totalRounds: 37, round: 1, aiPhaseProgress: 0,
+      aiUnits: { scouts: 80, attackers: 60, peopleKillers: 20 }, aiRobots: 160,
+      population: 200, maxPopulation: 200, resources: { ...base.resources, survival: 9000, combat: 100 } };
+    let assaultRaids = 0;
+    for (let m = 0; m < 12 && a.status === 'active'; m++) {
+      a = processRound(a, action({ defenders: 60, foragers: 60 }));
+      if (a.lastRoundLog?.raid?.occurred) assaultRaids++;
+    }
+    expect(assaultRaids).toBeGreaterThanOrEqual(7);   // ob izgubah vojske lahko zadnji odpade
+    expect(assaultRaids).toBeLessThanOrEqual(10);
   });
   it('zmaga isti mesec PREGLASI rok (uniči zadnjo točko v 36. mesecu)', () => {
     const base = newGame(4);

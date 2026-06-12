@@ -95,12 +95,15 @@ export const DECISIVE_MARGIN = 0.25;
  * ne deterministične mejne vrednosti. Še vedno seedan/deterministicen za isti seed.
  */
 // TAKTIKA > SREČA: kocka je stisnjena okoli sredine. Roll vedno pade v
-// [0.5−LUCK_BAND/2, 0.5+LUCK_BAND/2] = [0.25, 0.75], zato:
-//  • prepričljiva premoč (p ≥ 0.75) VEDNO uspe,
-//  • šibek poskus (p ≤ 0.25) VEDNO pade,
+// [0.5−LUCK_BAND/2, 0.5+LUCK_BAND/2] = [0.20, 0.80], zato:
+//  • prepričljiva premoč (p ≥ 0.80) VEDNO uspe,
+//  • šibek poskus (p ≤ 0.20) VEDNO pade,
 //  • le v vmesnem pasu odloča naključje boja.
-// Strategija (moč obeh strani) torej določa izid; sreča le maje rob.
-export const LUCK_BAND = 0.5;
+// USPEH je torej zagotovljen z močjo — DOMINACIJA (zmagovalec pobije vse,
+// poraženec ne dobi nič) pa NIKOLI ni zagotovljena: razred izida določa
+// margina (DECISIVE_MARGIN) proti naključnemu rollu, zato je tudi pri
+// p = 1 dominacija stvar verjetnosti, ne pravice.
+export const LUCK_BAND = 0.6;
 export function tacticalRoll(rng: RNGState): [number, RNGState] {
   const [r, next] = rngNext(rng);
   return [0.5 + (r - 0.5) * LUCK_BAND, next];

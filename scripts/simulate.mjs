@@ -9,7 +9,7 @@ import { newGame, processRound } from '../dist/engine/game.js';
 import { DIFFICULTIES } from '../dist/engine/difficulty.js';
 
 const N = parseInt(process.argv[2] ?? '100', 10);
-const MAX_ROUNDS = 40;
+const MAX_ROUNDS = parseInt(process.argv[3] ?? '40', 10);
 
 // ── heks pomočniki (axial, kot engine) ──
 const DIRS = [[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];

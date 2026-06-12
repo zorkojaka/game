@@ -259,6 +259,16 @@ export const LOGICAL_WEAKNESS_LETHALITY_REDUCTION = 0.15; // manj žrtev pri peo
 // ─── AI napad na kamp (raid) ─────────────────────────────────────────────────
 // P(raid) = base + popScaling * popFactor + aiKnowBonus * aiKnow
 // modificirano z osjo (hiding -50 %) in klansko aktivnostjo (drugi klani odvračajo)
+// ─── Tempo raidov po obdobjih ───────────────────────────────────────────────────
+// AI napade kamp načrtovano: ob vstopu v obdobje se izžreba število napadov in se
+// razporedijo po mesecih. Po 36. mesecu (konec 3. faze) AI VE, kje je kamp —
+// totalni napadi 8–10 na leto. Igra se nadaljuje: utrjen kamp lahko zmelje
+// vse robote in zmaga z obrambo.
+export const RAID_COUNT_BY_PHASE: Record<'find' | 'understand' | 'eliminate', [number, number]> = {
+  find: [1, 3], understand: [2, 4], eliminate: [4, 6],
+};
+export const ASSAULT_RAIDS_PER_YEAR: [number, number] = [8, 10];
+
 export const RAID_BASE_CHANCE          = 0.05;  // 5 % minimum
 export const RAID_POP_SCALING_MAX      = 0.20;  // +do 20 % glede na velikost
 export const RAID_POP_REFERENCE        = 100;   // pop za max scaling

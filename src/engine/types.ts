@@ -232,6 +232,10 @@ export interface GameState {
   // Težavnost — multiplikatorji v engine/difficulty.ts (manjkajoče = 'normal')
   difficulty?: 'easy' | 'normal' | 'hard' | 'brutal';
 
+  // Načrt AI raidov za tekoče obdobje (faza ali leto totalnega napada po 36. mesecu):
+  // ob vstopu v obdobje se določi število napadov in razporedi po mesecih.
+  raidPlan?: { periodStart: number; periodEnd: number; months: number[] };
+
   // Čas
   round: number;       // 1–12 znotraj faze
   phase: AIPhase;

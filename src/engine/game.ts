@@ -16,7 +16,7 @@ import {
   INITIAL_POPULATION, INITIAL_SURVIVAL, INITIAL_COMBAT, INITIAL_INTELLIGENCE, INITIAL_MATERIAL,
   INITIAL_AI_KNOWLEDGE,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
-  AI_UNIT_DEFS, aiAttackPower, aiDefensePower, AI_FULL_ATTACK_POWER,
+  AI_UNIT_DEFS, aiAttackPower, aiDefensePower,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
   SCOUT_INTEL_YIELD,
   RATIONS_LEVELS, DEFAULT_RATIONS,
@@ -25,8 +25,8 @@ import {
   RESEARCH_LEVEL_WORKER_MONTHS, researchMult,
   INITIAL_AI_INSIGHT, AI_INSIGHT_PER_RESEARCHER, NON_ROBOT_RESEARCH_INSIGHT_FACTOR, INSIGHT_PHASE_CAP,
   LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION, LOGICAL_WEAKNESS_LETHALITY_REDUCTION,
-  RAID_BASE_CHANCE, RAID_POP_SCALING_MAX, RAID_POP_REFERENCE, RAID_AI_KNOWLEDGE_BONUS,
-  RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT, RAID_FORCE_FLOOR, wpGarrisonUnits,
+  RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT, wpGarrisonUnits,
+  RAID_COUNT_BY_PHASE, ASSAULT_RAIDS_PER_YEAR,
   RAID_BREACH_AREAS, RAID_FRONT_LOSS_MULT, RAID_AREA_LOSS_MULT, RAID_AREA_LOSS_ANNIHILATION,
   RAID_DESTROY_FOOD_PCT, RAID_DESTROY_WEAPONS_PCT, RAID_DESTROY_MATERIAL_PCT, RAID_DESTROY_WALL_LEVELS,
   SCOUT_BASE_SUCCESS, SCOUT_INTEL_BONUS_PER_100, SCOUT_ESPIONAGE_BONUS,
@@ -132,18 +132,31 @@ export function destroyAIUnits(units: AIUnits, count: number): AIUnits {
   return res;
 }
 
-/** Verjetnost, da AI najde in napade kamp v tej rundi. Vezana na ofenzivno moč prisotnih enot (tudi izvidniki napadajo). */
+/** Obdobje raidov za dani mesec: meje + razpon števila napadov.
+ *  Faze 1–3 (1–12, 13–24, 25–36), nato leta TOTALNEGA NAPADA (8–10/leto). */
+export function raidPeriodFor(totalRounds: number): { start: number; end: number; range: [number, number]; assault: boolean } {
+  if (totalRounds <= 12) return { start: 1,  end: 12, range: RAID_COUNT_BY_PHASE.find,       assault: false };
+  if (totalRounds <= 24) return { start: 13, end: 24, range: RAID_COUNT_BY_PHASE.understand, assault: false };
+  if (totalRounds <= 36) return { start: 25, end: 36, range: RAID_COUNT_BY_PHASE.eliminate,  assault: false };
+  const start = 37 + Math.floor((totalRounds - 37) / 12) * 12;
+  return { start, end: start + 11, range: ASSAULT_RAIDS_PER_YEAR, assault: true };
+}
+
+/** Verjetnost raida ta mesec — ZA PRIKAZ: preostali načrtovani napadi / preostali meseci obdobja.
+ *  (Dejanski raidi so načrtovani vnaprej — glej raidPlan v processRound.) */
 export function raidProbability(state: GameState): number {
-  const attackPow = aiAttackPower(readAIUnits(state));
-  if (attackPow <= 0) return 0;
-  const popFactor = Math.min(1, state.population / RAID_POP_REFERENCE);
-  let p = RAID_BASE_CHANCE
-    + RAID_POP_SCALING_MAX * popFactor
-    + RAID_AI_KNOWLEDGE_BONUS * state.aiKnowledge;
-  // Šibkejša sila → manj raidov, a s spodnjo mejo: raidi se dogajajo SKOZI CELO igro
-  // (tudi v fazi 1 s samimi izvidniki), le redkejši so.
-  p *= Math.max(RAID_FORCE_FLOOR, Math.min(1, attackPow / AI_FULL_ATTACK_POWER));
-  return Math.max(0, Math.min(1, p));
+  if (aiAttackPower(readAIUnits(state)) <= 0) return 0;
+  const tr = state.totalRounds;
+  const period = raidPeriodFor(tr);
+  const plan = state.raidPlan;
+  if (plan && tr >= plan.periodStart && tr <= plan.periodEnd) {
+    const remaining = plan.months.filter(m => m >= tr).length;
+    const monthsLeft = plan.periodEnd - tr + 1;
+    return Math.max(0, Math.min(1, remaining / Math.max(1, monthsLeft)));
+  }
+  // Ocena pred generiranjem načrta: povprečno število napadov / dolžina obdobja
+  const avg = (period.range[0] + period.range[1]) / 2;
+  return Math.max(0, Math.min(1, avg / (period.end - period.start + 1)));
 }
 
 /** Verjetnost, da obramba odbije napad. Vsi branilci so v boju. */
@@ -605,11 +618,30 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     }
   }
 
-  // 6b. RAID — AI najde kamp z neko verjetnostjo
+  // 6b. RAID — NAČRTOVAN tempo: ob vstopu v obdobje (faza / leto totalnega napada)
+  // se izžreba število napadov in razporedi po mesecih. Po 36. mesecu AI VE, kje je
+  // kamp — totalni napadi (8–10/leto); utrjen kamp lahko zmelje vse robote in zmaga.
+  const trNow = state.totalRounds;
+  const periodNow = raidPeriodFor(trNow);
+  let raidPlan = state.raidPlan;
+  if (!raidPlan || trNow > raidPlan.periodEnd || trNow < raidPlan.periodStart) {
+    const [count, rngC] = rngInt(rng, periodNow.range[0], periodNow.range[1]); rng = rngC;
+    // izberi `count` različnih mesecev v preostanku obdobja (migracija starih iger: od zdaj naprej)
+    const window: number[] = [];
+    for (let m = Math.max(periodNow.start, trNow); m <= periodNow.end; m++) window.push(m);
+    const months: number[] = [];
+    for (let i = 0; i < count && window.length > 0; i++) {
+      const [idx, rngI] = rngInt(rng, 0, window.length - 1); rng = rngI;
+      months.push(window.splice(idx, 1)[0]);
+    }
+    months.sort((a, b) => a - b);
+    raidPlan = { periodStart: periodNow.start, periodEnd: periodNow.end, months };
+    if (periodNow.assault && trNow === periodNow.start) {
+      expeditionEvents.push(`🚨 TOTALNI NAPAD: AI ve, kje je kamp — letos načrtuje ${count} napadov. Brani se in zmelji njegovo vojsko!`);
+    }
+  }
   let raidLog: RaidResult | null = null;
-  const pRaid = raidProbability(state);
-  const [raidRoll, rngR1] = rngNext(rng); rng = rngR1;
-  if (raidRoll < pRaid) {
+  if (aiAttackPower(readAIUnits(state)) > 0 && raidPlan.months.includes(trNow)) {
     const { result: raidRes, rng: rngR2 } = resolveRaid(state, assignment, rng);
     rng = rngR2;
     // Obrambni nivo malo zmanjša žrtve med ljudmi
@@ -990,11 +1022,10 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   const totalClanAfter = finalPopulation
     + tickedMissions.reduce((s, m) => s + m.assigned, 0)
     + tickedExps.reduce((s, e) => s + e.assigned, 0);
+  // Poraz = samo izumrtje. Po 36. mesecu igra preide v TOTALNI NAPAD (8–10 raidov/leto):
+  // AI ve vse — a utrjen kamp lahko z obrambo zmelje vso vojsko in zmaga.
   let status: GameState['status'] = state.status;
   if (totalClanAfter <= 0) status = 'defeat_extinction';
-  else if (finalAiKnowledge >= 1.0 && state.phase === 'eliminate') {
-    status = 'defeat_overwhelmed';
-  }
 
   // 11. Fazni napredek in morebitni prehod
   const aiPhaseProgress = state.aiPhaseProgress + 1;
@@ -1019,12 +1050,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
       aiUnits = { ...aiUnits, peopleKillers: aiUnits.peopleKillers + difficultyProfile(state.difficulty).aiPeopleKillers };
       aiRobots = totalAIRobots(aiUnits);
       expeditionEvents.push(`☠ AI je pripeljal ${difficultyProfile(state.difficulty).aiPeopleKillers} people-killer enot — napadi so zdaj smrtonosnejši.`);
-    } else if (state.phase === 'eliminate') {
-      // ROK: konec 3. faze (36. mesec). Če AI šibke točke še stojijo, je AI
-      // dokončal svoj načrt — igralec, ki je "delal vse po malem", izgubi.
-      expeditionEvents.push(`⏳ AI je dokončal fazo iztrebljanja — njegov načrt je izveden do konca.`);
-      status = 'defeat_overwhelmed';
     }
+    // (Konec 3. faze NI poraz — sledi era totalnega napada; napoved gre prek raidPlan-a.)
   }
 
   // Zmaga — AI popolnoma iztrebljen (tudi v fazi 1: če pobijemo vse izvidnike, AI ne more nadaljevati),
@@ -1062,6 +1089,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     ...state,
     round,
     phase,
+    raidPlan,
     totalRounds: state.totalRounds + 1,
     population: finalPopulation,
     maxPopulation: finalMaxPopulation,
