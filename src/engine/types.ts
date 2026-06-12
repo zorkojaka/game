@@ -230,7 +230,7 @@ export interface PhaseEvent {
 
 export interface GameState {
   // Težavnost — multiplikatorji v engine/difficulty.ts (manjkajoče = 'normal')
-  difficulty?: 'easy' | 'normal' | 'hard';
+  difficulty?: 'easy' | 'normal' | 'hard' | 'brutal';
 
   // Čas
   round: number;       // 1–12 znotraj faze

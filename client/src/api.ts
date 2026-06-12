@@ -2,7 +2,7 @@ import type { GameState, Assignment, OddsPreview } from './types';
 
 const BASE = '/api';
 
-export async function createGame(seed?: number, difficulty?: 'easy' | 'normal' | 'hard'): Promise<GameState> {
+export async function createGame(seed?: number, difficulty?: 'easy' | 'normal' | 'hard' | 'brutal'): Promise<GameState> {
   const res = await fetch(`${BASE}/game/new`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

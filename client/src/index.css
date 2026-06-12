@@ -2942,3 +2942,4 @@ input[type=range].cz-slider::-moz-range-track { height: 6px; border-radius: 3px;
 .diff-btn.easy.on   { background: #0e2113; border-color: #4caf50; color: #a5e8a8; }
 .diff-btn.normal.on { background: #1a2030; border-color: #6aa6d9; color: #cfe6ff; }
 .diff-btn.hard.on   { background: #2a0d0d; border-color: #cc3333; color: #ffb0a8; }
+.diff-btn.brutal.on { background: #2a1505; border-color: #ff6a00; color: #ffc9a0; }

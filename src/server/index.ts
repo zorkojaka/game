@@ -71,7 +71,7 @@ app.post('/api/game/new', async (req, res) => {
   const seed = req.body.seed as number | undefined;
   // Težavnost: validiraj — neznane vrednosti padejo na 'normal'
   const rawDiff = req.body.difficulty;
-  const difficulty = rawDiff === 'easy' || rawDiff === 'normal' || rawDiff === 'hard' ? rawDiff : undefined;
+  const difficulty = rawDiff === 'easy' || rawDiff === 'normal' || rawDiff === 'hard' || rawDiff === 'brutal' ? rawDiff : undefined;
   const state = newGame(seed, difficulty);
   await GameSession.create(state);
   res.json({ runId: state.runId, state });

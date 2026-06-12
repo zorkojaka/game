@@ -2,7 +2,7 @@
 // Uteževanje: spreminjaj številke tu (ali dodaj nov profil); engine in UI sledita.
 // Objektivno preverjanje: `npm run sim` odigra N iger na profil in izpiše win-rate.
 
-export type DifficultyId = 'easy' | 'normal' | 'hard';
+export type DifficultyId = 'easy' | 'normal' | 'hard' | 'brutal';
 
 export interface DifficultyProfile {
   id: DifficultyId;
@@ -33,6 +33,11 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyProfile> = {
     id: 'hard', label: 'Težka', desc: 'AI je agresiven in smrtonosen, viri skopi. Za veterane.',
     raidChanceMult: 1.35, aiStrengthMult: 1.25, lethalityMult: 1.30, encounterMult: 1.25,
     garrisonMult: 1.40, forageMult: 0.85, researchSpeedMult: 0.80, findChanceMult: 0.80,
+  },
+  brutal: {
+    id: 'brutal', label: 'Brutalna', desc: 'AI lovi tvoj klan brez milosti. Vsaka napaka je zadnja.',
+    raidChanceMult: 1.70, aiStrengthMult: 1.50, lethalityMult: 1.60, encounterMult: 1.50,
+    garrisonMult: 1.80, forageMult: 0.70, researchSpeedMult: 0.65, findChanceMult: 0.65,
   },
 };
 
