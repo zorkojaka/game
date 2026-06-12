@@ -1424,7 +1424,8 @@ input[type=range]::-moz-range-thumb {
 }
 .rrn-btn:hover:not(:disabled) { background: #171817; border-color: #555; }
 .rrn-btn.selected { border-color: #66ccaa; box-shadow: 0 0 0 1px rgba(102,204,170,.24) inset; }
-.rrn-btn.completed { border-color: #ffd84a; box-shadow: 0 0 0 2px rgba(255,216,74,.28); }
+.rrn-btn.completed { border-color: #9f8736; box-shadow: 0 0 0 1px rgba(255,216,74,.16) inset; }
+.rrn-btn.selected.completed { border-color: #66ccaa; box-shadow: 0 0 0 1px rgba(102,204,170,.28) inset, 0 0 0 1px rgba(255,216,74,.16); }
 .rrn-btn:disabled { opacity: .56; cursor: not-allowed; }
 .rrn-icon { font-size: 1rem; }
 .rrn-label {

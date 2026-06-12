@@ -3627,7 +3627,7 @@ function ResearchSelector({ value, onChange, robotsLevel, weaponLevel, wallLevel
             style={o.locked
               ? { opacity: 0.45, cursor: 'not-allowed' }
               : highlight === o.id
-                ? { borderColor: '#ffd84a', color: value === o.id ? o.color : undefined, boxShadow: '0 0 0 2px rgba(255,216,74,.45)' }
+                ? { borderColor: value === o.id ? o.color : '#9f8736', color: value === o.id ? o.color : undefined, boxShadow: '0 0 0 1px rgba(255,216,74,.18) inset' }
                 : value === o.id ? { borderColor: o.color, color: o.color } : {}}
             onClick={() => { if (!o.locked) onChange(o.id); }} title={`${o.label} — ${o.desc}${o.locked ? ` · Zaklenjeno: najprej razišči Robote ${o.lvl + 1}.` : ''}`}>
             <span className="so-icon">{o.icon}</span>
