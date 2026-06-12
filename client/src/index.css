@@ -422,6 +422,7 @@ b      { color: var(--text); font-weight: 600; }
   background: #11171f; color: #cfe3ff; font-size: .9rem; cursor: pointer;
   align-items: center; justify-content: center;
 }
+.mobile-panel-scrim { display: none; }
 
 /* ─── Telefon (≤820px): vse vidno, brez drsenja ─────────────────────────────── */
 @media (max-width: 820px) {
@@ -472,6 +473,7 @@ b      { color: var(--text); font-weight: 600; }
   .sm-btn { width: auto; flex: 0 0 auto; padding: .3rem .5rem; border-radius: 8px; }
   .sm-icon { font-size: 1.1rem; }
   .sm-label { font-size: .5rem; }
+  .sm-mobile-only { display: flex; }
   .col-toggle, .sm-toggle { display: none; }     /* slide gumbi niso potrebni na telefonu */
 
   /* PANEL kot prekrivno okno čez karto; zaprt = skrit */
@@ -491,6 +493,246 @@ b      { color: var(--text); font-weight: 600; }
   .back-btn { display: none; }
   .bottom-actions { flex: 1; }
   .bottom-actions .exec-btn { min-width: 0; width: 100%; flex: 1; padding: .55rem; }
+}
+
+/* Telefon vodoravno: karta je primarni zaslon; orodja so začasni overlay. */
+@media (max-width: 920px) and (orientation: landscape) {
+  #root:has(.app-shell) {
+    height: 100dvh;
+    width: 100vw;
+    overflow: hidden;
+  }
+  .app-shell {
+    position: relative;
+    height: 100dvh;
+    width: 100vw;
+    padding: 0;
+    gap: 0;
+    display: block;
+    overflow: hidden;
+    background: #020405;
+  }
+  .top-bar {
+    position: fixed;
+    top: 6px;
+    left: 62px;
+    right: 48px;
+    z-index: 70;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .top-spacer { display: none; }
+  .top-menu-wrap {
+    position: fixed;
+    top: 6px;
+    right: 6px;
+    z-index: 72;
+    flex: 0 0 auto;
+    pointer-events: auto;
+  }
+  .top-res {
+    max-width: min(720px, calc(100vw - 124px));
+    padding: 3px 7px;
+    gap: 5px;
+    background: rgba(8, 12, 16, .82);
+    border-color: rgba(90, 115, 140, .42);
+    border-radius: 999px;
+    backdrop-filter: blur(8px);
+    pointer-events: auto;
+  }
+  .top-res .tr-side:first-child { display: none; }
+  .top-res .tr-main {
+    padding: 0 6px 0 0;
+    border-left: 0;
+    border-right: 1px solid rgba(80, 100, 120, .42);
+  }
+  .top-res .tr-side { opacity: .95; }
+  .top-res .big-stat {
+    padding: 2px 4px;
+    border: 0;
+    background: transparent;
+    min-width: 0;
+  }
+  .top-res .bs-icon,
+  .top-res .bs-icon-img {
+    width: 1.1rem;
+    height: 1.1rem;
+    font-size: 1rem;
+  }
+  .top-res .bs-label { display: none; }
+  .top-res .bs-val { font-size: .78rem; }
+  .top-res .bs-note { display: none; }
+
+  .main-cols,
+  .main-cols.left-collapsed,
+  .main-cols.right-collapsed,
+  .main-cols.left-collapsed.right-collapsed {
+    position: fixed;
+    inset: 0;
+    display: block;
+    min-height: 0;
+  }
+  .center-col {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    overflow: hidden;
+  }
+  .center-col .map-panel {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+    border: 0;
+    background: #020405;
+  }
+  .center-col .map-panel > .panel-head,
+  .center-col .map-legend {
+    display: none;
+  }
+  .center-col .map-panel .hex-map,
+  .center-col .hex-svg {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+  }
+
+  .right-col,
+  .col-toggle {
+    display: none !important;
+  }
+  .left-col {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 60;
+    display: block !important;
+    width: 54px;
+    min-height: 0;
+    pointer-events: none;
+  }
+  .left-col .side-menu {
+    position: absolute;
+    left: 6px;
+    top: 44px;
+    bottom: 54px;
+    width: 44px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0;
+    pointer-events: auto;
+  }
+  .left-col .side-menu .sm-btn {
+    width: 44px;
+    min-height: 40px;
+    padding: 4px 2px;
+    border-radius: 9px;
+    background: rgba(13, 18, 24, .9);
+    backdrop-filter: blur(8px);
+  }
+  .left-col .side-menu .sm-icon { font-size: 1.05rem; }
+  .left-col .side-menu .sm-label {
+    font-size: .45rem;
+    max-width: 40px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .left-col .side-menu .sm-btn.active {
+    background: rgba(31, 111, 235, .28);
+    border-color: #3f8cff;
+    color: #f0f6fc;
+  }
+  .left-col .side-menu .sm-mobile-only { display: flex; }
+
+  .mobile-panel-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    border: 0;
+    background: rgba(0, 0, 0, .38);
+    padding: 0;
+  }
+  .left-panel {
+    position: fixed;
+    left: 58px;
+    top: 42px;
+    bottom: 54px;
+    right: auto;
+    z-index: 65;
+    width: min(430px, calc(100vw - 72px));
+    padding: 10px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-radius: 12px;
+    background: rgba(8, 12, 16, .96);
+    border: 1px solid rgba(96, 126, 154, .5);
+    box-shadow: 0 18px 60px rgba(0,0,0,.72);
+    backdrop-filter: blur(10px);
+  }
+  .main-cols.left-collapsed .left-panel { display: none; }
+  .lp-mob-close {
+    display: flex;
+    top: 7px;
+    right: 7px;
+  }
+  .fit-outer {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .fit-inner {
+    transform: none !important;
+    width: 100% !important;
+  }
+  .left-panel .panel,
+  .left-panel .def-panel,
+  .left-panel .rc-log {
+    padding: 10px;
+  }
+  .left-panel .panel-head,
+  .left-panel .def-head {
+    padding-right: 32px;
+  }
+  .left-panel .rc-log-scroll {
+    max-height: calc(100dvh - 128px);
+    overflow-y: auto;
+  }
+
+  .bottom-bar {
+    position: fixed;
+    left: 58px;
+    right: 8px;
+    bottom: 6px;
+    z-index: 55;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    display: flex;
+    justify-content: flex-end;
+    pointer-events: none;
+  }
+  .bottom-bar .step-track,
+  .bottom-bar .bb-phases,
+  .bottom-bar .back-btn {
+    display: none;
+  }
+  .bottom-actions {
+    flex: 0 0 auto;
+    pointer-events: auto;
+  }
+  .bottom-actions .exec-btn {
+    width: auto;
+    min-width: 174px;
+    max-width: calc(100vw - 78px);
+    padding: .55rem .8rem;
+    border-radius: 999px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.55);
+  }
 }
 
 .side-menu {

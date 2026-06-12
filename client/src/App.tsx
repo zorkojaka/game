@@ -106,6 +106,9 @@ const START_TACTICS: StartTactic[] = [
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
+const isPhoneViewport = () =>
+  typeof window !== 'undefined'
+  && (window.innerWidth <= 820 || (window.innerWidth <= 920 && window.matchMedia('(orientation: landscape)').matches));
 
 /** Koliko vemo o AI drevesu [0–1]: partial=0.5, revealed=1 */
 function calcOurKnowledge(nodes: AITreeNode[]): number {
@@ -3864,7 +3867,7 @@ export default function App() {
   const [scoutTargets, setScoutTargets] = useState<Set<string>>(new Set());
   const [eventLog,     setEventLog]     = useState<EventEntry[]>([]);
   const [tab,          setTab]          = useState<'defense' | 'food' | 'workshop' | 'research' | 'map' | 'attack' | 'log'>('food');
-  const [leftOpen,     setLeftOpen]     = useState(() => typeof window !== 'undefined' ? window.innerWidth > 820 : true);   // panel: na telefonu privzeto zaprt (karta vidna)
+  const [leftOpen,     setLeftOpen]     = useState(() => typeof window !== 'undefined' ? !isPhoneViewport() : true);   // panel: na telefonu privzeto zaprt (karta vidna)
   const [rightOpen,    setRightOpen]    = useState(true);   // desni dnevnik odprt/zaprt
   const [draftPath,    setDraftPath]    = useState<Array<{ q: number; r: number }>>([]);
   const [draftReturn,  setDraftReturn]  = useState<Array<{ q: number; r: number }>>([]);
@@ -4309,6 +4312,7 @@ export default function App() {
     if (clan) setDraftPath([{ q: clan.q, r: clan.r }]);
     setDraftReturn([]);
     setDraftPeople(5);
+    if (isPhoneViewport()) setLeftOpen(false);
   }
   function confirmDraftExpedition() { confirmDraft('scout'); }
   function removePendingExpedition(idx: number) {
@@ -4516,6 +4520,7 @@ export default function App() {
         onClick={() => setRightOpen(o => !o)}>{rightOpen ? '▶' : '◀'}</button>
 
       {/* LEVO: hitri meni + vsebina izbranega zavihka */}
+      {leftOpen && <button className="mobile-panel-scrim" aria-label="Zapri panel" onClick={() => setLeftOpen(false)} />}
       <aside className="left-col">
         <nav className="side-menu">
           {([
@@ -4525,6 +4530,7 @@ export default function App() {
             { id: 'research', icon: '🔬', label: 'Raziskave' },
             { id: 'map',      icon: '🔭', label: 'Izvidniki' },
             { id: 'attack',   icon: '⚔️', label: 'Napad' },
+            { id: 'log',      icon: '📜', label: 'Dnevnik', mobileOnly: true },
           ] as const).map(m => (
             <button key={m.id} className={`sm-btn ${tab === m.id && leftOpen ? 'active' : ''} ${'mobileOnly' in m && m.mobileOnly ? 'sm-mobile-only' : ''}`}
               onClick={() => {
