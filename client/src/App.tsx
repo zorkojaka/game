@@ -1490,7 +1490,7 @@ function defaultRoundEventImage(kind: RoundEventKind, tone: RoundEventCardData['
 function raidEventStats(log: RoundLog, unit: AIRobotType): RoundEventStat[] {
   const r = log.raid;
   if (!r) return [];
-  const losses = r.defendersLost + r.foragersLost + (r.workersLost ?? 0) + (r.researchersLost ?? 0);
+  const losses = r.defendersLost + r.foragersLost + (r.workersLost ?? 0) + (r.researchersLost ?? 0) + (r.hiddenLost ?? 0);
   const weaponLoss = (r.weaponsDestroyed ?? 0) + r.defendersLost;
   const stats: RoundEventStat[] = [
     { label: 'AI enote', value: ROBOT_UNIT_LABEL[unit], tone: 'info' },
@@ -2217,6 +2217,7 @@ function RoundLog({ log }: { log: RoundLog }) {
             {r.foragersLost > 0    && <div className="rl-neg">− {r.foragersLost} nabiralcev</div>}
             {(r.workersLost ?? 0) > 0     && <div className="rl-neg">− {r.workersLost} delavcev</div>}
             {(r.researchersLost ?? 0) > 0 && <div className="rl-neg">− {r.researchersLost} raziskovalcev</div>}
+            {(r.hiddenLost ?? 0) > 0      && <div className="rl-neg">− {r.hiddenLost} skritih/prostih</div>}
             {(r.survivalDestroyed ?? 0) > 0 && <div className="rl-neg">− {r.survivalDestroyed} hrane</div>}
             {(r.weaponsDestroyed ?? 0) > 0  && <div className="rl-neg">− {r.weaponsDestroyed} orožja</div>}
             {(r.materialDestroyed ?? 0) > 0 && <div className="rl-neg">− {r.materialDestroyed} materiala</div>}

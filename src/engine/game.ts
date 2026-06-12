@@ -237,7 +237,7 @@ export function missionSuccessProbability(state: GameState, weakPointId: string,
 
 /** Resolve raid — vsi branilci se borijo + uničenje neuporabljenega orožja. */
 function resolveRaid(
-  state: GameState, assignment: Assignment, rng: RNGState
+  state: GameState, assignment: Assignment, rng: RNGState, campPopulation = state.population
 ): { result: RaidResult; rng: RNGState } {
   const defenders = (assignment.defenders ?? 0) + (assignment.dayGuard ?? 0) + (assignment.nightGuard ?? 0);
   const p = raidRepelProbability(state, assignment);
@@ -296,6 +296,11 @@ function resolveRaid(
   const foragersLost    = breachedAreas.includes('food')     ? Math.min(forAssigned, Math.floor(forAssigned * peopleLossFrac)) : 0;
   const workersLost     = breachedAreas.includes('workshop') ? Math.min(wrkAssigned, Math.floor(wrkAssigned * peopleLossFrac)) : 0;
   const researchersLost = breachedAreas.includes('research') ? Math.min(resAssigned, Math.floor(resAssigned * peopleLossFrac)) : 0;
+  const assignedInCamp = defenders + forAssigned + wrkAssigned + resAssigned;
+  const hiddenAssigned = Math.max(0, campPopulation - assignedInCamp);
+  const hiddenLost = state.aiKnowledge >= 0.99
+    ? Math.min(hiddenAssigned, Math.floor(hiddenAssigned * peopleLossFrac))
+    : 0;
   if (breachedAreas.includes('defense')) {
     defendersLost += Math.floor(defenders * peopleLossFrac);
   }
@@ -305,7 +310,7 @@ function resolveRaid(
   return {
     result: {
       occurred: true, outcome,
-      defendersLost, foragersLost, workersLost, researchersLost,
+      defendersLost, foragersLost, workersLost, researchersLost, hiddenLost,
       aiRobotsDestroyed, weaponsDestroyed,
       survivalDestroyed: 0, materialDestroyed: 0, wallsDestroyed: 0,
       breachedAreas,
@@ -642,7 +647,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   }
   let raidLog: RaidResult | null = null;
   if (aiAttackPower(readAIUnits(state)) > 0 && raidPlan.months.includes(trNow)) {
-    const { result: raidRes, rng: rngR2 } = resolveRaid(state, assignment, rng);
+    const { result: raidRes, rng: rngR2 } = resolveRaid(state, assignment, rng, population);
     rng = rngR2;
     // Obrambni nivo malo zmanjša žrtve med ljudmi
     const save = (n: number) => n;  // (obrambni bonus osi odstranjen)
@@ -650,8 +655,9 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     const actualFor = save(raidRes.foragersLost);
     const actualWrk = save(raidRes.workersLost);
     const actualRes = save(raidRes.researchersLost);
+    const actualHidden = save(raidRes.hiddenLost);
     // Žrtve so povsod, kjer je AI prebil — vsaka vloga izgubi svoje ljudi
-    population -= actualDef + actualFor + actualWrk + actualRes;
+    population -= actualDef + actualFor + actualWrk + actualRes + actualHidden;
     combat = Math.max(0, combat - actualDef);                    // padli branilci → izgubljeno orožje
     combat = Math.max(0, combat - raidRes.weaponsDestroyed);     // skladiščno (idle) orožje
 
@@ -674,14 +680,14 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     material += raidRes.aiRobotsDestroyed;  // branilci poberejo material iz uničenih robotov
     raidLog = {
       ...raidRes,
-      defendersLost: actualDef, foragersLost: actualFor, workersLost: actualWrk, researchersLost: actualRes,
+      defendersLost: actualDef, foragersLost: actualFor, workersLost: actualWrk, researchersLost: actualRes, hiddenLost: actualHidden,
       weaponsDestroyed, survivalDestroyed, materialDestroyed, wallsDestroyed,
     };
     // AI dobi informacije le, če se kak robot vrne — ob DOMINACIJI obrambe ne dobi nič.
     aiKnowledge = Math.min(1, aiKnowledge + raidRes.aiInfoGained);
   } else {
     raidLog = { occurred: false, outcome: null,
-      defendersLost: 0, foragersLost: 0, workersLost: 0, researchersLost: 0,
+      defendersLost: 0, foragersLost: 0, workersLost: 0, researchersLost: 0, hiddenLost: 0,
       aiRobotsDestroyed: 0, weaponsDestroyed: 0,
       survivalDestroyed: 0, materialDestroyed: 0, wallsDestroyed: 0,
       breachedAreas: [],
@@ -1194,6 +1200,7 @@ function buildNarrative(
       if (raid.foragersLost > 0)    losses.push(`${raid.foragersLost} nabiralcev`);
       if (raid.workersLost > 0)     losses.push(`${raid.workersLost} delavcev`);
       if (raid.researchersLost > 0) losses.push(`${raid.researchersLost} raziskovalcev`);
+      if (raid.hiddenLost > 0)      losses.push(`${raid.hiddenLost} skritih/prostih`);
       // uničeni viri
       const damage: string[] = [];
       if (raid.survivalDestroyed > 0) damage.push(`${raid.survivalDestroyed} hrane`);

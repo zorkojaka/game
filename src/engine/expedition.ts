@@ -20,7 +20,7 @@ import {
   GUARD_TILE_ENCOUNTER_MULT, NEAR_CORE_ENCOUNTER_MULT,
 } from './constants.js';
 
-export const TILES_PER_MONTH = 2;  // odprave prepotujejo 2 polji na mesec — da je mapo MOGOČE raziskati v fazi 1 (predviden lok igre)
+export const TILES_PER_MONTH = 1;  // berljiva motorika: ena odprava napreduje za en heks na mesec
 
 const CLAN_POS = { q: 0, r: 4 };
 

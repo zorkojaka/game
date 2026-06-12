@@ -192,6 +192,7 @@ export interface RaidResult {
   foragersLost: number;
   workersLost: number;        // žrtve v delavnici (če prebito)
   researchersLost: number;    // žrtve v raziskavah (če prebito)
+  hiddenLost: number;         // žrtve med prostimi/skritimi ljudmi, ko AI ve skoraj vse
   aiRobotsDestroyed: number;
   weaponsDestroyed: number;   // uničeno orožje (skladišče + delavnica)
   survivalDestroyed: number;  // uničena hrana (prehrana prebita)

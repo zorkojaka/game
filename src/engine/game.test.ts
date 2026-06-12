@@ -259,7 +259,7 @@ describe('pathToCamp — povratek se ustavi ob vstopu v kamp-grozd', () => {
 describe('odprava se vrne in raziskuje nazaj grede', () => {
   it('izvidnica preide v status returning, se premika po povratni poti in se na koncu vrne v kamp', () => {
     let s: GameState = newGame(7);
-    // daljša pot (4 koraki), da je povratni leg viden tudi pri hitrosti 2 polji/mesec
+    // daljša pot (4 koraki), da je povratni leg viden tudi pri mesečnem premiku
     const path = [{ q: 0, r: 4 }, { q: 1, r: 3 }, { q: 2, r: 3 }, { q: 3, r: 2 }, { q: 3, r: 1 }];
     s = processRound(s, action({ foragers: 30, rations: 4, newExpeditions: [
       { kind: 'scout', path, assigned: 3, rations: 4 },
@@ -279,6 +279,25 @@ describe('odprava se vrne in raziskuje nazaj grede', () => {
     if (returnIdx.length >= 2) expect(returnIdx[returnIdx.length - 1]).toBeGreaterThan(returnIdx[0]);
     // na koncu ni več aktivnih odprav — vrnila se je v kamp
     expect(s.expeditions?.length ?? 0).toBe(0);
+  });
+
+  it('po prvem mesečnem ticku napreduje za natanko en heks', () => {
+    const tiles = generateMap();
+    const path = [{ q: 2, r: 4 }, { q: 3, r: 4 }, { q: 4, r: 4 }, { q: 5, r: 4 }];
+    const r = tickExpedition({
+      id: 'exp_test',
+      kind: 'scout',
+      path,
+      currentIndex: 0,
+      assigned: 3,
+      rations: 3,
+      status: 'traveling',
+      monthsElapsed: 0,
+      encountersLog: [],
+    }, tiles, 0, createRNG(17), 0);
+
+    expect(r.exp.currentIndex).toBe(1);
+    expect(r.exp.path[r.exp.currentIndex]).toEqual(path[1]);
   });
 });
 
@@ -429,6 +448,27 @@ describe('raid — žrtve omejene na cono, odprave varne', () => {
     // odprava obstaja in ima dodeljene ljudi; raid na kamp je ne sme prizadeti
     expect(exp0.assigned).toBeGreaterThan(0);
     expect(exp0.assigned).toBeLessThanOrEqual(8);
+  });
+
+  it('skriti/prosti ljudje so tarča raida šele, ko AI ve vsaj 99%', () => {
+    const base = newGame(44);
+    const forcedRaid = {
+      ...base,
+      phase: 'eliminate' as const,
+      population: 60,
+      clanActivity: 0,
+      aiUnits: { scouts: 100, attackers: 75, peopleKillers: 25 },
+      aiRobots: 200,
+      raidPlan: { periodStart: 1, periodEnd: 12, months: [base.totalRounds] },
+      resources: { ...base.resources, combat: 0 },
+    };
+    const lowKnowledge = processRound({ ...forcedRaid, aiKnowledge: 0.98 }, action({ defenders: 0, foragers: 0, workers: 0, researchers: 0 }));
+    const maxKnowledge = processRound({ ...forcedRaid, aiKnowledge: 0.99 }, action({ defenders: 0, foragers: 0, workers: 0, researchers: 0 }));
+
+    expect(lowKnowledge.lastRoundLog?.raid?.occurred).toBe(true);
+    expect(maxKnowledge.lastRoundLog?.raid?.occurred).toBe(true);
+    expect(lowKnowledge.lastRoundLog?.raid?.hiddenLost).toBe(0);
+    expect(maxKnowledge.lastRoundLog?.raid?.hiddenLost ?? 0).toBeGreaterThan(0);
   });
 });
 
