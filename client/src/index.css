@@ -2475,21 +2475,20 @@ input[type=range]::-moz-range-thumb {
   stroke: rgba(102, 204, 136, .64);
   stroke-width: 1.4;
 }
-.mfh-zzz {
+.mfh-free-icon {
   fill: #9db8aa;
-  font-size: 12px;
+  font-size: 17px;
   font-weight: 900;
-  letter-spacing: 1.2px;
 }
 .mfh-svg-value {
   fill: #66cc88;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 900;
   font-family: 'Courier New', monospace;
 }
 .mfh-svg-label {
   fill: #9db8aa;
-  font-size: 8.5px;
+  font-size: 7.5px;
   font-weight: 800;
   letter-spacing: .8px;
   text-transform: uppercase;

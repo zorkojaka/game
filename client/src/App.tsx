@@ -2489,7 +2489,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
   const COL_RET = '#39b6c9';  // povratna pot — turkizna, da se loči od odhodne
   const draftColor = draftKind === 'attack' ? COL_ATK : COL_EXP;
   const FREE_MARKER = { q: -2, r: 4 };
-  const FREE_MARKER_SIZE = SIZE * 1.35;
+  const FREE_MARKER_SIZE = SIZE;
   // Kamp = 3 hexagoni (zoni). Vsak je svoje območje.
   const CAMP_ZONES = [
     { q: 0, r: 3, icon: '🔬', label: 'RAZISKAVE', count: camp.researchers, color: '#3377cc', adj: 'r' as const },
@@ -2620,9 +2620,9 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
             <g className="map-free-hex-svg" transform={`translate(${p.x} ${p.y})`} style={{ pointerEvents: 'none' }}>
               <title>{`Skriti prosti člani: ${pop.free}`}</title>
               <path d={hexPath(0, 0, FREE_MARKER_SIZE)} className="mfh-hex-shape" />
-              <text className="mfh-zzz" x={0} y={-15} textAnchor="middle">ZZZ</text>
+              <text className="mfh-free-icon" x={0} y={-11} textAnchor="middle">💤</text>
               <text className="mfh-svg-value" x={0} y={8} textAnchor="middle">{pop.free}</text>
-              <text className="mfh-svg-label" x={0} y={26} textAnchor="middle">skriti</text>
+              <text className="mfh-svg-label" x={0} y={24} textAnchor="middle">prosti</text>
             </g>
           );
         })()}
@@ -3013,7 +3013,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
               {z.adj === 'd' ? (
                 <g pointerEvents="none">
                   <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="21">🛡️</text>
-                  <text x={p.x} y={p.y - SIZE * 0.405} textAnchor="middle" dominantBaseline="central"
+                  <text x={p.x} y={p.y - SIZE * 0.44} textAnchor="middle" dominantBaseline="central"
                     fontSize="8" fill="#06110c" fontWeight="900" fontFamily="'Courier New', monospace">
                     {Math.round(Math.max(0, Math.min(1, repelProbability)) * 100)}
                   </text>
