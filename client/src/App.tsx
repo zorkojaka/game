@@ -2502,6 +2502,11 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
           </div>
         </div>
       )}
+      <div className="map-free-hex" title={`Prosti ljudje: ${pop.free}`}>
+        <span className="mfh-icon">💤</span>
+        <span className="mfh-value">{pop.free}</span>
+        <span className="mfh-label">prosti</span>
+      </div>
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="hex-svg"
         onPointerMove={moveDotDrag} onPointerUp={endDotDrag} onPointerCancel={endDotDrag}>
 
