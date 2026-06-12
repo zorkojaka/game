@@ -2435,7 +2435,7 @@ function respliceWaypoint(original: Hex[], index: number, y: Hex): Hex[] {
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, onRations, workshopObj, onWorkshop, researchObj, onResearch, workshop, research, pop, draftPeople, draftRations, draftStealth, draftLoot, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onDraftLoot, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
+function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, rationsLocked, onRations, workshopObj, onWorkshop, researchObj, onResearch, researchHighlight, workshop, research, pop, draftPeople, draftRations, draftStealth, draftLoot, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onDraftLoot, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   draftReturn: Array<{ q: number; r: number }>;
@@ -2456,9 +2456,9 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
   onCampSet: (which: 'd' | 'f' | 'w' | 'r', value: number) => void;
   repelProbability: number;  // 0–1, za barvo + polnost obrambne linije
   defenseContribution: { people: number; walls: number; missing: number }; // delež do 100 %: ljudje, obzidje, prazno
-  rations: number; onRations: (n: number) => void;
+  rations: number; rationsLocked: Record<number, boolean>; onRations: (n: number) => void;
   workshopObj: WorkshopObjective; onWorkshop: (o: WorkshopObjective) => void;
-  researchObj: ResearchObjective; onResearch: (o: ResearchObjective) => void;
+  researchObj: ResearchObjective; onResearch: (o: ResearchObjective) => void; researchHighlight?: ResearchObjective | null;
   workshop: { wallsBuilt: number; weaponProgress: number; wallProgress: number; artifactProgress: number; workers: number };
   research: { robotsLevel: number; robotsProgress: number; weaponLevel: number; weaponProgress: number; wallLevel: number; wallProgress: number; researchers: number };
   pop: { total: number; inCamp: number; away: number; free: number };
@@ -2488,6 +2488,8 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
   const COL_ATK = '#cc3333';
   const COL_RET = '#39b6c9';  // povratna pot — turkizna, da se loči od odhodne
   const draftColor = draftKind === 'attack' ? COL_ATK : COL_EXP;
+  const FREE_MARKER = { q: -2, r: 4 };
+  const FREE_MARKER_SIZE = SIZE * 1.35;
   // Kamp = 3 hexagoni (zoni). Vsak je svoje območje.
   const CAMP_ZONES = [
     { q: 0, r: 3, icon: '🔬', label: 'RAZISKAVE', count: camp.researchers, color: '#3377cc', adj: 'r' as const },
@@ -2498,12 +2500,17 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
   const campZoneIds = new Set(CAMP_ZONES.map(z => `${z.q},${z.r}`));
   const CAMP_EXTENT = SIZE * 1.85;  // prostor za kontrole okoli kampa (da niso odrezane)
   const pts = tiles.map(t => hexToPixel(t.q, t.r, SIZE));
+  const freeMarkerPt = hexToPixel(FREE_MARKER.q, FREE_MARKER.r, SIZE);
   const PADX = SIZE * 1.05;         // vodoravno: pol-širina pointy-top heksa ≈ 0.87×SIZE + rob
   const PADY = SIZE * 0.85;         // navpično
   let minX = Math.min(...pts.map(p => p.x)) - PADX;
   let maxX = Math.max(...pts.map(p => p.x)) + PADX;
   let minY = Math.min(...pts.map(p => p.y)) - SIZE * 1.5;  // zgoraj več (kontrole nad zadnjim heksom)
   let maxY = Math.max(...pts.map(p => p.y)) + PADY;
+  minX = Math.min(minX, freeMarkerPt.x - FREE_MARKER_SIZE * 1.1);
+  maxX = Math.max(maxX, freeMarkerPt.x + FREE_MARKER_SIZE * 1.1);
+  minY = Math.min(minY, freeMarkerPt.y - FREE_MARKER_SIZE * 1.1);
+  maxY = Math.max(maxY, freeMarkerPt.y + FREE_MARKER_SIZE * 1.1);
   // Razširi okvir, da je veliki kamp v celoti viden (ne odreže ga rob)
   const clanForBounds = tiles.find(t => t.isClanCamp);
   if (clanForBounds) {
@@ -2605,16 +2612,20 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
           </div>
         </div>
       )}
-      <div className="map-free-hex" title={`Skriti prosti člani v bunkerju: ${pop.free}`}>
-        <span className="mfh-bunker" aria-hidden="true">
-          <span className="mfh-bunker-roof" />
-          <span className="mfh-bunker-door" />
-        </span>
-        <span className="mfh-value">{pop.free}</span>
-        <span className="mfh-label">skriti</span>
-      </div>
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="hex-svg"
         onPointerMove={moveDotDrag} onPointerUp={endDotDrag} onPointerCancel={endDotDrag}>
+        {(() => {
+          const p = shift(freeMarkerPt);
+          return (
+            <g className="map-free-hex-svg" transform={`translate(${p.x} ${p.y})`} style={{ pointerEvents: 'none' }}>
+              <title>{`Skriti prosti člani: ${pop.free}`}</title>
+              <path d={hexPath(0, 0, FREE_MARKER_SIZE)} className="mfh-hex-shape" />
+              <text className="mfh-zzz" x={0} y={-15} textAnchor="middle">ZZZ</text>
+              <text className="mfh-svg-value" x={0} y={8} textAnchor="middle">{pop.free}</text>
+              <text className="mfh-svg-label" x={0} y={26} textAnchor="middle">skriti</text>
+            </g>
+          );
+        })()}
 
         {tiles.map(t => {
           const id = tileId(t);
@@ -2999,12 +3010,16 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
               />
               <path d={hexPath(p.x, p.y, SIZE * 0.94)} fill={z.color} opacity="0.07" style={{ pointerEvents: 'none' }} />
               {/* ikona + oznaka */}
-              <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="16">{z.icon}</text>
-              {/* OBRAMBA: število obzidij vpisano v ščit (del ikone) */}
-              {z.adj === 'd' && workshop.wallsBuilt > 0 && (
-                <text x={p.x} y={p.y - SIZE * 0.40} textAnchor="middle" dominantBaseline="central"
-                  fontSize="8" fill="#0a2a18" fontWeight="bold" fontFamily="'Courier New', monospace"
-                  pointerEvents="none">{workshop.wallsBuilt}</text>
+              {z.adj === 'd' ? (
+                <g pointerEvents="none">
+                  <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="21">🛡️</text>
+                  <text x={p.x} y={p.y - SIZE * 0.405} textAnchor="middle" dominantBaseline="central"
+                    fontSize="8" fill="#06110c" fontWeight="900" fontFamily="'Courier New', monospace">
+                    {Math.round(Math.max(0, Math.min(1, repelProbability)) * 100)}
+                  </text>
+                </g>
+              ) : (
+                <text x={p.x} y={p.y - SIZE * 0.42} textAnchor="middle" fontSize="16">{z.icon}</text>
               )}
               <text x={p.x} y={p.y - SIZE * 0.12} textAnchor="middle" fontSize="8" fill="#a8bdaf"
                 fontFamily="'Courier New', monospace" letterSpacing="0.5">{z.label}</text>
@@ -3067,15 +3082,19 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
             const dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
             const px = -dy, py = dx;  // pravokotno za razporeditev gumbov
             // Definiraj gumbe glede na zono
-            type Btn = { label: string; active: boolean; onClick: () => void; title: string; locked?: boolean; sub?: string; lvl?: number; segments?: { done: number; next: number; total: number } };
+            type Btn = { label: string; active: boolean; onClick: () => void; title: string; locked?: boolean; highlight?: boolean; sub?: string; lvl?: number; segments?: { done: number; next: number; total: number } };
             let btns: Btn[] = [];
             if (z.adj === 'f') {
               btns = [1,2,3,4,5].map(lvl => {
                 const t = RATIONS[lvl];
                 const popHint = t.popMin === 0 && t.popMax === 0 ? '±0' : `${t.popMin}…${t.popMax}`;
+                const locked = !!rationsLocked[lvl];
                 return {
                   label: RATIONS_EMOJI[lvl]!, active: rations === lvl, onClick: () => onRations(lvl),
-                  title: `Obroki: ${t.label} — hrana ×${t.foodMult}, moč ×${t.strengthMult}, ljudje ${popHint}`,
+                  locked,
+                  title: locked
+                    ? `Obroki: ${t.label} — premalo hrane za naslednji mesec`
+                    : `Obroki: ${t.label} — hrana ×${t.foodMult}, moč ×${t.strengthMult}, ljudje ${popHint}`,
                   sub: rations === lvl ? `×${t.foodMult}` : undefined,  // količnik hrane le za izbrano
                 };
               });
@@ -3089,7 +3108,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                       ? Math.min(6, workshop.weaponProgress + workshop.workers)
                       : workshop.weaponProgress,
                     total: 6 } },
-                { label: '🧱', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),
+                { label: '🛡️', active: workshopObj === 'wall',   onClick: () => onWorkshop('wall'),
                   lvl: workshop.wallsBuilt,
                   title: `Obzidje: 12 delavec-mesecev + 4 materiala za 1 obzidje. Zgrajenih: ${workshop.wallsBuilt}. Napredek se ohrani ob preklopu.`,
                   segments: {
@@ -3119,15 +3138,15 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
               // Tudi zaklenjena gumba kažeta SVOJO ikono (⚔️/🧱) — ključavnica je le značka.
               btns = [
                 { label: '🤖', active: researchObj === 'robots', onClick: () => onResearch('robots'),
-                  locked: false, lvl: research.robotsLevel,
+                  locked: false, highlight: researchHighlight === 'robots', lvl: research.robotsLevel,
                   title: `Roboti Lv${research.robotsLevel}: odkrivanje šibkih točk, odklene Orožje/Obzidje. ${RESEARCH_LEVEL_WORKER_MONTHS} razisk.-mes. na stopnjo.`,
                   segments: seg('robots', research.robotsProgress) },
                 { label: '⚔️', active: researchObj === 'weapon', onClick: () => onResearch('weapon'),
-                  locked: wpnLocked, lvl: research.weaponLevel,
+                  locked: wpnLocked, highlight: researchHighlight === 'weapon', lvl: research.weaponLevel,
                   title: `Raziskava orožja Lv${research.weaponLevel}: vsaka stopnja podvoji napad (${RESEARCH_LEVEL_WORKER_MONTHS} razisk.-mes.).${wpnLocked ? ` Zaklenjeno — najprej Roboti ${research.weaponLevel + 1}.` : ''}`,
                   segments: seg('weapon', research.weaponProgress) },
-                { label: '🧱', active: researchObj === 'wall', onClick: () => onResearch('wall'),
-                  locked: wallLocked, lvl: research.wallLevel,
+                { label: '🛡️', active: researchObj === 'wall', onClick: () => onResearch('wall'),
+                  locked: wallLocked, highlight: researchHighlight === 'wall', lvl: research.wallLevel,
                   title: `Raziskava obzidja Lv${research.wallLevel}: vsaka stopnja podvoji obrambo (${RESEARCH_LEVEL_WORKER_MONTHS} razisk.-mes.).${wallLocked ? ` Zaklenjeno — najprej Roboti ${research.wallLevel + 1}.` : ''}`,
                   segments: seg('wall', research.wallProgress) },
               ];
@@ -3165,6 +3184,9 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
                         fill={b.active ? z.color : '#0a0a0a'}
                         stroke={b.segments ? 'none' : (b.active ? '#000000' : z.color)}
                         strokeWidth={b.active ? 2 : 1.5} />
+                      {b.highlight && (
+                        <circle cx={bxp} cy={byp} r={rIn + 3.8} fill="none" stroke="#ffd84a" strokeWidth="2.4" pointerEvents="none" />
+                      )}
                       {/* Segmenti / lok kot obroba ikone — done = polno, next-month napoved = svetlo */}
                       {b.segments && (() => {
                         const { done, next, total } = b.segments;
@@ -3358,7 +3380,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
               </g>
               {/* vrsta 2: − število + */}
               <g className="dc-people">
-                <Btn x={cx - 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="minus" disabled={draftPeople <= 1}
+                <Btn x={cx - 26} y={cy + 7} r={8} fill="#0a0a0a" stroke="#888" icon="minus" disabled={draftPeople <= 0}
                   onClick={() => onDraftPeople(-1)} title="Manj ljudi" />
                 <circle cx={cx} cy={cy + 7} r={11} fill="#11171f" stroke={draftKind === 'attack' ? '#cc3333' : '#ffd84a'} strokeWidth="1.5" />
                 <text x={cx} y={cy + 7} textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold" fill="#fff" style={{ pointerEvents: 'none' }}>{draftPeople}</text>
@@ -3447,7 +3469,7 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
 function WorkshopSelector({ value, onChange, weaponLevel, wallLevel }: { value: WorkshopObjective; onChange: (o: WorkshopObjective) => void; weaponLevel: number; wallLevel: number }) {
   const opts: Array<{ id: WorkshopObjective; icon: string; label: string; color: string; desc: string; research?: number }> = [
     { id: 'weapon',   icon: '⚔️', label: 'Orožje',   color: '#cc4433', desc: '6 delavec-mesecev za 1 orožje (−1 material). Napredek se ohrani ob preklopu.', research: weaponLevel },
-    { id: 'wall',     icon: '🧱', label: 'Obzidje', color: '#aabb88', desc: '12 delavec-mesecev za 1 obzidje (−4 materiala). +2 % obrambe. Ohrani napredek.', research: wallLevel },
+    { id: 'wall',     icon: '🛡️', label: 'Obzidje', color: '#aabb88', desc: '12 delavec-mesecev za 1 obzidje (−4 materiala). +2 % obrambe. Ohrani napredek.', research: wallLevel },
     { id: 'artifact', icon: '💎', label: 'Artefakt', color: '#ffd84a', desc: `${ARTIFACT_WORKER_MONTHS} delavec-mesecev (10 let z 1 delavcem) za 1 artefakt (−20 materiala). Ohrani napredek.` },
   ];
   const sel = opts.find(o => o.id === value);
@@ -3470,22 +3492,24 @@ function WorkshopSelector({ value, onChange, weaponLevel, wallLevel }: { value: 
 }
 
 /** Izbira cilja raziskave (raziskovalci) */
-function ResearchSelector({ value, onChange, robotsLevel, weaponLevel, wallLevel }: { value: ResearchObjective; onChange: (o: ResearchObjective) => void; robotsLevel: number; weaponLevel: number; wallLevel: number }) {
+function ResearchSelector({ value, onChange, robotsLevel, weaponLevel, wallLevel, highlight }: { value: ResearchObjective; onChange: (o: ResearchObjective) => void; robotsLevel: number; weaponLevel: number; wallLevel: number; highlight?: ResearchObjective | null }) {
   const opts: Array<{ id: ResearchObjective; icon: string; label: string; color: string; desc: string; lvl: number; locked: boolean }> = [
     { id: 'robots', icon: '🤖', label: RESEARCH_LEVEL_NAMES.robots[Math.min(robotsLevel, 2)] ?? 'Roboti', color: '#cc8800', desc: 'Raziskave ustvarjajo intel in odpirajo AI drevo. Mehanske šibkosti odklenejo tehnologijo.', lvl: robotsLevel, locked: false },
     { id: 'weapon', icon: '⚔️', label: RESEARCH_LEVEL_NAMES.weapon[Math.min(weaponLevel, 2)] ?? 'Orožje', color: '#cc4433', desc: 'Vsaka stopnja podvoji prispevek orožja. Zaklenjeno z mehanskimi šibkostmi AI.', lvl: weaponLevel, locked: weaponLevel >= robotsLevel },
-    { id: 'wall',   icon: '🧱', label: RESEARCH_LEVEL_NAMES.wall[Math.min(wallLevel, 2)] ?? 'Obzidje', color: '#aabb88', desc: 'Vsaka stopnja podvoji učinek obzidja. Zaklenjeno z mehanskimi šibkostmi AI.', lvl: wallLevel, locked: wallLevel >= robotsLevel },
+    { id: 'wall',   icon: '🛡️', label: RESEARCH_LEVEL_NAMES.wall[Math.min(wallLevel, 2)] ?? 'Obzidje', color: '#aabb88', desc: 'Vsaka stopnja podvoji učinek obzidja. Zaklenjeno z mehanskimi šibkostmi AI.', lvl: wallLevel, locked: wallLevel >= robotsLevel },
   ];
   const sel = opts.find(o => o.id === value);
   return (
     <div className="scout-objectives compact">
       <div className="so-row" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
         {opts.map(o => (
-          <button key={o.id} className={`so-btn ${value === o.id ? 'sel' : ''}`}
+          <button key={o.id} className={`so-btn ${value === o.id ? 'sel' : ''} ${highlight === o.id ? 'just-completed' : ''}`}
             disabled={o.locked}
             style={o.locked
               ? { opacity: 0.45, cursor: 'not-allowed' }
-              : value === o.id ? { borderColor: o.color, color: o.color } : {}}
+              : highlight === o.id
+                ? { borderColor: '#ffd84a', color: value === o.id ? o.color : undefined, boxShadow: '0 0 0 2px rgba(255,216,74,.45)' }
+                : value === o.id ? { borderColor: o.color, color: o.color } : {}}
             onClick={() => { if (!o.locked) onChange(o.id); }} title={`${o.label} — ${o.desc}${o.locked ? ` · Zaklenjeno: najprej razišči Robote ${o.lvl + 1}.` : ''}`}>
             <span className="so-icon">{o.icon}</span>
             <span className="so-label-mini">{o.label} Lv{o.lvl}{o.locked ? ' 🔒' : ''}</span>
@@ -3498,7 +3522,7 @@ function ResearchSelector({ value, onChange, robotsLevel, weaponLevel, wallLevel
 }
 
 /** Kompaktni rations selector — 5 emoji gumbov + razlaga izbire */
-function RationsMini({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+function RationsMini({ value, onChange, locked = {} }: { value: number; onChange: (n: number) => void; locked?: Record<number, boolean> }) {
   const r = RATIONS[value];
   const popHint = r.popMin === 0 && r.popMax === 0 ? '±0' :
                   r.popMin === r.popMax ? `${r.popMin > 0 ? '+' : ''}${r.popMin}` :
@@ -3509,13 +3533,16 @@ function RationsMini({ value, onChange }: { value: number; onChange: (n: number)
       <div className="rm-row">
         {[1,2,3,4,5].map(lvl => {
           const t = RATIONS[lvl];
+          const isLocked = !!locked[lvl];
           return (
             <button key={lvl}
-              className={`rm-btn ${value === lvl ? 'sel' : ''}`}
+              className={`rm-btn ${value === lvl ? 'sel' : ''} ${isLocked ? 'locked' : ''}`}
               style={value === lvl ? { borderColor: t.color, color: t.color } : {}}
-              onClick={() => onChange(lvl)}
-              title={`${t.label} — hrana ×${t.foodMult}, moč ×${t.strengthMult}`}>
+              disabled={isLocked}
+              onClick={() => { if (!isLocked) onChange(lvl); }}
+              title={isLocked ? `${t.label} — premalo hrane za naslednji mesec` : `${t.label} — hrana ×${t.foodMult}, moč ×${t.strengthMult}`}>
               <span>{t.emoji}</span>
+              {isLocked && <span className="rm-lock">🔒</span>}
             </button>
           );
         })}
@@ -4189,7 +4216,7 @@ export default function App() {
       );
       const { state } = await playRound(game.runId, {
         assignment: { axis, combatants: 0, defenders, foragers, workers, researchers,
-          workshopObjective: workshopObj, researchObjective: safeResearchObj, rations,
+          workshopObjective: workshopObj, researchObjective: safeResearchObj, rations: effectiveRations,
           newExpeditions: newExps.length > 0 ? newExps : undefined,
           useArtifactOnWpId: artifactTargetWp || undefined },
         targetWeakPoint: targetWP || undefined,
@@ -4230,7 +4257,9 @@ export default function App() {
   const pop = campPop;  // ostane za kompatibilnost spodaj
   const newMissionPeople = 0;
   const pendingExpPpl = pendingExpeditions.reduce((s, e) => s + e.assigned, 0);
-  const plannedTotal = newMissionPeople + pendingExpPpl + combatants;  // rezervirani za odprave/misije/napad
+  const committedPlannedTotal = newMissionPeople + pendingExpPpl + combatants;
+  const draftReservedPeople = draftPath.length >= 2 ? draftPeople : 0;
+  const plannedTotal = committedPlannedTotal + draftReservedPeople;  // potrjene + trenutno narisana odprava
   const assignedHome = defenders + foragers + workers + researchers;
   // Ljudje na voljo za razporejanje = celoten kamp (ljudje zunaj so že izločeni iz campPop).
   const availablePop = Math.max(0, campPop);
@@ -4249,7 +4278,7 @@ export default function App() {
 
   type SliderKey = 'd' | 'f' | 'w' | 'r';
   function setSliderClamped(which: SliderKey, newVal: number) {
-    const reserved = combatants + newMissionPeople + pendingExpPpl;
+    const reserved = plannedTotal;
     const v = Math.max(0, Math.min(availablePop, Math.floor(newVal)));
     const cur = { d: defenders, f: foragers, w: workers, r: researchers };
     cur[which] = v;
@@ -4278,6 +4307,8 @@ export default function App() {
     const out = greedyHexPath({ q: clan.q, r: clan.r }, tile);
     setDraftPath(out);
     setDraftReturn(greedyHexPath(tile, { q: clan.q, r: clan.r }));
+    const freeForNewDraft = Math.max(0, availablePop - assignedHome - committedPlannedTotal);
+    setDraftPeople(Math.min(5, freeForNewDraft));
     // Če je levi meni odprt, pokaži panel poti (izvidniki/napad glede na tip).
     if (leftOpen) setTab(draftKind === 'attack' ? 'attack' : 'map');
   }
@@ -4375,13 +4406,13 @@ export default function App() {
     return 1 - pNo;
   })();
   const canConfirmDraft = draftPath.length >= 2 && draftPeople > 0
-    && (assignedHome + plannedTotal + draftPeople <= availablePop)
+    && (assignedHome + plannedTotal <= availablePop)
     && !overArmed;  // vsak član odprave rabi orožje
 
   function setMissionAssignment(wpId: string, n: number) {
     const thisCur = missions[wpId] ?? 0;
     // Vse drugo že razporejeno (brez te misije)
-    const otherPop   = assignedHome + combatants + pendingExpPpl + (newMissionPeople - thisCur);
+    const otherPop   = assignedHome + committedPlannedTotal + draftReservedPeople - thisCur;
     // Oboroženi drugje (branilci + napadalci + odprave + druge misije) — člani misije so napadalci
     const otherArmed = defenders + combatants + pendingExpPpl + draftArmed + (newMissionPeople - thisCur);
     const maxByPop     = availablePop - otherPop;
@@ -4422,7 +4453,7 @@ export default function App() {
     const clan = game?.mapTiles?.find(t => t.isClanCamp);
     if (clan) setDraftPath([{ q: clan.q, r: clan.r }]);
     setDraftReturn([]);
-    setDraftPeople(5);
+    setDraftPeople(Math.min(5, Math.max(0, availablePop - assignedHome - committedPlannedTotal - draftPeople)));
     if (isPhoneViewport()) setLeftOpen(false);
   }
   function confirmDraftExpedition() { confirmDraft('scout'); }
@@ -4481,13 +4512,7 @@ export default function App() {
     </>
   );
 
-  const rTier = RATIONS[rations];
-  const foragerYield = Math.floor(foragers * 4 * rTier.strengthMult);
-  const researchIntelBase = Math.floor(researchers * 8 * rTier.strengthMult);
-  const researchIntelBonus = researchObj === 'robots' ? Math.floor(researchers * 8 * 3 * rTier.strengthMult) : 0;
-  const researchIntel = researchIntelBase + researchIntelBonus;
   const inCampPop    = Math.max(0, game.population);
-  const campFoodCost = Math.round(inCampPop * rTier.foodMult);
   // Aktivne misije/odprave: ne jedo iz kampa (so vzele upfront)
   // Nove odprave/misije, ki bodo poslane TA mesec, vzamejo hrano s seboj iz kampa
   const clanTile = game.mapTiles?.find(t => t.isClanCamp);
@@ -4517,12 +4542,37 @@ export default function App() {
     return s + Math.round(ppl * dur * t.foodMult);
   }, 0);
   const expPacksFood = pendingExpFood + draftExpFood + newMissionFood;
+  const foodProjectionForRations = (lvl: number) => {
+    const t = RATIONS[lvl] ?? RATIONS[1];
+    const projectedForage = Math.floor(foragers * 4 * t.strengthMult);
+    const projectedCampCost = Math.round(inCampPop * t.foodMult);
+    return game.resources.survival - projectedCampCost + projectedForage - expPacksFood;
+  };
+  const rationsLocked: Record<number, boolean> = {
+    1: false,
+    2: foodProjectionForRations(2) < 0,
+    3: foodProjectionForRations(3) < 0,
+    4: foodProjectionForRations(4) < 0,
+    5: foodProjectionForRations(5) < 0,
+  };
+  const affordableRation = ([5, 4, 3, 2, 1] as const).find(lvl => !rationsLocked[lvl]) ?? 1;
+  const effectiveRations = rationsLocked[rations] ? affordableRation : rations;
+  const rTier = RATIONS[effectiveRations];
+  const foragerYield = Math.floor(foragers * 4 * rTier.strengthMult);
+  const researchIntelBase = Math.floor(researchers * 8 * rTier.strengthMult);
+  const researchIntelBonus = researchObj === 'robots' ? Math.floor(researchers * 8 * 3 * rTier.strengthMult) : 0;
+  const researchIntel = researchIntelBase + researchIntelBonus;
+  const campFoodCost = Math.round(inCampPop * rTier.foodMult);
   const foodCost     = campFoodCost + expPacksFood;
   const survBalance  = foragerYield - foodCost;
-  // Projekcija z istim klampanjem kot engine (survival ne gre pod 0)
-  const _curSurv     = game.resources.survival;
-  const _afterCamp   = Math.max(0, _curSurv - campFoodCost + foragerYield);
-  const foodNextMonth = Math.max(0, _afterCamp - expPacksFood);
+  const foodNextMonth = Math.max(0, foodProjectionForRations(effectiveRations));
+  const researchHighlight: ResearchObjective | null = (() => {
+    const narrative = game.lastRoundLog?.narrative ?? '';
+    if (/Raziskava robotov dokončana/.test(narrative)) return 'robots';
+    if (/Raziskava orožja dokončana/.test(narrative)) return 'weapon';
+    if (/Raziskava obzidja dokončana/.test(narrative)) return 'wall';
+    return null;
+  })();
 
   return (
     <div className={`app-shell mob-tab-${tab}`}>
@@ -4707,7 +4757,7 @@ export default function App() {
                   <div className="def-wall-lvl">STOPNJA {wallLvl}</div>
                   <div className="def-stat-note">+{Math.round(wallLvl * difficultyProfile(game.difficulty).wallDefensePct * researchMult(game.wallResearchLevel ?? 0) * 100)}% k obrambi</div>
                   <div className="def-seg">{Array.from({ length: 12 }).map((_, i) => <span key={i} className={`def-seg-cell ${i < wallProg ? 'fill' : ''}`} />)}</div>
-                  <button className="def-upgrade-btn" onClick={() => { setWorkshopObj('wall'); setTab('workshop'); }}>🧱 GRADI OBZIDJE</button>
+                  <button className="def-upgrade-btn" onClick={() => { setWorkshopObj('wall'); setTab('workshop'); }}>🛡️ GRADI OBZIDJE</button>
                 </div>
               </div>
 
@@ -4757,7 +4807,7 @@ export default function App() {
               </div>
               <div className="def-card">
                 <div className="def-card-title">OBROKI</div>
-                <RationsMini value={rations} onChange={setRations} />
+                <RationsMini value={effectiveRations} onChange={setRations} locked={rationsLocked} />
               </div>
               <div className="def-stat-grid">
                 <div className="def-stat"><div className="def-stat-label">PRIDELEK / MESEC</div><div className="def-stat-big" style={{ color: '#22cc88' }}>+{foragerYield}</div><div className="def-stat-note">hrane</div></div>
@@ -4778,7 +4828,7 @@ export default function App() {
             const cfg = workshopObj === 'weapon'
               ? { label: 'orožje', total: 6, prog: game.weaponWorkshopProgress ?? 0, color: '#cc7733', icon: '⚔️', made: game.resources.combat }
               : workshopObj === 'wall'
-                ? { label: 'obzidje', total: 12, prog: game.wallProgress ?? 0, color: '#aabb88', icon: '🏰', made: game.wallsBuilt ?? 0 }
+                ? { label: 'obzidje', total: 12, prog: game.wallProgress ?? 0, color: '#aabb88', icon: '🛡️', made: game.wallsBuilt ?? 0 }
                 : { label: 'artefakt', total: ARTIFACT_WORKER_MONTHS, prog: game.artifactWorkshopProgress ?? 0, color: '#ffd84a', icon: '💎', made: game.resources.artifacts ?? 0 };
             const need = Math.max(0, cfg.total - cfg.prog);
             const months = workers > 0 ? Math.ceil(need / workers) : Infinity;
@@ -4850,7 +4900,7 @@ export default function App() {
               </div>
               <div className="def-card">
                 <div className="def-card-title">CILJ RAZISKAVE</div>
-                <ResearchSelector value={researchObj} onChange={setResearchObj} robotsLevel={game.robotsResearchLevel ?? 0} weaponLevel={game.weaponResearchLevel ?? 0} wallLevel={game.wallResearchLevel ?? 0} />
+                <ResearchSelector value={researchObj} onChange={setResearchObj} robotsLevel={game.robotsResearchLevel ?? 0} weaponLevel={game.weaponResearchLevel ?? 0} wallLevel={game.wallResearchLevel ?? 0} highlight={researchHighlight} />
                 <div className="def-build-prog">
                   <div className="def-stat-note">{cfg.icon} {cfg.label}: <b style={{ color: cfg.color }}>Lv{cfg.lvl}</b> · {cfg.eff}</div>
                   <div className="def-progbar"><span className="def-progbar-fill" style={{ width: `${pctv}%`, background: cfg.color }} /></div>
@@ -4892,8 +4942,8 @@ export default function App() {
                   <div className="def-defenders">
                     <div className="def-big-num" style={{ color: '#ffd84a' }}>{draftPeople}</div>
                     <div className="def-slider-row" style={{ justifyContent: 'flex-end' }}>
-                      <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
-                      <button className="pa-btn" disabled={assignedHome + plannedTotal + draftPeople >= availablePop} onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
+                      <button className="pa-btn" disabled={draftPeople <= 0} onClick={() => setDraftPeople(Math.max(0, draftPeople - 1))}>−</button>
+                      <button className="pa-btn" disabled={assignedHome + plannedTotal >= availablePop} onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
                     </div>
                   </div>
                   <div className="exp-rations" style={{ marginTop: '.45rem' }}><span className="dim small">Obroki:</span><RationsMini value={draftRations} onChange={setDraftRations} /></div>
@@ -4983,8 +5033,8 @@ export default function App() {
                     <div className="def-defenders">
                       <div className="def-big-num" style={{ color: '#cc4433' }}>⚔️ {draftPeople}</div>
                       <div className="def-slider-row" style={{ justifyContent: 'flex-end' }}>
-                        <button className="pa-btn" disabled={draftPeople <= 1} onClick={() => setDraftPeople(Math.max(1, draftPeople - 1))}>−</button>
-                        <button className="pa-btn" disabled={assignedHome + plannedTotal + draftPeople >= availablePop || weaponsLeft <= 0} onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
+                        <button className="pa-btn" disabled={draftPeople <= 0} onClick={() => setDraftPeople(Math.max(0, draftPeople - 1))}>−</button>
+                        <button className="pa-btn" disabled={assignedHome + plannedTotal >= availablePop || weaponsLeft <= 0} onClick={() => setDraftPeople(draftPeople + 1)}>+</button>
                       </div>
                     </div>
                     <div className="def-stat-note">Prosto orožja: <b style={{ color: weaponsLeft > 0 ? '#66cc88' : '#cc4444' }}>{weaponsLeft}</b> (vsak napadalec rabi orožje)</div>
@@ -5098,10 +5148,10 @@ export default function App() {
             onCampAdjust={(which, delta) => { bumpRole(which, delta); if (leftOpen) setTab(ZONE_TAB[which]); }}
             onCampSet={(which, value) => { setRole(which, value); if (leftOpen) setTab(ZONE_TAB[which]); }}
             repelProbability={odds?.raidRepelProbability ?? 0}
-            defenseContribution={defenseContributionBreakdown(game, defenders, rations, odds?.intelBonus ?? 0)}
-            rations={rations} onRations={(n) => { setRations(n); if (leftOpen) setTab('food'); }}
+            defenseContribution={defenseContributionBreakdown(game, defenders, effectiveRations, odds?.intelBonus ?? 0)}
+            rations={effectiveRations} rationsLocked={rationsLocked} onRations={(n) => { if (!rationsLocked[n]) setRations(n); if (leftOpen) setTab('food'); }}
             workshopObj={workshopObj} onWorkshop={(o) => { setWorkshopObj(o); if (leftOpen) setTab('workshop'); }}
-            researchObj={researchObj} onResearch={(o) => { setResearchObj(o); if (leftOpen) setTab('research'); }}
+            researchObj={researchObj} onResearch={(o) => { setResearchObj(o); if (leftOpen) setTab('research'); }} researchHighlight={researchHighlight}
             workshop={{ wallsBuilt: game.wallsBuilt ?? 0, weaponProgress: game.weaponWorkshopProgress ?? 0, wallProgress: game.wallProgress ?? 0, artifactProgress: game.artifactWorkshopProgress ?? 0, workers }}
             research={{ robotsLevel: game.robotsResearchLevel ?? 0, robotsProgress: game.robotsResearchProgress ?? 0, weaponLevel: game.weaponResearchLevel ?? 0, weaponProgress: game.weaponResearchProgress ?? 0, wallLevel: game.wallResearchLevel ?? 0, wallProgress: game.wallResearchProgress ?? 0, researchers }}
             pop={{ total: game.population, inCamp: Math.max(0, game.population - inMissions), away: inMissions, free: freePeople }}
@@ -5115,15 +5165,15 @@ export default function App() {
               setLeftOpen(true);
             }}
             onDraftPeople={(d) => {
-              if (d > 0) { if (!(assignedHome + plannedTotal + draftPeople >= availablePop || (!draftIsStealthScout && weaponsLeft <= 0))) setDraftPeople(draftPeople + 1); }
-              else setDraftPeople(Math.max(1, draftPeople - 1));
+              if (d > 0) { if (!(assignedHome + plannedTotal >= availablePop || (!draftIsStealthScout && weaponsLeft <= 0))) setDraftPeople(draftPeople + 1); }
+              else setDraftPeople(Math.max(0, draftPeople - 1));
             }}
             onDraftRations={setDraftRations}
             onDraftStealth={setDraftStealth}
             onDraftLoot={setDraftLoot}
             onConfirmDraft={() => confirmDraft(draftKind)}
             canConfirmDraft={canConfirmDraft}
-            draftAddDisabled={assignedHome + plannedTotal + draftPeople >= availablePop || (!draftIsStealthScout && weaponsLeft <= 0)} />
+            draftAddDisabled={assignedHome + plannedTotal >= availablePop || (!draftIsStealthScout && weaponsLeft <= 0)} />
           <div className="map-legend">
             <span className="ml-item"><span style={{ color: '#66ccaa' }}>⌂</span> klan</span>
             <span className="ml-item"><span style={{ color: '#cc3333' }}>☣</span> AI jedro</span>

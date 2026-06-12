@@ -792,18 +792,6 @@ b      { color: var(--text); font-weight: 600; }
     max-width: none;
     max-height: none;
   }
-  .map-free-hex {
-    left: 56px;
-    bottom: 39%;
-    width: 52px;
-    height: 46px;
-  }
-  .mfh-bunker { width: 22px; height: 11px; }
-  .mfh-bunker-roof { left: 4px; right: 4px; top: -3px; height: 6px; }
-  .mfh-bunker-door { width: 6px; height: 7px; }
-  .mfh-value { font-size: .95rem; }
-  .mfh-label { font-size: .38rem; }
-
   .right-col,
   .col-toggle {
     display: none !important;
@@ -2481,82 +2469,30 @@ input[type=range]::-moz-range-thumb {
 
 .hex-map { position: relative; }
 
-.map-free-hex {
-  position: absolute;
-  left: clamp(18px, 4.8%, 58px);
-  bottom: 38%;
-  z-index: 12;
-  width: 58px;
-  height: 51px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  color: #d9efe4;
-  background:
-    radial-gradient(circle at 50% 36%, rgba(70, 136, 112, .18), transparent 48%),
-    linear-gradient(180deg, rgba(14, 24, 23, .94), rgba(5, 9, 9, .9));
-  border: 1px solid rgba(102, 204, 136, .54);
-  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%);
-  box-shadow: 0 8px 20px rgba(0,0,0,.42), inset 0 0 14px rgba(102,204,136,.07);
-  pointer-events: none;
-  backdrop-filter: blur(8px);
+.map-free-hex-svg { filter: drop-shadow(0 8px 16px rgba(0,0,0,.42)); }
+.mfh-hex-shape {
+  fill: rgba(7, 13, 12, .9);
+  stroke: rgba(102, 204, 136, .64);
+  stroke-width: 1.4;
 }
-.mfh-bunker {
-  position: relative;
-  width: 25px;
-  height: 13px;
-  display: block;
-  margin-bottom: 1px;
-  border-radius: 9px 9px 3px 3px;
-  background: linear-gradient(180deg, #597065, #26362f);
-  box-shadow: inset 0 -2px 0 rgba(0,0,0,.28), 0 1px 0 rgba(180,220,200,.16);
+.mfh-zzz {
+  fill: #9db8aa;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1.2px;
 }
-.mfh-bunker::before {
-  content: "";
-  position: absolute;
-  left: -3px;
-  right: -3px;
-  bottom: -3px;
-  height: 5px;
-  border-radius: 999px;
-  background: #14221d;
-  box-shadow: 0 1px 0 rgba(102,204,136,.18);
-}
-.mfh-bunker-roof {
-  position: absolute;
-  left: 5px;
-  right: 5px;
-  top: -4px;
-  height: 7px;
-  border-radius: 8px 8px 0 0;
-  background: #6f8578;
-}
-.mfh-bunker-door {
-  position: absolute;
-  left: 50%;
-  bottom: 1px;
-  width: 7px;
-  height: 8px;
-  transform: translateX(-50%);
-  border-radius: 4px 4px 1px 1px;
-  background: #08100e;
-  box-shadow: inset 0 0 0 1px rgba(102,204,136,.32);
-}
-.mfh-value {
-  color: #66cc88;
-  font-size: 1.05rem;
-  line-height: 1;
-  font-weight: bold;
+.mfh-svg-value {
+  fill: #66cc88;
+  font-size: 24px;
+  font-weight: 900;
   font-family: 'Courier New', monospace;
 }
-.mfh-label {
-  color: #9db8aa;
-  font-size: .42rem;
-  line-height: 1;
+.mfh-svg-label {
+  fill: #9db8aa;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: .8px;
   text-transform: uppercase;
-  letter-spacing: .06em;
 }
 
 .map-info-pop {
@@ -2849,6 +2785,20 @@ input[type=range]::-moz-range-thumb {
 }
 .rm-btn:hover { background: #181818; }
 .rm-btn.sel   { background: #0e0e0e; }
+.rm-btn.locked {
+  position: relative;
+  opacity: .45;
+  cursor: not-allowed;
+  filter: grayscale(.7);
+}
+.rm-btn.locked:hover { background: var(--bg2); }
+.rm-lock {
+  position: absolute;
+  right: 1px;
+  bottom: -1px;
+  font-size: .48rem;
+  line-height: 1;
+}
 .rm-info { font-size: .62rem; font-weight: bold; letter-spacing: .06em; text-align: center; }
 
 /* Scout objectives compact */
