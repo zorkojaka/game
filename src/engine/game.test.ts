@@ -334,6 +334,20 @@ describe('legacy missions disabled', () => {
 });
 
 describe('odprave — izbrana povratna pot', () => {
+  it('novoodposlana odprava ostane na kamp hexu do naslednjega meseca', () => {
+    const g = newGame(321);
+    const camp = g.mapTiles!.find(t => t.isClanCamp)!;
+    const path = [{ q: camp.q, r: camp.r }, { q: camp.q + 1, r: camp.r - 1 }, { q: camp.q + 2, r: camp.r - 1 }];
+    const r = processRound(g, action({
+      foragers: 10,
+      newExpeditions: [{ kind: 'scout', path, assigned: 5, rations: 3 }],
+    }));
+    const exp = (r.expeditions ?? [])[0];
+    expect(exp).toBeTruthy();
+    expect(exp.currentIndex).toBe(0);
+    expect(exp.path[exp.currentIndex]).toEqual(path[0]);
+  });
+
   it('returnPath iz vhoda se prenese na ustvarjeno odpravo', () => {
     const g = newGame(123);
     const camp = g.mapTiles!.find(t => t.isClanCamp)!;

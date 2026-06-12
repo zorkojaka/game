@@ -721,7 +721,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     return parts.join(', ');
   };
 
-  // Sprejmi NOVE odprave PRED tikanjem — da gredo takoj ven iz kampa (premaknejo se še ta mesec)
+  // Sprejmi NOVE odprave po logistiki tega meseca, vendar jih ne tikaj takoj:
+  // po potrditvi morajo biti na izhodnem kamp hexu do naslednjega meseca.
   const newlyCreated: Expedition[] = [];
   for (const inp of incomingExps) {
     if (!inp.path || inp.path.length < 2) continue;
@@ -767,7 +768,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     });
   }
 
-  for (const e of [...oldExps, ...newlyCreated]) {
+  for (const e of oldExps) {
     const scoutEncounterUnits = Math.round(aiUnits.scouts * (1 - (logicalWeaknessByRobot({ ...state, aiTree } as GameState).scouts ? LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION : 0)));
     const r = tickExpedition(e, mapTiles, aiKnowledge, rng, scoutEncounterUnits);
     rng = r.rng;
@@ -931,7 +932,9 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     }
   }
 
-  // (nove odprave so sprejete in stikane zgoraj — gredo ven takoj)
+  tickedExps.push(...newlyCreated);
+
+  // Nove odprave se premaknejo šele v naslednjem processRound.
 
   // Avtomatsko razkrivanje šibkih točk: če je heks z wp dosegel >= 0.50 raziskanost, je discovered
   for (let i = 0; i < aiWeakPoints.length; i++) {
