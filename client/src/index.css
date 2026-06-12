@@ -3431,3 +3431,19 @@ input[type=range].cz-slider::-moz-range-track { height: 6px; border-radius: 3px;
 .diff-btn.hard.on   { background: #2a0d0d; border-color: #cc3333; color: #ffb0a8; }
 .diff-btn.brutal.on { background: #2a1505; border-color: #ff6a00; color: #ffc9a0; }
 .diff-facts { text-align: center; line-height: 1.6; max-width: 480px; }
+
+/* ─── Pregled taktike ob koncu igre ─── */
+.go-tactics { width: 100%; max-width: 640px; text-align: left; background: #0c1218cc; border: 1px solid #25405a; border-radius: 12px; padding: .8rem .9rem; margin-top: .4rem; }
+.go-tac-title { font-size: .85rem; color: #9fd0ff; margin: 0 0 .55rem; letter-spacing: .03em; }
+.go-tac-row { margin-bottom: .6rem; }
+.go-tac-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: .74rem; color: #cfe0ee; margin-bottom: .25rem; flex-wrap: wrap; }
+.go-tac-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; }
+.go-tac-bar { display: grid; grid-template-columns: 16px 1fr 52px; align-items: center; gap: 6px; }
+.go-tac-ic { font-size: .72rem; }
+.go-tac-track { position: relative; height: 8px; background: #16202b; border-radius: 4px; overflow: visible; }
+.go-tac-fill { height: 100%; border-radius: 4px; }
+.go-tac-mark { position: absolute; top: -2px; width: 2px; height: 12px; background: #ffd84a; }  /* 🧬 cilj */
+.go-tac-num { font-size: .66rem; color: #cfe0ee; text-align: right; }
+.go-tac-tips { margin-top: .5rem; font-size: .72rem; color: #ffd9a0; background: #1a1405; border: 1px solid #553a00; border-radius: 8px; padding: .45rem .6rem; }
+.go-tac-tips ul { margin: .25rem 0 0 1rem; padding: 0; }
+.go-tac-tips li { margin-bottom: .15rem; line-height: 1.35; }

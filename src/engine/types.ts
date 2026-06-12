@@ -117,6 +117,21 @@ export interface ScoutPlan {
   targetTileIds?: string[];    // če objective='map'
 }
 
+/** Agregat taktike enega obdobja (vsote čez mesece — za povprečja deli z months). */
+export interface TacticsAgg {
+  months: number;        // odigranih mesecev v obdobju
+  pop: number;           // vsota populacije (za % izračune)
+  def: number;           // vsota branilcev
+  forag: number;         // vsota nabiralcev
+  wrk: number;           // vsota delavcev
+  res: number;           // vsota raziskovalcev
+  scoutsSent: number;    // poslanih izvidnic
+  attacksSent: number;   // poslanih napadov
+  raidsFaced: number;    // AI raidov na kamp
+  raidsRepelled: number; // od tega odbitih
+  wpDestroyed: number;   // uničenih šibkih točk v obdobju
+}
+
 export function tileId(t: { q: number; r: number }): string {
   return `${t.q},${t.r}`;
 }
@@ -235,6 +250,10 @@ export interface GameState {
   // Načrt AI raidov za tekoče obdobje (faza ali leto totalnega napada po 36. mesecu):
   // ob vstopu v obdobje se določi število napadov in razporedi po mesecih.
   raidPlan?: { periodStart: number; periodEnd: number; months: number[] };
+
+  // Agregat igralčeve TAKTIKE po obdobjih — za pregled ob koncu igre
+  // (primerjava z evolucijsko najdeno strategijo; "kaj popraviti naslednjič").
+  tacticsByPhase?: Partial<Record<'find' | 'understand' | 'eliminate' | 'assault', TacticsAgg>>;
 
   // Čas
   round: number;       // 1–12 znotraj faze

@@ -710,3 +710,20 @@ describe('taktika > sreča + rok AI-ja', () => {
     expect(r.status).toBe('victory');
   });
 });
+
+describe('tacticsByPhase — agregat taktike za pregled ob koncu', () => {
+  it('beleži mesece, razporeditve, raide in odprave po obdobjih', () => {
+    let s: GameState = { ...newGame(12), resources: { ...newGame(12).resources, survival: 2000 } };
+    for (let m = 0; m < 3; m++) {
+      s = processRound(s, action({ defenders: 10, foragers: 20, workers: 5, researchers: 5,
+        newExpeditions: m === 0 ? [{ kind: 'scout', path: [{ q: 1, r: 4 }, { q: 2, r: 4 }], assigned: 4, rations: 3 }] : undefined }));
+    }
+    const t = s.tacticsByPhase?.find;
+    expect(t).toBeTruthy();
+    expect(t!.months).toBe(3);
+    expect(t!.def).toBe(30);
+    expect(t!.forag).toBe(60);
+    expect(t!.scoutsSent).toBe(1);
+    expect(t!.raidsFaced).toBeGreaterThanOrEqual(0);
+  });
+});

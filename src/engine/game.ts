@@ -1060,6 +1060,28 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     status = 'victory';
   }
 
+  // Agregat igralčeve TAKTIKE za pregled ob koncu igre (po obdobjih, v jeziku genoma)
+  const tacticsKey = (state.totalRounds > 36 ? 'assault' : state.phase) as 'find' | 'understand' | 'eliminate' | 'assault';
+  const tPrev = state.tacticsByPhase ?? {};
+  const tCur = tPrev[tacticsKey] ?? { months: 0, pop: 0, def: 0, forag: 0, wrk: 0, res: 0,
+    scoutsSent: 0, attacksSent: 0, raidsFaced: 0, raidsRepelled: 0, wpDestroyed: 0 };
+  const wpExploitedBefore = state.aiWeakPoints.filter(w => w.exploited).length;
+  const wpExploitedNow = aiWeakPoints.filter(w => w.exploited).length;
+  const newExpsIn = assignment.newExpeditions ?? [];
+  const tacticsByPhase = { ...tPrev, [tacticsKey]: {
+    months: tCur.months + 1,
+    pop: tCur.pop + Math.max(0, state.population),
+    def: tCur.def + (assignment.defenders ?? 0),
+    forag: tCur.forag + (assignment.foragers ?? 0),
+    wrk: tCur.wrk + (assignment.workers ?? 0),
+    res: tCur.res + (assignment.researchers ?? 0),
+    scoutsSent: tCur.scoutsSent + newExpsIn.filter(e => e.kind === 'scout').length,
+    attacksSent: tCur.attacksSent + newExpsIn.filter(e => e.kind === 'mission').length,
+    raidsFaced: tCur.raidsFaced + (raidLog?.occurred ? 1 : 0),
+    raidsRepelled: tCur.raidsRepelled + (raidLog?.occurred && (raidLog.outcome === 'victory' || raidLog.outcome === 'partial') ? 1 : 0),
+    wpDestroyed: tCur.wpDestroyed + Math.max(0, wpExploitedNow - wpExploitedBefore),
+  } };
+
   const log: RoundLog = {
     round: state.round,
     phase: state.phase,
@@ -1090,6 +1112,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     round,
     phase,
     raidPlan,
+    tacticsByPhase,
     totalRounds: state.totalRounds + 1,
     population: finalPopulation,
     maxPopulation: finalMaxPopulation,

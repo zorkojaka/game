@@ -3904,6 +3904,71 @@ function endScreenImage(status: GameState['status']): string {
   return '/assets/screens/end-overwhelmed.png';
 }
 
+// Referenčna strategija — NAJBOLJŠA, ki jo je našla evolucija (scripts/evolve.mjs, normal).
+// Pregled ob koncu igre primerja igralčevo dejansko taktiko s to in svetuje popravke.
+const EVOLVED_BENCHMARK: Record<'find' | 'understand' | 'eliminate' | 'assault',
+  { label: string; def: number; forag: number; wrk: number; res: number; hint: string }> = {
+  find:       { label: 'FAZA 1 — IŠČI',       def: 10, forag: 38, wrk: 16, res: 27, hint: 'malo obrambe, veliko hrane in raziskav, izvidnice ven' },
+  understand: { label: 'FAZA 2 — PRIPRAVI',   def: 24, forag: 35, wrk: 14, res: 19, hint: 'dvigni obrambo, gradi obzidje, raziskuj orožje' },
+  eliminate:  { label: 'FAZA 3 — NAPADI',     def: 28, forag: 33, wrk: 18, res: 13, hint: 'trdna obramba + napadi na šibke točke (15+ ljudi)' },
+  assault:    { label: 'TOTALNI NAPAD (37+)', def: 27, forag: 18, wrk: 28, res: 20, hint: 'trdnjava: obramba in delavnice, zmelji robote' },
+};
+
+/** Pregled taktike po obdobjih + namigi (primerjava z evolucijsko strategijo). */
+function TacticsReview({ game }: { game: GameState }) {
+  const t = game.tacticsByPhase;
+  if (!t || Object.keys(t).length === 0) return null;
+  const order: Array<'find' | 'understand' | 'eliminate' | 'assault'> = ['find', 'understand', 'eliminate', 'assault'];
+  const tips: string[] = [];
+  const rows = order.filter(k => t[k] && t[k]!.months > 0).map(k => {
+    const a = t[k]!;
+    const bench = EVOLVED_BENCHMARK[k];
+    const pct = (x: number) => a.pop > 0 ? Math.round((x / a.pop) * 100) : 0;
+    const mine = { def: pct(a.def), forag: pct(a.forag), wrk: pct(a.wrk), res: pct(a.res) };
+    // namigi: odstopanje ≥ 10 točk od evolucijske strategije
+    const roleLbl = { def: 'obrambo', forag: 'hrano', wrk: 'delavnice', res: 'raziskave' } as const;
+    (Object.keys(roleLbl) as Array<keyof typeof roleLbl>).forEach(r => {
+      const d = mine[r] - bench[r];
+      if (d <= -10) tips.push(`${bench.label}: premalo za ${roleLbl[r]} (${mine[r]} % proti priporočenim ${bench[r]} %).`);
+      else if (d >= 12) tips.push(`${bench.label}: preveč za ${roleLbl[r]} (${mine[r]} % proti priporočenim ${bench[r]} %).`);
+    });
+    if (k === 'find' && a.scoutsSent < 3) tips.push('FAZA 1: premalo izvidnic — mapa mora biti raziskana do faze 2 (pošlji jih več vzporedno).');
+    if (k === 'eliminate' && a.attacksSent === 0) tips.push('FAZA 3: nobenega napada na šibke točke — brez tega ni zmage.');
+    return { k, a, bench, mine };
+  });
+  return (
+    <div className="go-tactics">
+      <h3 className="go-tac-title">📊 PREGLED TVOJE TAKTIKE <span className="dim small">(tvoja % proti 🧬 evolucijsko najdeni strategiji)</span></h3>
+      {rows.map(({ k, a, bench, mine }) => (
+        <div key={k} className="go-tac-row">
+          <div className="go-tac-head">
+            <b>{bench.label}</b>
+            <span className="dim small">{a.months} mes. · raidi {a.raidsRepelled}/{a.raidsFaced} odbiti · 🔭{a.scoutsSent} · ⚔️{a.attacksSent} · ◆{a.wpDestroyed}</span>
+          </div>
+          <div className="go-tac-bars">
+            {([['def', '🛡', '#66aabb'], ['forag', '🌾', '#6aa630'], ['wrk', '🔨', '#cc7733'], ['res', '🔬', '#3377cc']] as const).map(([r, ic, col]) => (
+              <div key={r} className="go-tac-bar" title={`${ic} ti: ${mine[r]} % · 🧬 ${bench[r]} %`}>
+                <span className="go-tac-ic">{ic}</span>
+                <div className="go-tac-track">
+                  <div className="go-tac-fill" style={{ width: `${Math.min(100, mine[r])}%`, background: col }} />
+                  <div className="go-tac-mark" style={{ left: `${Math.min(100, bench[r])}%` }} />
+                </div>
+                <span className="go-tac-num">{mine[r]}<span className="dim">/{bench[r]}%</span></span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {tips.length > 0 && (
+        <div className="go-tac-tips">
+          <b>💡 Za naslednjič:</b>
+          <ul>{[...new Set(tips)].slice(0, 5).map((tip, i) => <li key={i}>{tip}</li>)}</ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GameOverScreen({ game, onNew, loading }: { game: GameState; onNew: () => void; loading: boolean }) {
   const won = game.status === 'victory';
   const exploited = game.aiWeakPoints.filter(w => w.exploited).length;
@@ -3937,6 +4002,7 @@ function GameOverScreen({ game, onNew, loading }: { game: GameState; onNew: () =
             </div>
           ))}
         </div>
+        <TacticsReview game={game} />
         <button className="start-btn go-btn" onClick={onNew} disabled={loading}>
           {loading ? '⟳' : '↺  NOVA LINIJA'}
         </button>
