@@ -1746,16 +1746,19 @@ function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardD
         stats: [{ label: 'Šibkost', value: unitWeakness, tone: 'good' }],
         researchCompleted,
       });
-    } else if (/Odprava se je vrnila|ZAVEZNIŠTVO|Napad uspešen|Napad odbit|Odprava izgubljena/.test(line)) {
-      const lost = /izgubljena|odbit/.test(line);
+    } else if (/Odprava se je vrnila|ZAVEZNIŠTVO|Napad uspešen|Napad odbit|Odprava izgubljena|Odprava .*se ni vrnila/.test(line)) {
+      const missing = /se ni vrnila/.test(line);
+      const lost = missing || /izgubljena|odbit/.test(line);
       add({
         id: `exp-${log.round}-${idx}`,
         kind: 'expedition',
         tone: lost ? 'bad' : 'good',
         eyebrow: 'Odprava',
-        title: /ZAVEZNIŠTVO/.test(line) ? 'Zavezništvo sklenjeno' : lost ? 'Odprava pod pritiskom' : 'Odprava uspela',
-        body: line.replace(/^[^\s]+ /, ''),
-        stats: [{ label: 'Izid', value: lost ? 'izgube' : 'uspeh', tone: lost ? 'bad' : 'good' }],
+        title: /ZAVEZNIŠTVO/.test(line) ? 'Zavezništvo sklenjeno' : missing ? 'Izgubili smo stik z odpravo' : lost ? 'Odprava pod pritiskom' : 'Odprava uspela',
+        body: missing
+          ? 'Signal je utihnil in oznaka odprave je izginila z zemljevida. Ne vemo, kaj se jim je zgodilo.'
+          : line.replace(/^[^\s]+ /, ''),
+        stats: [{ label: 'Izid', value: missing ? 'komunikacija izgubljena' : lost ? 'izgube' : 'uspeh', tone: lost ? 'bad' : 'good' }],
       });
     }
   });
