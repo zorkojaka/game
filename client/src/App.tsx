@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, Fragment } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan, AIUnits, TacticsAgg } from './types';
 import { tileId, hexLabel } from './types';
-import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
+import { createGame, getGame, playRound, previewOdds, sendFeedback, getStats } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
 import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT, wpGarrisonUnits, RESEARCH_LEVEL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS } from '../../src/engine/constants';
 import { missionSuccessProbability, aiEnergyInflow, aiCoreDestroyed, aiTargetArmy, wpEffectiveGarrison, effectiveRaidAttackPower, raidProbability } from '../../src/engine/game';
@@ -48,21 +48,6 @@ const RATIONS: Record<number, RationsRow> = Object.fromEntries(
 const STORAGE_KEY = 'avh-runId';
 const SOUND_STORAGE_KEY = 'avh-soundEnabled';
 
-// Števec ODIGRANIH iger (samo resnične, v brskalniku — simulator jih ne dotika).
-const STATS_KEY = 'avh-stats';
-const STATS_SEED_KEY = 'avh-lastResultSeed';
-type GameStats = { played: number; wins: number; losses: number };
-function readStats(): GameStats {
-  try { const s = JSON.parse(localStorage.getItem(STATS_KEY) || ''); if (s && typeof s.played === 'number') return s; } catch { /* ignore */ }
-  return { played: 0, wins: 0, losses: 0 };
-}
-function recordResult(seed: number, won: boolean): void {
-  if (localStorage.getItem(STATS_SEED_KEY) === String(seed)) return;  // ista igra → ne štej dvakrat
-  localStorage.setItem(STATS_SEED_KEY, String(seed));
-  const s = readStats();
-  s.played++; if (won) s.wins++; else s.losses++;
-  localStorage.setItem(STATS_KEY, JSON.stringify(s));
-}
 
 type StartTacticId = 'food' | 'research' | 'workshop' | 'defense';
 
@@ -4297,7 +4282,8 @@ function StartScreen({ onNew, loading, soundEnabled, onToggleSound }: { onNew: (
   ];
   const assignedStart = alloc.reduce((s, a) => s + a.value, 0);
   const freeStart = 15;
-  const stats = readStats();
+  const [stats, setStats] = useState<{ played: number; wins: number; losses: number } | null>(null);
+  useEffect(() => { getStats().then(setStats); }, []);
 
   return (
     <div className="start">
@@ -4346,11 +4332,9 @@ function StartScreen({ onNew, loading, soundEnabled, onToggleSound }: { onNew: (
         <button className="start-btn" onClick={() => onNew(selectedTactic, difficulty)} disabled={loading}>
           {loading ? '⟳ Nalagam…' : '▶  ZAČNI IGRO'}
         </button>
-        {stats.played > 0 && (
-          <div className="start-stats dim small" title="Samo tvoje resnične igre (brez simulacij)">
-            🎮 odigranih <b>{stats.played}</b> · 🏆 zmag <b style={{ color: '#22cc66' }}>{stats.wins}</b> · 💀 porazov <b style={{ color: '#cc5555' }}>{stats.losses}</b>
-          </div>
-        )}
+        <div className="start-stats dim small" title="Globalno vsi igralci (brez simulacij in razvijalca)">
+          🌍 odigranih <b>{stats ? stats.played : '…'}</b> · 🏆 zmag <b style={{ color: '#22cc66' }}>{stats ? stats.wins : '…'}</b> · 💀 porazov <b style={{ color: '#cc5555' }}>{stats ? stats.losses : '…'}</b>
+        </div>
       </div>
       <div className="start-tactics" aria-label="Začetna taktika">
         <div className="st-tabs">
@@ -4615,10 +4599,6 @@ export default function App() {
   const [loading,    setLoading]    = useState(false);
   const [showStart,  setShowStart]  = useState(false);
 
-  // Zabeleži izid resnične igre (zmaga/poraz) v števec — enkrat na igro (po seedu).
-  useEffect(() => {
-    if (game && game.status !== 'active') recordResult(game.rngSeed, game.status === 'victory');
-  }, [game?.status, game?.rngSeed]);
   const [axis,       setAxis]       = useState<HumanAxis>('obzidje');
   const [combatants,   setCombatants]   = useState(0);
   const [defenders,    setDefenders]    = useState(15);

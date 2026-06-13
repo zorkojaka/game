@@ -97,8 +97,9 @@ app.post('/api/game/:runId/round', async (req, res) => {
   const newState = processRound(doc as ReturnType<typeof newGame>, action);
   await GameSession.updateOne({ runId: doc.runId }, { $set: newState });
 
-  // Če je igra končana, shrani v CompletedRun z dejansko zgodovino osi
-  if (newState.status !== 'active') {
+  // Če je igra končana, shrani v CompletedRun z dejansko zgodovino osi.
+  // Opt-out: brskalnik z glavo x-no-stats:1 (npr. razvijalčev) se NE šteje v globalni števec.
+  if (newState.status !== 'active' && req.get('x-no-stats') !== '1') {
     await CompletedRun.create({
       runId: newState.runId,
       status: newState.status,
@@ -147,6 +148,17 @@ app.get('/api/feedback', async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const list = await Feedback.find().sort({ createdAt: -1 }).limit(200).lean();
   res.json(list);
+});
+
+// Globalni števec odigranih iger (vsi resnični igralci; simulator ne kliče API-ja).
+app.get('/api/stats', async (_req, res) => {
+  try {
+    const played = await CompletedRun.countDocuments({});
+    const wins = await CompletedRun.countDocuments({ status: 'victory' });
+    res.json({ played, wins, losses: Math.max(0, played - wins) });
+  } catch {
+    res.json({ played: 0, wins: 0, losses: 0 });
+  }
 });
 
 // Seznam sej (zadnjih 20, admin)

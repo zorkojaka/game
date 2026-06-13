@@ -22,12 +22,25 @@ export async function playRound(
   runId: string,
   action: { assignment: Assignment; targetWeakPoint?: string }
 ): Promise<{ state: GameState }> {
+  // Opt-out: brskalnik z localStorage 'avh-noStats' = '1' se ne šteje v globalni števec.
+  const noStats = typeof localStorage !== 'undefined' && localStorage.getItem('avh-noStats') === '1';
   const res = await fetch(`${BASE}/game/${runId}/round`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(noStats ? { 'x-no-stats': '1' } : {}) },
     body: JSON.stringify(action),
   });
   return res.json();
+}
+
+/** Globalni števec odigranih iger vseh igralcev (iz baze CompletedRun). */
+export async function getStats(): Promise<{ played: number; wins: number; losses: number }> {
+  try {
+    const res = await fetch(`${BASE}/stats`);
+    if (!res.ok) throw new Error('stats');
+    return await res.json();
+  } catch {
+    return { played: 0, wins: 0, losses: 0 };
+  }
 }
 
 export async function sendFeedback(
