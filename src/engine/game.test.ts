@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability, missionSuccessProbability , aiEnergyInflow, aiReinforce, aiCoreDestroyed, aiTargetArmy } from './game.js';
+import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability, missionSuccessProbability , aiEnergyInflow, aiReinforce, aiCoreDestroyed, aiTargetArmy, aiChoosePhaseShipment } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus, resolveCombat } from './combat.js';
 import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp, tileEncounterProbability, expeditionMonthsForSteps } from './expedition.js';
 import { wpGarrisonMult } from './constants.js';
@@ -915,5 +915,19 @@ describe('AI ekonomija — energija iz jedra poganja nadomeščanje', () => {
     const g = newGame(9, 'normal');
     const r = processRound(g, action({ foragers: 10 }));
     expect((r.aiEnergy ?? 0)).toBeGreaterThan(g.aiEnergy ?? 0);
+  });
+});
+
+describe('AI izbira pošiljke ob prehodu faze (#1)', () => {
+  it('iz proračuna kupi signaturno enoto faze (v1 reproducira lok)', () => {
+    // normal: 75 napadalcev × cena 4 = 300 energije → 75 napadalcev
+    expect(aiChoosePhaseShipment('understand', 75 * 4)).toEqual({ scouts: 0, attackers: 75, peopleKillers: 0 });
+    // 25 people-killerjev × cena 10 = 250 → 25 pk
+    expect(aiChoosePhaseShipment('eliminate', 25 * 10)).toEqual({ scouts: 0, attackers: 0, peopleKillers: 25 });
+  });
+  it('prehod v understand še vedno pripelje natanko profilno število (ohranjen balans)', () => {
+    const g: GameState = { ...newGame(2, 'normal'), aiPhaseProgress: 11, round: 12 };
+    const r = processRound(g, action({ foragers: 5 }));
+    expect(r.aiUnits.attackers).toBe(75);
   });
 });
