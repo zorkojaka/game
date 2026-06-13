@@ -5,7 +5,8 @@ import { tileId, hexLabel } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
 import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT, wpGarrisonUnits, RESEARCH_LEVEL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS } from '../../src/engine/constants';
-import { missionSuccessProbability } from '../../src/engine/game';
+import { missionSuccessProbability, aiEnergyInflow, aiCoreDestroyed, aiTargetArmy, wpEffectiveGarrison, effectiveRaidAttackPower, raidProbability } from '../../src/engine/game';
+import { aiAttackPower } from '../../src/engine/constants';
 import { expeditionMonthsForSteps } from '../../src/engine/expedition';
 import { logicalWeaknessBonus, logicalWeaknessByRobot } from '../../src/engine/combat';
 import { MAP_COLS, MAP_ROWS, collapseCampRuns } from '../../src/engine/map';
@@ -3910,6 +3911,86 @@ const HELP_ANCHORS: HelpAnchorDef[] = [
     text: 'Izvede potezo. Cilj: uniči vse ◆ šibke točke ali vse robote, preden klan izumre.' },
 ];
 
+/** 🔬 Inšpektor engina — "ozadje igre": živo stanje JAZ / AI (akcijski prostor) /
+ *  formule z vstavljenimi vrednostmi. Bere `game` + čiste engine-funkcije. */
+function EngineInspector({ game, onClose }: { game: GameState; onClose: () => void }) {
+  const prof = difficultyProfile(game.difficulty);
+  const units = game.aiUnits ?? { scouts: game.aiRobots, attackers: 0, peopleKillers: 0 };
+  const inflow = aiEnergyInflow(game);
+  const coreDead = aiCoreDestroyed(game);
+  const target = aiTargetArmy(game, game.totalRounds);
+  const deficit = (k: keyof typeof units) => Math.max(0, (target[k] ?? 0) - (units[k] ?? 0));
+  const raidPow = effectiveRaidAttackPower(game) * RAID_AI_FORCE_PCT;
+  const wps = game.aiWeakPoints ?? [];
+  const f0 = (n: number) => Math.round(n).toString();
+  const f1 = (n: number) => n.toFixed(1);
+  const pct = (n: number) => `${Math.round(n * 100)} %`;
+  const wLv = game.weaponResearchLevel ?? 0;
+  const wallLv = game.wallResearchLevel ?? 0;
+
+  const Row = ({ k, v, hint }: { k: string; v: React.ReactNode; hint?: string }) => (
+    <div title={hint} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '2px 0', fontSize: '.78rem', borderBottom: '1px solid #161f29' }}>
+      <span style={{ color: '#9fb0c0' }}>{k}</span><span style={{ color: '#e8eef4', fontWeight: 600, textAlign: 'right' }}>{v}</span>
+    </div>
+  );
+  const Sec = ({ t, sub, children }: { t: string; sub?: string; children: React.ReactNode }) => (
+    <div style={{ margin: '10px 0', padding: '8px 11px', background: '#0d141b', border: '1px solid #223344', borderRadius: 9 }}>
+      <div style={{ fontSize: '.8rem', letterSpacing: '.03em', color: '#9fd0ff', marginBottom: 6, fontWeight: 700 }}>{t}{sub && <span style={{ color: '#6a7c8c', fontWeight: 400 }}> — {sub}</span>}</div>
+      {children}
+    </div>
+  );
+
+  return (
+    <div className="info-overlay" onClick={onClose}>
+      <div className="info-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 720, width: '92%', maxHeight: '88vh', overflowY: 'auto', textAlign: 'left' }}>
+        <button className="info-close" onClick={onClose}>✕</button>
+        <div className="info-title">🔬 Ozadje igre — inšpektor engina</div>
+        <div style={{ fontSize: '.72rem', color: '#7e90a0', marginBottom: 4 }}>
+          Mesec {game.totalRounds + 1} · faza {game.phase} · težavnost {prof.label} · seed {game.rngSeed}
+        </div>
+
+        <Sec t="🧍 JAZ — klan" sub="moja stran">
+          <Row k="Ljudje (kamp)" v={Math.max(0, game.population)} />
+          <Row k="Hrana · Orožje · Material · Intel" v={`${f0(game.resources.survival)} · ${f0(game.resources.combat)} · ${f0(game.resources.material ?? 0)} · ${f0(game.resources.intelligence)}`} />
+          <Row k="Artefakti 💎" v={game.resources.artifacts ?? 0} hint="vsak instant uniči eno šibko točko" />
+          <Row k="Orožje raziskava" v={`Lv${wLv} → učinek ×${f1(weaponEffectMult(game.difficulty, wLv))}`} hint={`vsaka stopnja: učinek orožja × ${prof.weaponResearchMult}`} />
+          <Row k="Obzidje" v={`${game.wallsBuilt ?? 0}× · raziskava Lv${wallLv} → +${pct(prof.wallDefensePct * researchMult(wallLv))}/zid`} hint="prispevek enega obzidja k obrambni moči" />
+          <Row k="Znanje o AI (insight)" v={pct(game.aiInsight ?? 0)} hint="odpira AI drevo; fazni stropi 30/60/90 %" />
+        </Sec>
+
+        <Sec t="🤖 AI — akcijski prostor" sub="kaj AI počne in lahko počne">
+          <Row k="⚡ Energija (zaloga)" v={f0(game.aiEnergy ?? 0)} hint="poganja nadomeščanje izgubljenih enot" />
+          <Row k="⚡ Pritok / mesec" v={`${f1(inflow)} ${coreDead ? '(jedro 💥 → ×0.25)' : '(jedro ✓ celo)'}`} hint="iz energijskega jedra = šibka točka wp_power" />
+          <Row k="Enote" v={`🔭${units.scouts} · ⚔️${units.attackers} · ☠${units.peopleKillers} = ${game.aiRobots}`} />
+          <Row k="Napadalna moč (vsi)" v={f1(aiAttackPower(units))} hint={`raid uporabi ${pct(RAID_AI_FORCE_PCT)} → ${f1(raidPow)}`} />
+          <Row k="Obrambna moč (ko jih napadeš)" v={f1(aiDefensePower(units))} />
+          <Row k="Cilj vojske / bo obnovil" v={`🔭${target.scouts} ⚔️${target.attackers} ☠${target.peopleKillers}  →  primanjkljaj 🔭${deficit('scouts')} ⚔️${deficit('attackers')} ☠${deficit('peopleKillers')}`} hint="z energijo nadomesti izgube do cilja (drage enote prej)" />
+          <Row k="AI ve o nas" v={`${pct(game.aiKnowledge)} ${game.aiKnowledge >= 0.95 ? '· vidi SKRITE' : game.aiKnowledge > 0.5 ? '· +foreknowledge' : ''}`} hint="≥50 % → bonus v boju; ≥95 % → doseže skrite ljudi" />
+          <Row k="Raid plan (meseci)" v={game.raidPlan?.months?.map(m => m + 1).join(', ') || '—'} hint="načrtovani napadi tega obdobja" />
+        </Sec>
+
+        <Sec t="◆ Šibke točke / straža" sub="straža = del AI vojske; uničena znižuje skupne robote">
+          {wps.map(w => (
+            <Row key={w.id} k={`${w.exploited ? '💥' : w.discovered ? '◆' : '❔'} ${w.label}`}
+              v={w.exploited ? 'UNIČENA' : w.discovered ? `straža ${wpEffectiveGarrison(game, w.id)} · primer P(napad 10 ljudi) ${pct(missionSuccessProbability(game, w.id, 10, 3))}` : 'neodkrita'}
+              hint={w.id === 'wp_power' ? 'ENERGIJSKO JEDRO — uničenje zniža AI pritok na 25 %' : undefined} />
+          ))}
+        </Sec>
+
+        <Sec t="🧮 Formule & uteži" sub="z živimi vrednostmi">
+          <Row k="Taktična kocka" v="roll ∈ [0.20, 0.80] · p≥80 % vedno uspe, p≤20 % vedno pade" hint="taktika > sreča; dominacija ostane na verjetnost (DECISIVE_MARGIN 0.25)" />
+          <Row k="P(odbij raid)" v={`obramba / (obramba + ${f1(raidPow)})`} hint="obrambni člen = (branilci×1.2×obroki + orožje×0.4××orožje) ×(1+intel)×obzidje; odvisen od tvoje razporeditve" />
+          <Row k="P(napad na točko)" v="teamPower / (teamPower + trdota×straža)" hint="teamPower = (√ljudje×9.6 + orožje×1.2××orožje)×obroki×(1+intel)" />
+          <Row k="Verjetnost raida (ocena)" v={pct(raidProbability(game))} />
+        </Sec>
+        <div style={{ fontSize: '.68rem', color: '#6a7c8c', marginTop: 4 }}>
+          Ta panel je notranji pregled — kasneje skrit navadnim igralcem. AI akcijski prostor se bo tu širil (razporeditev robotov: raid / straža / patrulja / lov na odprave).
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HelpOverlay({ onClose }: { onClose: () => void }) {
   type Place = { rect: { x: number; y: number; w: number; h: number }; a: HelpAnchorDef; lx: number; ly: number; w: number };
   const [places, setPlaces] = useState<Place[]>([]);
@@ -4362,6 +4443,7 @@ export default function App() {
   const [showRules,    setShowRules]    = useState(false);
   const [appMenuOpen,  setAppMenuOpen]  = useState(false);
   const [helpOverlay,  setHelpOverlay]  = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(() => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem(SOUND_STORAGE_KEY) === '1';
@@ -4988,6 +5070,7 @@ export default function App() {
       {showFeedback && <FeedbackModal game={game} onClose={() => setShowFeedback(false)} />}
       {showRules && <RulesModal onClose={() => setShowRules(false)} />}
       {helpOverlay && <HelpOverlay onClose={() => setHelpOverlay(false)} />}
+      {inspectorOpen && <EngineInspector game={game} onClose={() => setInspectorOpen(false)} />}
       {appMenuOpen && (
         <div className="app-menu-overlay" onClick={() => setAppMenuOpen(false)}>
           <div className="app-menu" onClick={e => e.stopPropagation()}>
@@ -5040,6 +5123,8 @@ export default function App() {
           </button>
           <button className={`ph-menu-btn ph-info-btn${helpOverlay ? ' on' : ''}`} onClick={() => setHelpOverlay(o => !o)}
             title="Pomoč — razlaga gumbov" aria-label="Pomoč">ⓘ</button>
+          <button className={`ph-menu-btn${inspectorOpen ? ' on' : ''}`} onClick={() => setInspectorOpen(o => !o)}
+            title="Ozadje igre — inšpektor engina (JAZ / AI / formule)" aria-label="Ozadje igre">🔬</button>
           <button className="ph-menu-btn" onClick={() => setAppMenuOpen(true)} title="Meni" aria-label="Meni">
             {loading ? '⟳' : '☰'}
           </button>

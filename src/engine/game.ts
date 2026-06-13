@@ -104,7 +104,7 @@ export function mechanicalTechUnlockLevel(state: Pick<GameState, 'aiTree'>): num
 }
 
 /** AI raid moč po pasivnih logičnih bonusih igralca. */
-function effectiveRaidAttackPower(state: GameState): number {
+export function effectiveRaidAttackPower(state: GameState): number {
   const units = readAIUnits(state);
   const logical = logicalWeaknessByRobot(state);
   const reduce = (robot: keyof AIUnits) => Math.max(0, 1 - (logical[robot] ? LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS : 0));
