@@ -1570,9 +1570,9 @@ function unitEventImage(prefix: 'raid' | 'combat' | 'phase', unit: AIRobotType, 
 }
 
 function aiUnitIconHref(unit: AIRobotType): string {
-  if (unit === 'scouts') return '/assets/map/ai-scouts.svg';
-  if (unit === 'attackers') return '/assets/map/ai-attackers.svg';
-  return '/assets/map/ai-people-killers.svg';
+  if (unit === 'scouts') return '/assets/map/ai-scouts-real.png';
+  if (unit === 'attackers') return '/assets/map/ai-attackers-real.png';
+  return '/assets/map/ai-people-killers-real.png';
 }
 
 function aiUnitFromPhase(phase: AIWeakPoint['phase']): AIRobotType {
