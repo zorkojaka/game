@@ -3975,6 +3975,18 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
   const wLv = game.weaponResearchLevel ?? 0;
   const wallLv = game.wallResearchLevel ?? 0;
 
+  // Barvna paleta: ista veličina = ista barva po VSEJ strani (vrstice + formule),
+  // da vizualno povežeš, od kod pride vsak člen formule.
+  const C = {
+    ljudje:   '#6aa630',  orozje:   '#e0922f',  obzidje:  '#b07d4a',
+    intel:    '#5b9bd5',  obroki:   '#e58fb0',  energija: '#ffd84a',
+    aiMoc:    '#e0564a',  straza:   '#a07cff',  insight:  '#3fb6c9',
+  };
+  const Tok = ({ c, children }: { c: string; children: React.ReactNode }) => <b style={{ color: c }}>{children}</b>;
+  const orozMult = weaponEffectMult(game.difficulty, wLv);
+  const wallFactor = 1 + prof.wallDefensePct * researchMult(wallLv) * (game.wallsBuilt ?? 0);
+  const intelMult = 1 + Math.min(0.25, 0.05 * (game.resources.intelligence / 100));
+
   const Row = ({ k, v, hint }: { k: string; v: React.ReactNode; hint?: string }) => (
     <div title={hint} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '2px 0', fontSize: '.78rem', borderBottom: '1px solid #161f29' }}>
       <span style={{ color: '#9fb0c0' }}>{k}</span><span style={{ color: '#e8eef4', fontWeight: 600, textAlign: 'right' }}>{v}</span>
@@ -3997,21 +4009,23 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
         </div>
 
         <Sec t="🧍 JAZ — klan" sub="moja stran">
-          <Row k="Ljudje (kamp)" v={Math.max(0, game.population)} />
-          <Row k="Hrana · Orožje · Material · Intel" v={`${f0(game.resources.survival)} · ${f0(game.resources.combat)} · ${f0(game.resources.material ?? 0)} · ${f0(game.resources.intelligence)}`} />
+          <Row k="Ljudje (kamp)" v={<Tok c={C.ljudje}>{Math.max(0, game.population)}</Tok>} hint="branilci/napadalci/teamPower izhajajo iz ljudi" />
+          <Row k="Hrana · Orožje · Material · Intel" v={<>{f0(game.resources.survival)} · <Tok c={C.orozje}>{f0(game.resources.combat)}</Tok> · {f0(game.resources.material ?? 0)} · <Tok c={C.intel}>{f0(game.resources.intelligence)}</Tok></>} />
           <Row k="Artefakti 💎" v={game.resources.artifacts ?? 0} hint="vsak instant uniči eno šibko točko" />
-          <Row k="Orožje raziskava" v={`Lv${wLv} → učinek ×${f1(weaponEffectMult(game.difficulty, wLv))}`} hint={`vsaka stopnja: učinek orožja × ${prof.weaponResearchMult}`} />
-          <Row k="Obzidje" v={`${game.wallsBuilt ?? 0}× · raziskava Lv${wallLv} → +${pct(prof.wallDefensePct * researchMult(wallLv))}/zid`} hint="prispevek enega obzidja k obrambni moči" />
-          <Row k="Znanje o AI (insight)" v={pct(game.aiInsight ?? 0)} hint="odpira AI drevo; fazni stropi 30/60/90 %" />
+          <Row k="Orožje — učinek (raziskava)" v={<>Lv{wLv} → ×<Tok c={C.orozje}>{f1(orozMult)}</Tok></>} hint={`vsaka stopnja: učinek orožja × ${prof.weaponResearchMult}`} />
+          <Row k="Obzidje — faktor obrambe" v={<><Tok c={C.obzidje}>{game.wallsBuilt ?? 0}×</Tok> · Lv{wallLv} → ×<Tok c={C.obzidje}>{f1(wallFactor)}</Tok></>} hint={`1 + ${pct(prof.wallDefensePct)} × 2^Lv × št. obzidij`} />
+          <Row k="Obroki — moč (×)" v={<Tok c={C.obroki}>×{f1(RATIONS_LEVELS[3]?.strengthMult ?? 1)}</Tok>} hint="trenutni prikaz pri normalnih obrokih; izbira obrokov spremeni ta množitelj" />
+          <Row k="Intel — množitelj boja" v={<Tok c={C.intel}>×{f1(intelMult)}</Tok>} hint="1 + min(25 %, 5 %/100 intela)" />
+          <Row k="Znanje o AI (insight)" v={<Tok c={C.insight}>{pct(game.aiInsight ?? 0)}</Tok>} hint="odpira AI drevo; fazni stropi 30/60/90 %" />
         </Sec>
 
         <Sec t="🤖 AI — akcijski prostor" sub="kaj AI počne in lahko počne">
-          <Row k="⚡ Energija (zaloga)" v={f0(game.aiEnergy ?? 0)} hint="poganja nadomeščanje izgubljenih enot" />
-          <Row k="⚡ Pritok / mesec" v={`${f1(inflow)} ${coreDead ? '(jedro 💥 → ×0.25)' : '(jedro ✓ celo)'}`} hint="iz energijskega jedra = šibka točka wp_power" />
+          <Row k="⚡ Energija (zaloga)" v={<Tok c={C.energija}>{f0(game.aiEnergy ?? 0)}</Tok>} hint="poganja nadomeščanje izgubljenih enot" />
+          <Row k="⚡ Pritok / mesec" v={<><Tok c={C.energija}>{f1(inflow)}</Tok> {coreDead ? '(jedro 💥 → ×0.25)' : '(jedro ✓ celo)'}</>} hint="iz energijskega jedra = šibka točka wp_power" />
           <Row k="Enote" v={`🔭${units.scouts} · ⚔️${units.attackers} · ☠${units.peopleKillers} = ${game.aiRobots}`} />
-          <Row k="Napadalna moč (vsi)" v={f1(aiAttackPower(units))} hint={`raid uporabi ${pct(RAID_AI_FORCE_PCT)} → ${f1(raidPow)}`} />
+          <Row k="Napadalna moč → raid" v={<>{f1(aiAttackPower(units))} → raid <Tok c={C.aiMoc}>{f1(raidPow)}</Tok></>} hint={`raid uporabi ${pct(RAID_AI_FORCE_PCT)} napadalne moči`} />
           <Row k="Obrambna moč (ko jih napadeš)" v={f1(aiDefensePower(units))} />
-          <Row k="Cilj vojske / bo obnovil" v={`🔭${target.scouts} ⚔️${target.attackers} ☠${target.peopleKillers}  →  primanjkljaj 🔭${deficit('scouts')} ⚔️${deficit('attackers')} ☠${deficit('peopleKillers')}`} hint="z energijo nadomesti izgube do cilja (drage enote prej)" />
+          <Row k="Cilj vojske / bo obnovil" v={`🔭${target.scouts} ⚔️${target.attackers} ☠${target.peopleKillers} → primanjkljaj 🔭${deficit('scouts')} ⚔️${deficit('attackers')} ☠${deficit('peopleKillers')}`} hint="z energijo nadomesti izgube do cilja (drage enote prej)" />
           <Row k="AI ve o nas" v={`${pct(game.aiKnowledge)} ${game.aiKnowledge >= 0.95 ? '· vidi SKRITE' : game.aiKnowledge > 0.5 ? '· +foreknowledge' : ''}`} hint="≥50 % → bonus v boju; ≥95 % → doseže skrite ljudi" />
           <Row k="Raid plan (meseci)" v={game.raidPlan?.months?.map(m => m + 1).join(', ') || '—'} hint="načrtovani napadi tega obdobja" />
         </Sec>
@@ -4019,19 +4033,23 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
         <Sec t="◆ Šibke točke / straža" sub="straža = del AI vojske; uničena znižuje skupne robote">
           {wps.map(w => (
             <Row key={w.id} k={`${w.exploited ? '💥' : w.discovered ? '◆' : '❔'} ${w.label}`}
-              v={w.exploited ? 'UNIČENA' : w.discovered ? `straža ${wpEffectiveGarrison(game, w.id)} · primer P(napad 10 ljudi) ${pct(missionSuccessProbability(game, w.id, 10, 3))}` : 'neodkrita'}
+              v={w.exploited ? 'UNIČENA' : w.discovered ? <>straža <Tok c={C.straza}>{wpEffectiveGarrison(game, w.id)}</Tok> · P(napad 10) {pct(missionSuccessProbability(game, w.id, 10, 3))}</> : 'neodkrita'}
               hint={w.id === 'wp_power' ? 'ENERGIJSKO JEDRO — uničenje zniža AI pritok na 25 %' : undefined} />
           ))}
         </Sec>
 
-        <Sec t="🧮 Formule & uteži" sub="z živimi vrednostmi">
+        <Sec t="🧮 Formule & uteži" sub="iste barve = iste vrednosti zgoraj">
           <Row k="Taktična kocka" v="roll ∈ [0.20, 0.80] · p≥80 % vedno uspe, p≤20 % vedno pade" hint="taktika > sreča; dominacija ostane na verjetnost (DECISIVE_MARGIN 0.25)" />
-          <Row k="P(odbij raid)" v={`obramba / (obramba + ${f1(raidPow)})`} hint="obrambni člen = (branilci×1.2×obroki + orožje×0.4××orožje) ×(1+intel)×obzidje; odvisen od tvoje razporeditve" />
-          <Row k="P(napad na točko)" v="teamPower / (teamPower + trdota×straža)" hint="teamPower = (√ljudje×9.6 + orožje×1.2××orožje)×obroki×(1+intel)" />
+          <div style={{ fontSize: '.76rem', color: '#cfe0ee', padding: '6px 0', lineHeight: 1.7 }}>
+            <div><b style={{ color: '#9fd0ff' }}>P(odbij raid)</b> = O / (O + <Tok c={C.aiMoc}>{f1(raidPow)}</Tok>)</div>
+            <div style={{ paddingLeft: 14 }}>O = (<Tok c={C.ljudje}>branilci</Tok>×1.2×<Tok c={C.obroki}>obroki</Tok> + <Tok c={C.orozje}>{f0(game.resources.combat)}</Tok>×0.4×<Tok c={C.orozje}>{f1(orozMult)}</Tok>) × <Tok c={C.intel}>{f1(intelMult)}</Tok> × <Tok c={C.obzidje}>{f1(wallFactor)}</Tok></div>
+            <div style={{ marginTop: 6 }}><b style={{ color: '#9fd0ff' }}>P(napad na točko)</b> = T / (T + trdota×<Tok c={C.straza}>straža</Tok>)</div>
+            <div style={{ paddingLeft: 14 }}>T = (√<Tok c={C.ljudje}>ljudje</Tok>×9.6 + <Tok c={C.orozje}>{f0(game.resources.combat)}</Tok>×1.2×<Tok c={C.orozje}>{f1(orozMult)}</Tok>) × <Tok c={C.obroki}>obroki</Tok> × <Tok c={C.intel}>{f1(intelMult)}</Tok></div>
+          </div>
           <Row k="Verjetnost raida (ocena)" v={pct(raidProbability(game))} />
         </Sec>
         <div style={{ fontSize: '.68rem', color: '#6a7c8c', marginTop: 4 }}>
-          Ta panel je notranji pregled — kasneje skrit navadnim igralcem. AI akcijski prostor se bo tu širil (razporeditev robotov: raid / straža / patrulja / lov na odprave).
+          🎨 Barve: <Tok c={C.ljudje}>ljudje</Tok> · <Tok c={C.orozje}>orožje</Tok> · <Tok c={C.obzidje}>obzidje</Tok> · <Tok c={C.intel}>intel</Tok> · <Tok c={C.obroki}>obroki</Tok> · <Tok c={C.energija}>energija</Tok> · <Tok c={C.aiMoc}>AI moč</Tok> · <Tok c={C.straza}>straža</Tok> · <Tok c={C.insight}>insight</Tok>. Notranji pregled — kasneje skrit igralcem.
         </div>
       </div>
     </div>
