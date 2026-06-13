@@ -1385,84 +1385,72 @@ interface RoundEventCardData {
   researchCompleted?: ResearchObjective;
 }
 
-let cardAudioCtx: AudioContext | null = null;
+type CardSoundId =
+  | 'ui-on'
+  | 'raid-good'
+  | 'raid-bad'
+  | 'combat-win'
+  | 'combat-loss'
+  | 'research'
+  | 'artifact'
+  | 'weakpoint'
+  | 'expedition-good'
+  | 'expedition-bad'
+  | 'phase-ai'
+  | 'info';
 
-function getCardAudioContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
-  const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioCtor) return null;
-  if (!cardAudioCtx) cardAudioCtx = new AudioCtor();
-  if (cardAudioCtx.state === 'suspended') void cardAudioCtx.resume();
-  return cardAudioCtx;
+const CARD_SOUND_PATH: Record<CardSoundId, string> = {
+  'ui-on': '/assets/audio/card-ui-on.wav',
+  'raid-good': '/assets/audio/card-raid-good.wav',
+  'raid-bad': '/assets/audio/card-raid-bad.wav',
+  'combat-win': '/assets/audio/card-combat-win.wav',
+  'combat-loss': '/assets/audio/card-combat-loss.wav',
+  research: '/assets/audio/card-research.wav',
+  artifact: '/assets/audio/card-artifact.wav',
+  weakpoint: '/assets/audio/card-weakpoint.wav',
+  'expedition-good': '/assets/audio/card-expedition-good.wav',
+  'expedition-bad': '/assets/audio/card-expedition-bad.wav',
+  'phase-ai': '/assets/audio/card-phase-ai.wav',
+  info: '/assets/audio/card-info.wav',
+};
+
+const cardAudioCache = new Map<CardSoundId, HTMLAudioElement>();
+
+function preloadCardSounds() {
+  if (typeof Audio === 'undefined') return;
+  (Object.keys(CARD_SOUND_PATH) as CardSoundId[]).forEach(id => {
+    if (cardAudioCache.has(id)) return;
+    const audio = new Audio(CARD_SOUND_PATH[id]);
+    audio.preload = 'auto';
+    audio.volume = 0.72;
+    cardAudioCache.set(id, audio);
+  });
 }
 
-function tone(ctx: AudioContext, start: number, freq: number, duration: number, type: OscillatorType, volume: number) {
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, start);
-  gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(start);
-  osc.stop(start + duration + 0.025);
+function cardSoundId(card: RoundEventCardData): CardSoundId {
+  if (card.kind === 'raid') return card.tone === 'good' ? 'raid-good' : 'raid-bad';
+  if (card.kind === 'combat-win') return 'combat-win';
+  if (card.kind === 'combat-loss') return 'combat-loss';
+  if (card.kind === 'research') return 'research';
+  if (card.kind === 'artifact') return 'artifact';
+  if (card.kind === 'weakpoint') return 'weakpoint';
+  if (card.kind === 'expedition') return card.tone === 'bad' ? 'expedition-bad' : 'expedition-good';
+  if (card.kind === 'phase') return 'phase-ai';
+  return 'info';
 }
 
-function noiseHit(ctx: AudioContext, start: number, duration: number, volume: number) {
-  const buffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * duration)), ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
-  const src = ctx.createBufferSource();
-  const gain = ctx.createGain();
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(900, start);
-  gain.gain.setValueAtTime(volume, start);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-  src.buffer = buffer;
-  src.connect(filter);
-  filter.connect(gain);
-  gain.connect(ctx.destination);
-  src.start(start);
-  src.stop(start + duration);
+function playCardSound(id: CardSoundId, volume = 0.72) {
+  if (typeof Audio === 'undefined') return;
+  preloadCardSounds();
+  const cached = cardAudioCache.get(id);
+  const audio = cached ? cached.cloneNode(true) as HTMLAudioElement : new Audio(CARD_SOUND_PATH[id]);
+  audio.volume = volume;
+  audio.currentTime = 0;
+  void audio.play().catch(() => {});
 }
 
 function playRoundCardSound(card: RoundEventCardData) {
-  const ctx = getCardAudioContext();
-  if (!ctx) return;
-  const now = ctx.currentTime + 0.015;
-  if (card.kind === 'raid') {
-    noiseHit(ctx, now, 0.18, card.tone === 'good' ? 0.055 : 0.085);
-    tone(ctx, now + 0.03, card.tone === 'good' ? 190 : 92, 0.24, 'sawtooth', 0.045);
-    tone(ctx, now + 0.18, card.tone === 'good' ? 330 : 78, 0.18, 'triangle', 0.04);
-  } else if (card.kind === 'combat-win') {
-    tone(ctx, now, 330, 0.09, 'square', 0.035);
-    tone(ctx, now + 0.09, 494, 0.11, 'square', 0.035);
-    tone(ctx, now + 0.19, 740, 0.16, 'triangle', 0.04);
-  } else if (card.kind === 'combat-loss') {
-    noiseHit(ctx, now, 0.12, 0.06);
-    tone(ctx, now + 0.02, 180, 0.16, 'sawtooth', 0.045);
-    tone(ctx, now + 0.15, 104, 0.24, 'sawtooth', 0.04);
-  } else if (card.kind === 'research') {
-    tone(ctx, now, 660, 0.08, 'sine', 0.032);
-    tone(ctx, now + 0.08, 880, 0.08, 'sine', 0.032);
-    tone(ctx, now + 0.17, 1320, 0.18, 'triangle', 0.038);
-  } else if (card.kind === 'artifact' || card.kind === 'weakpoint') {
-    tone(ctx, now, 220, 0.12, 'triangle', 0.04);
-    tone(ctx, now + 0.07, 660, 0.18, 'sine', 0.038);
-    tone(ctx, now + 0.22, 990, 0.22, 'sine', 0.034);
-  } else if (card.kind === 'expedition') {
-    tone(ctx, now, card.tone === 'bad' ? 196 : 392, 0.10, 'triangle', 0.034);
-    tone(ctx, now + 0.11, card.tone === 'bad' ? 147 : 523, 0.16, 'triangle', 0.034);
-  } else if (card.kind === 'phase') {
-    tone(ctx, now, 110, 0.14, 'sawtooth', 0.04);
-    tone(ctx, now + 0.11, 165, 0.18, 'sawtooth', 0.04);
-    tone(ctx, now + 0.26, 220, 0.20, 'triangle', 0.035);
-  } else {
-    tone(ctx, now, card.tone === 'bad' ? 160 : 520, 0.14, 'triangle', 0.032);
-  }
+  playCardSound(cardSoundId(card));
 }
 
 const AREA_LABELS: Record<string, string> = {
@@ -4377,8 +4365,8 @@ export default function App() {
     setSoundEnabled(on => {
       const next = !on;
       if (next) {
-        const ctx = getCardAudioContext();
-        if (ctx) tone(ctx, ctx.currentTime + 0.015, 660, 0.1, 'sine', 0.025);
+        preloadCardSounds();
+        playCardSound('ui-on', 0.58);
       }
       return next;
     });
