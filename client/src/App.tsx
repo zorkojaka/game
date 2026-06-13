@@ -4003,13 +4003,15 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
 
   return (
     <div className="info-overlay" onClick={onClose}>
-      <div className="info-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 720, width: '92%', maxHeight: '88vh', overflowY: 'auto', textAlign: 'left' }}>
+      <div className="info-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 980, width: '94%', maxHeight: '88vh', overflowY: 'auto', textAlign: 'left' }}>
         <button className="info-close" onClick={onClose}>✕</button>
         <div className="info-title">🔬 Ozadje igre — inšpektor engina</div>
         <div style={{ fontSize: '.72rem', color: '#7e90a0', marginBottom: 4 }}>
           Mesec {game.totalRounds + 1} · faza {game.phase} · težavnost {prof.label} · seed {game.rngSeed}
         </div>
 
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, alignItems: 'start' }}>
+        <div>
         <Sec t="🧍 JAZ — klan" sub="moja stran">
           <Row kc={C.ljudje} k="ljudje (kamp)" v={Math.max(0, game.population)} hint="branilci/napadalci/teamPower izhajajo iz ljudi" />
           <Row kc={C.orozje} k="orožje (zaloga)" v={f0(game.resources.combat)} hint="isto orožje brani, napada in ga nesejo misije" />
@@ -4036,35 +4038,45 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
           {wps.map(w => (
             <Row key={w.id} kc={w.discovered && !w.exploited ? C.straza : undefined}
               k={`${w.exploited ? '💥' : w.discovered ? '◆' : '❔'} ${w.label}`}
-              v={w.exploited ? 'UNIČENA' : w.discovered ? `straža ${wpEffectiveGarrison(game, w.id)} · P(napad 10) ${pct(missionSuccessProbability(game, w.id, 10, 3))}` : 'neodkrita'}
+              v={w.exploited ? 'UNIČENA' : w.discovered ? `straža ${wpEffectiveGarrison(game, w.id)} · uspeh z 10 ljudmi ${pct(missionSuccessProbability(game, w.id, 10, 3))}` : 'neodkrita'}
               hint={w.id === 'wp_power' ? 'ENERGIJSKO JEDRO — uničenje zniža AI pritok na 25 %' : undefined} />
           ))}
         </Sec>
+        </div>
 
-        <Sec t="🧮 Formule & uteži" sub="iste barve = iste spremenljivke zgoraj">
+        <div>
+        <Sec t="🧮 Kako se izračuna izid" sub="iste barve = iste spremenljivke levo">
           {/* Grafični pas taktične kocke */}
-          <div style={{ margin: '2px 0 10px' }}>
-            <div style={{ fontSize: '.74rem', color: '#cfe0ee', marginBottom: 4 }}>Taktična kocka — kdaj odloča <b style={{ color: '#8df0a5' }}>moč</b>, kdaj <b style={{ color: '#caa24a' }}>sreča</b>:</div>
-            <div style={{ display: 'flex', height: 20, borderRadius: 6, overflow: 'hidden', fontSize: '.58rem', fontWeight: 800, color: '#0a0a0a' }}>
-              <div style={{ flex: 20, background: '#d05a5a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>VEDNO PADE</div>
-              <div style={{ flex: 60, background: 'linear-gradient(90deg,#d0a64a,#9bbf63)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>BOJ ODLOČA (sreča)</div>
-              <div style={{ flex: 20, background: '#4caf6a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>VEDNO USPE</div>
+          <div style={{ margin: '2px 0 12px' }}>
+            <div style={{ fontSize: '.76rem', color: '#cfe0ee', marginBottom: 5 }}>Kdaj zmaga <b style={{ color: '#8df0a5' }}>moč</b> in kdaj odloča <b style={{ color: '#caa24a' }}>sreča</b>:</div>
+            <div style={{ display: 'flex', height: 22, borderRadius: 6, overflow: 'hidden', fontSize: '.6rem', fontWeight: 800, color: '#0a0a0a' }}>
+              <div style={{ flex: 20, background: '#d05a5a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>VEDNO IZGUBIŠ</div>
+              <div style={{ flex: 60, background: 'linear-gradient(90deg,#d0a64a,#9bbf63)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>ODLOČA SREČA</div>
+              <div style={{ flex: 20, background: '#4caf6a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>VEDNO ZMAGAŠ</div>
             </div>
             <div style={{ display: 'flex', fontSize: '.58rem', color: '#8aa0b6', marginTop: 2 }}>
               <div style={{ flex: 20, textAlign: 'right' }}>20 %</div>
               <div style={{ flex: 60, textAlign: 'right' }}>80 %</div>
               <div style={{ flex: 20, textAlign: 'right' }}>100 %</div>
             </div>
-            <div style={{ fontSize: '.64rem', color: '#7e90a0', marginTop: 3 }}>p = verjetnost uspeha = moja moč / (moja + nasprotnikova). Dominacija (vse/nič) ostane na verjetnost.</div>
+            <div style={{ fontSize: '.66rem', color: '#7e90a0', marginTop: 4 }}>Spodnja lestvica = tvoja moč kot delež skupne moči obeh strani. Če imaš nad 80 % moči, vedno zmagaš; pod 20 %, vedno izgubiš; vmes odloča sreča. (Ali zmagovalec pobije čisto vse, ostane stvar sreče.)</div>
           </div>
-          <div style={{ fontSize: '.78rem', color: '#cfe0ee', padding: '4px 0', lineHeight: 1.85 }}>
-            <div><b style={{ color: '#9fd0ff' }}>P(odbij raid)</b> = O / (O + <Tok c={C.aiMoc}>AI raid moč</Tok>={f1(raidPow)})</div>
-            <div style={{ paddingLeft: 14 }}>O = (<Tok c={C.ljudje}>branilci</Tok>×1.2×<Tok c={C.obroki}>obroki</Tok> + <Tok c={C.orozje}>orožje</Tok>×0.4×<Tok c={C.orozje}>učinek</Tok>) × <Tok c={C.intel}>intel</Tok> × <Tok c={C.obzidje}>obzidje</Tok></div>
-            <div style={{ marginTop: 6 }}><b style={{ color: '#9fd0ff' }}>P(napad na točko)</b> = T / (T + trdota×<Tok c={C.straza}>straža</Tok>)</div>
-            <div style={{ paddingLeft: 14 }}>T = (√<Tok c={C.ljudje}>ljudje</Tok>×9.6 + <Tok c={C.orozje}>orožje</Tok>×1.2×<Tok c={C.orozje}>učinek</Tok>) × <Tok c={C.obroki}>obroki</Tok> × <Tok c={C.intel}>intel</Tok></div>
+          <div style={{ fontSize: '.78rem', color: '#cfe0ee', padding: '4px 0', lineHeight: 1.8 }}>
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ color: '#9fd0ff', fontWeight: 700 }}>🛡 Bo tvoja obramba zdržala napad?</div>
+              <div style={{ color: '#9fb0c0', fontSize: '.72rem' }}>Primerja tvojo <b>obrambno moč</b> z <Tok c={C.aiMoc}>AI napadom</Tok> ({f1(raidPow)}). Več kot je tvoje proti njegovi, večja možnost, da napad odbiješ.</div>
+              <div style={{ paddingLeft: 8, marginTop: 2 }}>tvoja obramba = (<Tok c={C.ljudje}>branilci</Tok>×1.2×<Tok c={C.obroki}>obroki</Tok> + <Tok c={C.orozje}>orožje</Tok>×0.4×<Tok c={C.orozje}>učinek</Tok>) × <Tok c={C.intel}>intel</Tok> × <Tok c={C.obzidje}>obzidje</Tok></div>
+            </div>
+            <div>
+              <div style={{ color: '#9fd0ff', fontWeight: 700 }}>⚔️ Bo tvoj napad uničil šibko točko?</div>
+              <div style={{ color: '#9fb0c0', fontSize: '.72rem' }}>Primerja <b>moč ekipe</b> s trdoto točke × njeno <Tok c={C.straza}>stražo</Tok>. Močnejša ekipa (več ljudi + boljše orožje) = večja možnost.</div>
+              <div style={{ paddingLeft: 8, marginTop: 2 }}>moč ekipe = (√<Tok c={C.ljudje}>ljudje</Tok>×9.6 + <Tok c={C.orozje}>orožje</Tok>×1.2×<Tok c={C.orozje}>učinek</Tok>) × <Tok c={C.obroki}>obroki</Tok> × <Tok c={C.intel}>intel</Tok></div>
+            </div>
           </div>
-          <Row k="verjetnost raida (ocena)" v={pct(raidProbability(game))} />
+          <Row k="možnost napada na kamp ta mesec" v={pct(raidProbability(game))} />
         </Sec>
+        </div>
+        </div>
       </div>
     </div>
   );
