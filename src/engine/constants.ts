@@ -94,6 +94,10 @@ export const GUARD_TILE_ENCOUNTER_MULT = 2.2;
 export const NEAR_CORE_ENCOUNTER_MULT  = 1.5;
 
 export const INITIAL_AI_KNOWLEDGE = 0.1; // AI malo ve o nas na začetku
+// Ko AI ve toliko o nas, vidi tudi SKRITE (nerazporejene) ljudi in jih raid lahko doseže.
+export const AI_KNOWLEDGE_EXPOSE_HIDDEN = 0.95;  // prej 0.99 — skrivanje je bilo skoraj zastonj
+// Če je ob KONCU FAZE cel klan ≤ toliko, je igre konec (kapica na neskončno vračanje preživelih).
+export const MIN_CLAN_AT_PHASE_END = 1;
 
 // ─── Populacijska dinamika ─────────────────────────────────────────────────────
 export const SURVIVAL_PER_PERSON_PER_ROUND = 1;    // vsak človek poje 1 unit/rundo
@@ -111,11 +115,8 @@ export const COMBAT_EQUIPMENT_MULTIPLIER = 0.8;  // combat resources multiplier
 export const AI_ROBOT_STRENGTH = 1.5;            // strength per robot
 export const AI_FOREKNOWLEDGE_BONUS = 1.3;       // AI gets this if aiKnowledge > 0.5
 
-// Prag za izide
-export const VICTORY_THRESHOLD = 0.65;     // P > 65 % → victory (AI ujame nič)
-export const PARTIAL_THRESHOLD = 0.45;     // P 45–65 % → partial
-export const DEFEAT_THRESHOLD = 0.20;      // P 20–45 % → defeat (nekaj preživi)
-// P < 20 % → annihilation
+// (Stari determinististični pragovi VICTORY/PARTIAL/DEFEAT_THRESHOLD odstranjeni —
+//  izid zdaj določa rollOutcome + DECISIVE_MARGIN, glej combat.ts.)
 
 // ─── Krivulja aktivnosti klanov ───────────────────────────────────────────────
 // Tarčne vrednosti ob koncu vsake faze (brez zavezniških bonusov):

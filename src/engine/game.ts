@@ -15,6 +15,8 @@ import { calcAISurveillanceGain, generateAITree, generateAIWeakPoints, DEFAULT_G
 import {
   INITIAL_POPULATION, INITIAL_SURVIVAL, INITIAL_COMBAT, INITIAL_INTELLIGENCE, INITIAL_MATERIAL,
   INITIAL_AI_KNOWLEDGE,
+  AI_KNOWLEDGE_EXPOSE_HIDDEN,
+  MIN_CLAN_AT_PHASE_END,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
   AI_UNIT_DEFS, aiAttackPower, aiDefensePower,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
@@ -304,7 +306,7 @@ function resolveRaid(
   const researchersLost = breachedAreas.includes('research') ? Math.min(resAssigned, Math.floor(resAssigned * peopleLossFrac)) : 0;
   const assignedInCamp = defenders + forAssigned + wrkAssigned + resAssigned;
   const hiddenAssigned = Math.max(0, campPopulation - assignedInCamp);
-  const hiddenLost = state.aiKnowledge >= 0.99
+  const hiddenLost = state.aiKnowledge >= AI_KNOWLEDGE_EXPOSE_HIDDEN
     ? Math.min(hiddenAssigned, Math.floor(hiddenAssigned * peopleLossFrac))
     : 0;
   if (breachedAreas.includes('defense')) {
@@ -754,10 +756,10 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     }
     const [idRoll, rngId] = rngInt(rng, 1000, 9999); rng = rngId;
     population -= take;
-    // OROŽJE GRE Z NJIMI: vsak član vzame 1 orožje iz kampa (vrne se s preživelimi).
-    // Izjema: izvidniki v SKRIVANJU orožja ne nosijo (raje se skrijejo) → 0 orožja.
-    const stealthScout = inp.kind === 'scout' && !!inp.stealth;
-    const equippedWeapons = stealthScout ? 0 : Math.min(take, Math.max(0, combat));
+    // OROŽJE GRE Z NJIMI: napadalne misije vzamejo 1 orožje na člana (vrne se s preživelimi).
+    // IZVIDNIKI orožja NE nosijo (logično — izvidujejo, ne napadajo) → 0 orožja, ne trošijo
+    // dragocenega orožja, ki ga rabimo za obrambo. (Prej le stealth; zdaj vsi izvidniki.)
+    const equippedWeapons = inp.kind === 'scout' ? 0 : Math.min(take, Math.max(0, combat));
     combat -= equippedWeapons;
     const eTier = RATIONS_LEVELS[inp.rations] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
     // Hrana se plača po dolžini poti v hexih, ne po pospešenem trajanju.
@@ -1057,6 +1059,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   // 11. Fazni napredek in morebitni prehod
   const aiPhaseProgress = state.aiPhaseProgress + 1;
   const phaseComplete = aiPhaseProgress >= ROUNDS_PER_PHASE;
+  // Konec faze s kritično majhnim klanom = poraz (kapica na neskončno vračanje preživelih).
+  if (phaseComplete && totalClanAfter <= MIN_CLAN_AT_PHASE_END) status = 'defeat_extinction';
 
   const round = state.round < ROUNDS_PER_PHASE ? state.round + 1 : 1;
   const phase = phaseComplete ? nextPhase(state.phase) : state.phase;

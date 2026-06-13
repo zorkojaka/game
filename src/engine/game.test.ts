@@ -500,7 +500,7 @@ describe('raid — žrtve omejene na cono, odprave varne', () => {
     expect(exp0.assigned).toBeLessThanOrEqual(8);
   });
 
-  it('skriti/prosti ljudje so tarča raida šele, ko AI ve vsaj 99%', () => {
+  it('skriti/prosti ljudje so tarča raida šele, ko AI ve vsaj 95%', () => {
     const base = newGame(44);
     const forcedRaid = {
       ...base,
@@ -512,8 +512,8 @@ describe('raid — žrtve omejene na cono, odprave varne', () => {
       raidPlan: { periodStart: 1, periodEnd: 12, months: [base.totalRounds] },
       resources: { ...base.resources, combat: 0 },
     };
-    const lowKnowledge = processRound({ ...forcedRaid, aiKnowledge: 0.98 }, action({ defenders: 0, foragers: 0, workers: 0, researchers: 0 }));
-    const maxKnowledge = processRound({ ...forcedRaid, aiKnowledge: 0.99 }, action({ defenders: 0, foragers: 0, workers: 0, researchers: 0 }));
+    const lowKnowledge = processRound({ ...forcedRaid, aiKnowledge: 0.94 }, action({ defenders: 0, foragers: 0, workers: 0, researchers: 0 }));
+    const maxKnowledge = processRound({ ...forcedRaid, aiKnowledge: 0.95 }, action({ defenders: 0, foragers: 0, workers: 0, researchers: 0 }));
 
     expect(lowKnowledge.lastRoundLog?.raid?.occurred).toBe(true);
     expect(maxKnowledge.lastRoundLog?.raid?.occurred).toBe(true);
@@ -594,14 +594,14 @@ describe('izvidniki v skrivanju ne nosijo orožja', () => {
     const exp = (r.expeditions ?? []).find(e => e.kind === 'scout');
     expect(exp?.equippedWeapons ?? 0).toBe(0);
   });
-  it('navaden (neskrit) izvidnik vzame orožje', () => {
+  it('tudi navaden (neskrit) izvidnik NE vzame orožja — izvidniki ne trošijo orožja', () => {
     const base = newGame(7);
     const g: GameState = { ...base, population: 60, resources: { ...base.resources, combat: 20 } };
     const path = [{ q: 0, r: 4 }, { q: 1, r: 2 }];
     const r = processRound(g, action({ foragers: 10,
       newExpeditions: [{ kind: 'scout', path, assigned: 4, rations: 3, stealth: false }] }));
     const exp = (r.expeditions ?? []).find(e => e.kind === 'scout');
-    expect(exp?.equippedWeapons).toBe(4);
+    expect(exp?.equippedWeapons ?? 0).toBe(0);
   });
 });
 
