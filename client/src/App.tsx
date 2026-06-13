@@ -4573,8 +4573,11 @@ function TacticsReview({ game }: { game: GameState }) {
 
 /** 🤖 Zaslon IGRALCA 2 (AI) v 2-player hotseat: vnese AI potezo (produkcija + nadgradnja).
  *  Najprej "predaja naprave" za skrivnost; vloge/raid/lov pridejo v naslednjih stopnjah. */
-function AIControlScreen({ game, onConfirm, onBack, loading }: {
-  game: GameState; onConfirm: (a: AIAction) => void; onBack: () => void; loading: boolean;
+type AIPlan = { roles: { raid: number; patrol: number; search: number }; lab: 'attack' | 'defense' | null; upgrade: boolean };
+
+function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading }: {
+  game: GameState; plan: AIPlan; onPlanChange: (p: AIPlan) => void;
+  onConfirm: (a: AIAction) => void; onBack: () => void; loading: boolean;
 }) {
   const [revealed, setRevealed] = useState(false);
   const units = game.aiUnits ?? { scouts: game.aiRobots, attackers: 0, peopleKillers: 0 };
@@ -4586,15 +4589,12 @@ function AIControlScreen({ game, onConfirm, onBack, loading }: {
   const suggest = (() => { let e = budget; const s = { scouts: 0, attackers: 0, peopleKillers: 0 };
     (['peopleKillers', 'attackers', 'scouts'] as const).forEach(t => { const c = AI_UNIT_ENERGY_COST[t]; const n = Math.min(def(t), Math.floor(e / c)); s[t] = n; e -= n * c; }); return s; })();
   const [build, setBuild] = useState(suggest);
-  const [upgrade, setUpgrade] = useState(false);
-  // Privzete vloge po fazi (kar bi naredil naš AI) — igralec 2 jih lahko spremeni.
-  const ph = game.totalRounds > 36 ? 'assault' : game.phase;
-  const defPatrol = ph === 'find' ? 0 : ph === 'understand' ? 0.08 : ph === 'eliminate' ? 0.12 : 0.16;
-  const defSearch = ph === 'find' ? 0 : ph === 'understand' ? 0.05 : ph === 'eliminate' ? 0.10 : 0.14;
-  const [roles, setRoles] = useState({ raid: 0.2, patrol: defPatrol, search: defSearch });
-  const [lab, setLab] = useState<'attack' | 'defense' | null>(null);
+  // Vloge / laboratorij / nadgradnja so VZTRAJNI (App stanje) — nastaviš enkrat, ostane.
+  const roles = plan.roles; const lab = plan.lab; const upgrade = plan.upgrade;
+  const setLab = (v: 'attack' | 'defense' | null) => onPlanChange({ ...plan, lab: v });
+  const setUpgrade = (v: boolean) => onPlanChange({ ...plan, upgrade: v });
   const adjRole = (k: 'raid' | 'patrol' | 'search', d: number) =>
-    setRoles(r => ({ ...r, [k]: Math.max(0, Math.min(1, Math.round((r[k] + d) * 100) / 100)) }));
+    onPlanChange({ ...plan, roles: { ...plan.roles, [k]: Math.max(0, Math.min(1, Math.round((plan.roles[k] + d) * 100) / 100)) } });
   const cost = build.scouts * AI_UNIT_ENERGY_COST.scouts + build.attackers * AI_UNIT_ENERGY_COST.attackers + build.peopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
   const remaining = budget - cost;
   const canUpgrade = level < AI_ENERGY_LEVEL_MAX && remaining >= AI_ENERGY_LEVEL_COST;
@@ -4792,6 +4792,8 @@ export default function App() {
   const [players,    setPlayers]    = useState<1 | 2>(1);   // 1 = single, 2 = hotseat (igralec 2 vodi AI)
   // 2-player: ko klan odda potezo, počakamo na potezo igralca 2 (AI). Hrani zamrznjeno klan-potezo.
   const [aiTurn, setAiTurn] = useState<null | { clanAction: { assignment: Assignment; targetWeakPoint?: string } }>(null);
+  // VZTRAJNI AI načrt igralca 2 — nastaviš enkrat, ostane v naslednjih rundah.
+  const [aiPlan, setAiPlan] = useState<AIPlan>({ roles: { raid: 0.2, patrol: 0, search: 0 }, lab: null, upgrade: false });
 
   const [axis,       setAxis]       = useState<HumanAxis>('obzidje');
   const [combatants,   setCombatants]   = useState(0);
@@ -5374,7 +5376,7 @@ export default function App() {
 
   // 2-player: po klanovi potezi zaslon IGRALCA 2 (AI). 1-player nikoli ne pride sem.
   if (aiTurn) return (
-    <AIControlScreen game={game} loading={loading}
+    <AIControlScreen game={game} loading={loading} plan={aiPlan} onPlanChange={setAiPlan}
       onConfirm={(ai) => resolveRound(aiTurn.clanAction, ai)}
       onBack={() => setAiTurn(null)} />
   );
