@@ -2685,7 +2685,7 @@ function respliceWaypoint(original: Hex[], index: number, y: Hex): Hex[] {
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ observer = false, tiles, draftPath, draftReturn, aiUnits, wpGarrison, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, artifactCount, artifactTargetWpId, onArtifactTarget, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, rationsLocked, onRations, workshopObj, onWorkshop, researchObj, onResearch, researchHighlight, workshop, research, pop, draftPeople, draftRations, draftStealth, draftLoot, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onDraftLoot, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
+function HexMap({ observer = false, incomingRaids = [], tiles, draftPath, draftReturn, aiUnits, wpGarrison, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, artifactCount, artifactTargetWpId, onArtifactTarget, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, rationsLocked, onRations, workshopObj, onWorkshop, researchObj, onResearch, researchHighlight, workshop, research, pop, draftPeople, draftRations, draftStealth, draftLoot, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onDraftLoot, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   draftReturn: Array<{ q: number; r: number }>;
@@ -2729,6 +2729,7 @@ function HexMap({ observer = false, tiles, draftPath, draftReturn, aiUnits, wpGa
   canConfirmDraft: boolean;
   draftAddDisabled: boolean;
   observer?: boolean;   // AI/opazovalni pogled: skrije igralčeve kampove kontrole
+  incomingRaids?: Array<{ monthsAway: number; force: number }>;  // telegraf prihajajočih AI napadov
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
@@ -3560,6 +3561,30 @@ function HexMap({ observer = false, tiles, draftPath, draftReturn, aiUnits, wpGa
             </g>
           );
         })}
+
+        {/* TELEGRAF prihajajočih AI napadov — robot korakajo od ☣ proti ⛺ (bližje = prej) */}
+        {incomingRaids.length > 0 && (() => {
+          const core = tiles.find(t => t.isAICore);
+          const camp = tiles.find(t => t.isClanCamp);
+          if (!core || !camp) return null;
+          const pc = shift(hexToPixel(core.q, core.r, SIZE));
+          const pk = shift(hexToPixel(camp.q, camp.r, SIZE));
+          const LEAD = 4;
+          return incomingRaids.filter(r => r.monthsAway >= 0 && r.monthsAway <= LEAD).map((r, i) => {
+            const t = Math.max(0, Math.min(1, 1 - r.monthsAway / LEAD));
+            const x = pc.x + (pk.x - pc.x) * t, y = pc.y + (pk.y - pc.y) * t;
+            return (
+              <g key={`raid_${i}`} style={{ pointerEvents: 'none' }}>
+                <line x1={pc.x} y1={pc.y} x2={x} y2={y} stroke="#cc333344" strokeWidth="2" strokeDasharray="4 4" />
+                <circle cx={x} cy={y} r="11" fill="#3a0d0d" stroke="#cc3333" strokeWidth="1.5" opacity="0.95" />
+                <text x={x} y={y + 3.5} textAnchor="middle" fontSize="11" style={{ pointerEvents: 'none' }}>🤖</text>
+                <text x={x} y={y + 22} textAnchor="middle" fontSize="8.5" fontWeight="bold" fill="#ff8866" style={{ pointerEvents: 'none' }}>
+                  {r.monthsAway === 0 ? 'ZDAJ' : `${r.monthsAway}m`} · {r.force}
+                </text>
+              </g>
+            );
+          });
+        })()}
 
         {/* ─── Kontrole odprave na ZADNJEM heksu poti ─── */}
         {/* ZAČETNA točka poti — v ZGORNJI plasti (nad grafiko kampa), na robu kampa
@@ -4586,6 +4611,7 @@ function AIControlScreen({ game, onConfirm, onBack, loading }: {
         {/* Isti zemljevid kot igralec 1 (read-only): ☣ AI baza zgoraj, ⛺ kamp spodaj. */}
         <div style={{ background: '#0d141b', border: '1px solid #223344', borderRadius: 10, padding: '.4rem', marginBottom: '.6rem' }}>
           <HexMap observer
+            incomingRaids={(game.raidPlan?.months ?? []).filter(m => m >= game.totalRounds).map(m => ({ monthsAway: m - game.totalRounds, force: Math.floor(game.aiRobots * 0.2) }))}
             tiles={game.mapTiles ?? []} draftPath={[]} draftReturn={[]}
             aiUnits={game.aiUnits} wpGarrison={0} draftKind={'scout'} plannedPaths={[]}
             onPathClick={() => {}} onWaypointMove={() => {}} onWpSelect={() => {}}
@@ -5987,6 +6013,7 @@ export default function App() {
             </span>
           </div>
           <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
+            incomingRaids={(game.raidPlan?.months ?? []).filter(m => m >= game.totalRounds).map(m => ({ monthsAway: m - game.totalRounds, force: Math.floor(game.aiRobots * 0.2) }))}
             draftReturn={draftReturn}
             aiUnits={game.aiUnits}
             wpGarrison={wpGarrisonUnits(game.aiUnits)}
