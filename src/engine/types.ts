@@ -132,6 +132,17 @@ export interface TacticsAgg {
   wpDestroyed: number;   // uničenih šibkih točk v obdobju
 }
 
+/** Akcijski prostor AI — zrcalo PlayerAction. Vodi ga politika (skripta → genom →
+ *  igralec 2 v 2-player). Stopnja A: production + upgrade aktivna; roles/raidForcePct/
+ *  focusWeakPoint zaenkrat opisno (aktivno v naslednjih stopnjah). */
+export interface AIAction {
+  production: AIUnits;       // nove enote, zgrajene iz energije ta mesec
+  upgrade: boolean;          // dvig energijskega nivoja (vlaganje presežka)
+  raidForcePct: number;      // delež napadalne moči v raidu
+  roles: { raid: number; garrison: number; patrol: number; hunt: number };  // razporeditev robotov po vlogah (deleži)
+  focusWeakPoint?: string;   // katero šibko točko AI prednostno brani
+}
+
 export function tileId(t: { q: number; r: number }): string {
   return `${t.q},${t.r}`;
 }
@@ -278,7 +289,8 @@ export interface GameState {
   // AI ekonomija (temelj): energija iz jedra (= šibka točka wp_power) poganja
   // NADOMEŠČANJE izgubljenih enot. Uničeno jedro → pritok strmo pade.
   aiEnergy?: number;        // trenutna zaloga energije
-  aiEnergyLevel?: number;   // AI nadgradnja pritoka (zaenkrat 0; kasneje ga AI dviguje sam)
+  aiEnergyLevel?: number;   // AI nadgradnja pritoka (AI ga dviguje sam, ko ima presežek)
+  aiLastAction?: AIAction;  // odločitve AI v zadnji potezi (za inšpektor / 2-player)
   aiTree: AITreeNode[];
   aiWeakPoints: AIWeakPoint[];
 

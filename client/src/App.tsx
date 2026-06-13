@@ -4036,8 +4036,15 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
 
         <Sec t="🤖 AI — akcijski prostor" sub="kaj AI počne in lahko počne">
           <Row kc={C.energija} k="energija (zaloga)" v={f0(game.aiEnergy ?? 0)} hint="poganja nadomeščanje izgubljenih enot" />
-          <Row kc={C.energija} k="energija (pritok/mesec)" v={`${f1(inflow)} ${coreDead ? '· jedro 💥 ×0.25' : '· jedro ✓'}`} hint="iz energijskega jedra = šibka točka wp_power" />
+          <Row kc={C.energija} k="energija (pritok/mesec)" v={`${f1(inflow)} ${(game.aiEnergyLevel ?? 0) > 0 ? `· nivo ${game.aiEnergyLevel}` : ''} ${coreDead ? '· jedro 💥 ×0.25' : '· jedro ✓'}`} hint="iz energijskega jedra; AI ga sam nadgrajuje s presežkom" />
           <Row k="enote" v={`🔭${units.scouts} · ⚔️${units.attackers} · ☠${units.peopleKillers} = ${game.aiRobots}`} />
+          {game.aiLastAction && (() => { const a = game.aiLastAction!; const prod = a.production; const pb = prod.scouts + prod.attackers + prod.peopleKillers;
+            const focusLbl = a.focusWeakPoint ? (wps.find(w => w.id === a.focusWeakPoint)?.label ?? a.focusWeakPoint) : '—';
+            return (
+              <Row k="🧠 odločitve (zadnja poteza)"
+                v={`gradnja 🔭${prod.scouts} ⚔️${prod.attackers} ☠${prod.peopleKillers}${pb === 0 ? ' (nič)' : ''}${a.upgrade ? ' · ⚙️ nadgradnja' : ''} · brani: ${focusLbl}`}
+                hint={`razporeditev: raid ${pct(a.roles.raid)} · straža ${pct(a.roles.garrison)} · patrulja ${pct(a.roles.patrol)} · lov ${pct(a.roles.hunt)} (patrulja/lov v pripravi)`} />
+            ); })()}
           <Row kc={C.aiMoc} k="AI raid moč" v={`${f1(aiAttackPower(units))} × ${pct(RAID_AI_FORCE_PCT)} = ${f1(raidPow)}`} hint="del napadalne moči, ki sodeluje v raidu" />
           <Row k="obrambna moč (ko jih napadeš)" v={f1(aiDefensePower(units))} />
           <Row k="cilj vojske / bo obnovil" v={`🔭${target.scouts} ⚔️${target.attackers} ☠${target.peopleKillers} → ▲🔭${deficit('scouts')} ⚔️${deficit('attackers')} ☠${deficit('peopleKillers')}`} hint="z energijo nadomesti izgube do cilja (drage enote prej)" />

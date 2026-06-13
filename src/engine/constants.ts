@@ -108,6 +108,9 @@ export const AI_ENERGY_PER_LEVEL = 0.5;                 // +50 % pritoka na stop
 export const AI_UNIT_ENERGY_COST: Record<'scouts' | 'attackers' | 'peopleKillers', number> = {
   scouts: 1, attackers: 4, peopleKillers: 10,
 };
+// AI sam vlaga PRESEŽEK energije v dvig pritoka (mirror igralčevih raziskav).
+export const AI_ENERGY_LEVEL_COST = 60;  // energije za +1 nivo pritoka
+export const AI_ENERGY_LEVEL_MAX  = 3;   // največ +150 % pritoka
 // Ko AI ve toliko o nas, vidi tudi SKRITE (nerazporejene) ljudi in jih raid lahko doseže.
 export const AI_KNOWLEDGE_EXPOSE_HIDDEN = 0.95;  // prej 0.99 — skrivanje je bilo skoraj zastonj
 // Če je ob KONCU FAZE cel klan ≤ toliko, je igre konec (kapica na neskončno vračanje preživelih).

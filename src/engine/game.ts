@@ -1,7 +1,7 @@
 // Glavni game engine — čiste funkcije (state, action) → new state
 // Brez side effectov, brez IO
 
-import type { GameState, PlayerAction, RoundLog, Assignment, AIPhase, RaidResult, ScoutResult, HumanAxis, Mission, AIUnits, AIWeakPoint, ResearchObjective, CampArea } from './types.js';
+import type { GameState, PlayerAction, RoundLog, Assignment, AIPhase, RaidResult, ScoutResult, HumanAxis, Mission, AIUnits, AIWeakPoint, AIAction, ResearchObjective, CampArea } from './types.js';
 import type { RNGState } from './rng.js';
 import { rngInt, rngNext, seedFromString } from './rng.js';
 import { resolveCombat } from './combat.js';
@@ -18,7 +18,7 @@ import {
   AI_KNOWLEDGE_EXPOSE_HIDDEN,
   MIN_CLAN_AT_PHASE_END,
   AI_ENERGY_CORE_WEAKPOINT, AI_ENERGY_START, AI_ENERGY_CORE_DESTROYED_MULT,
-  AI_ENERGY_PER_LEVEL, AI_UNIT_ENERGY_COST,
+  AI_ENERGY_PER_LEVEL, AI_UNIT_ENERGY_COST, AI_ENERGY_LEVEL_COST, AI_ENERGY_LEVEL_MAX,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
   AI_UNIT_DEFS, aiAttackPower, aiDefensePower,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
@@ -172,6 +172,35 @@ export function aiChoosePhaseShipment(phase: AIPhase, budgetEnergy: number): AIU
   if (phase === 'understand') add.attackers = Math.floor(budgetEnergy / AI_UNIT_ENERGY_COST.attackers);
   else if (phase === 'eliminate') add.peopleKillers = Math.floor(budgetEnergy / AI_UNIT_ENERGY_COST.peopleKillers);
   return add;
+}
+
+/** POLITIKA AI: iz danega stanja izpelje odločitve (akcijski prostor). Skripta —
+ *  kasneje genom / igralec 2. Nadgrajuje obstoječe: privzeto ohrani balans,
+ *  prva aktivna nova odločitev je vlaganje presežka energije v nivo. */
+export function decideAIAction(state: GameState): AIAction {
+  const units = readAIUnits(state);
+  const total = Math.max(1, totalAIRobots(units));
+  const target = aiTargetArmy(state, state.totalRounds + 1);
+  const energy = state.aiEnergy ?? 0;
+  const level = state.aiEnergyLevel ?? 0;
+  // Produkcija: nadomesti primanjkljaj do cilja (drage enote prej), znotraj energije.
+  const built = aiReinforce(units, energy, target);
+  const production: AIUnits = {
+    scouts: built.units.scouts - units.scouts,
+    attackers: built.units.attackers - units.attackers,
+    peopleKillers: built.units.peopleKillers - units.peopleKillers,
+  };
+  // Nadgradnja: vloži presežek (po nadomeščanju) v dvig pritoka, če ostane dovolj.
+  const upgrade = level < AI_ENERGY_LEVEL_MAX && built.energy >= AI_ENERGY_LEVEL_COST;
+  // Razporeditev po vlogah (opisno; raid/garnizija aktivni, patrulja/lov pridejo v stopnji B).
+  const garrison = wpGarrisonUnits(units) / total;
+  const raid = RAID_AI_FORCE_PCT;
+  const roles = { raid, garrison, patrol: 0, hunt: 0 };
+  // Fokus obrambe: odkrita, neuničena točka, ki je igralcu najlažja (najverjetnejši cilj).
+  const focus = (state.aiWeakPoints ?? [])
+    .filter(w => w.discovered && !w.exploited)
+    .sort((a, b) => (MISSION_WP_DIFFICULTY[a.id] ?? 100) - (MISSION_WP_DIFFICULTY[b.id] ?? 100))[0]?.id;
+  return { production, upgrade, raidForcePct: raid, roles, focusWeakPoint: focus };
 }
 
 /** Porabi energijo za NADOMEŠČANJE izgub do ciljne vojske (drage enote prej). */
@@ -1155,18 +1184,28 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   // Uničeno jedro (wp_power) strmo zniža pritok → izčrpavalna zmaga postane dosegljiva.
   // Ne oživlja popolnoma iztrebljene vojske (aiRobots = 0 ostane zmaga igralca).
   let aiEnergy = state.aiEnergy ?? AI_ENERGY_START;
-  const aiEnergyLevel = state.aiEnergyLevel ?? 0;
+  let aiEnergyLevel = state.aiEnergyLevel ?? 0;
+  let aiLastAction: AIAction | undefined;
   {
     const coreDestroyed = !!aiWeakPoints.find(w => w.id === AI_ENERGY_CORE_WEAKPOINT && w.exploited);
     const coreMult = coreDestroyed ? AI_ENERGY_CORE_DESTROYED_MULT : 1;
     aiEnergy += difficultyProfile(state.difficulty).aiEnergyInflow * coreMult * (1 + aiEnergyLevel * AI_ENERGY_PER_LEVEL);
+    // AI POLITIKA: izpelji odločitve iz stanja po izgubah (aiEnergy/Level + post-loss enote).
+    const decided = decideAIAction({ ...state, aiUnits, aiRobots, aiEnergy, aiEnergyLevel, aiWeakPoints });
     if (aiRobots > 0) {
+      // 1) PRODUKCIJA: nadomesti izgube do cilja.
       const target = aiTargetArmy(state, state.totalRounds + 1);
       const rein = aiReinforce(aiUnits, aiEnergy, target);
       const built = totalAIRobots(rein.units) - aiRobots;
       aiUnits = rein.units; aiEnergy = rein.energy; aiRobots = totalAIRobots(aiUnits);
       if (built > 0) expeditionEvents.push(`⚡ AI je iz jedra obnovil ${built} ${built === 1 ? 'enoto' : 'enot'}.`);
+      // 2) NADGRADNJA: vloži presežek v dvig pritoka.
+      if (decided.upgrade && aiEnergyLevel < AI_ENERGY_LEVEL_MAX && aiEnergy >= AI_ENERGY_LEVEL_COST) {
+        aiEnergy -= AI_ENERGY_LEVEL_COST; aiEnergyLevel += 1;
+        expeditionEvents.push(`⚙️ AI je nadgradil energijsko jedro (nivo ${aiEnergyLevel}) — odslej hitrejši pritok.`);
+      }
     }
+    aiLastAction = { ...decided, upgrade: aiEnergyLevel > (state.aiEnergyLevel ?? 0) };
   }
 
   // Zmaga — AI popolnoma iztrebljen (tudi v fazi 1: če pobijemo vse izvidnike, AI ne more nadaljevati),
@@ -1241,6 +1280,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     aiKnowledge: finalAiKnowledge,
     aiEnergy,
     aiEnergyLevel,
+    aiLastAction,
     aiTree: finalTree,
     aiWeakPoints,
     clanActivity,

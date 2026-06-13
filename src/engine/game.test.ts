@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability, missionSuccessProbability , aiEnergyInflow, aiReinforce, aiCoreDestroyed, aiTargetArmy, aiChoosePhaseShipment } from './game.js';
+import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability, missionSuccessProbability , aiEnergyInflow, aiReinforce, aiCoreDestroyed, aiTargetArmy, aiChoosePhaseShipment, decideAIAction } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus, resolveCombat } from './combat.js';
 import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp, tileEncounterProbability, expeditionMonthsForSteps } from './expedition.js';
 import { wpGarrisonMult } from './constants.js';
@@ -929,5 +929,24 @@ describe('AI izbira pošiljke ob prehodu faze (#1)', () => {
     const g: GameState = { ...newGame(2, 'normal'), aiPhaseProgress: 11, round: 12 };
     const r = processRound(g, action({ foragers: 5 }));
     expect(r.aiUnits.attackers).toBe(75);
+  });
+});
+
+describe('decideAIAction — AI politika (akcijski prostor)', () => {
+  it('produkcija nadomesti primanjkljaj do cilja', () => {
+    const g: GameState = { ...newGame(3, 'normal'), aiEnergy: 50,
+      aiUnits: { scouts: 90, attackers: 0, peopleKillers: 0 }, aiRobots: 90 };
+    const a = decideAIAction(g);
+    expect(a.production.scouts).toBe(10);   // cilj 100, primanjkljaj 10, cena 1, dovolj energije
+  });
+  it('pri presežku energije se odloči za nadgradnjo', () => {
+    const g: GameState = { ...newGame(3, 'normal'), aiEnergy: 200,
+      aiUnits: { scouts: 100, attackers: 0, peopleKillers: 0 }, aiRobots: 100 };
+    expect(decideAIAction(g).upgrade).toBe(true);
+  });
+  it('brez presežka ni nadgradnje', () => {
+    const g: GameState = { ...newGame(3, 'normal'), aiEnergy: 5,
+      aiUnits: { scouts: 100, attackers: 0, peopleKillers: 0 }, aiRobots: 100 };
+    expect(decideAIAction(g).upgrade).toBe(false);
   });
 });
