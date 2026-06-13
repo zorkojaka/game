@@ -4644,6 +4644,26 @@ function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading 
             onDraftKind={() => {}} onDraftPeople={() => {}} onDraftRations={() => {}} onDraftStealth={() => {}} onDraftLoot={() => {}}
             onConfirmDraft={() => {}} canConfirmDraft={false} draftAddDisabled={true} />
         </div>
+        {/* 🎯 AI ZGODBA / CILJI — zrcalo igralčevih poti do zmage */}
+        {(() => {
+          const phG = game.totalRounds > 36
+            ? { ic: '🚨', t: 'TOTALNI NAPAD', d: 'Veš, kje je kamp — zmelji ga do izumrtja.' }
+            : game.phase === 'find' ? { ic: '🔭', t: 'FAZA 1 — NAJDI', d: 'Odkrij, kje je človeški kamp (dvigni znanje z iskanjem).' }
+            : game.phase === 'understand' ? { ic: '⚔️', t: 'FAZA 2 — RAZUMI', d: 'Prebij obrambo, spoznaj klan, slabi ga z napadi.' }
+            : { ic: '☠', t: 'FAZA 3 — IZTREBI', d: 'Pobij klan do izumrtja, preden uniči tvoje funkcije.' };
+          const intact = (game.aiWeakPoints ?? []).filter(w => !w.exploited).length;
+          return (
+            <div style={{ background: '#160c0c', border: '1px solid #4a2222', borderRadius: 10, padding: '.6rem .9rem', margin: '.6rem 0' }}>
+              <div style={{ fontSize: '.82rem', color: '#ff8866', fontWeight: 700 }}>{phG.ic} TVOJA ZGODBA — {phG.t}</div>
+              <div className="dim small" style={{ margin: '2px 0 6px' }}>{phG.d} <b>Zmaga = klan izumre.</b></div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: '.7rem' }}>
+                <span style={{ background: '#11171f', border: '1px solid #2a3a4a', borderRadius: 6, padding: '2px 7px' }}>🤖 vojska <b>{game.aiRobots}</b></span>
+                <span style={{ background: '#11171f', border: '1px solid #2a3a4a', borderRadius: 6, padding: '2px 7px' }}>👁 znanje o klanu <b>{Math.round(game.aiKnowledge * 100)}%</b></span>
+                <span style={{ background: '#11171f', border: `1px solid ${intact === 3 ? '#2a3a4a' : '#cc5555'}`, borderRadius: 6, padding: '2px 7px' }}>🛡 cele funkcije <b style={{ color: intact === 3 ? '#8df0a5' : '#e0564a' }}>{intact}/3</b></span>
+              </div>
+            </div>
+          );
+        })()}
         <div style={{ background: '#0d141b', border: '1px solid #223344', borderRadius: 10, padding: '.7rem .9rem' }}>
           <div style={{ fontSize: '.8rem', color: '#9fd0ff', fontWeight: 700, marginBottom: 6 }}>Zgradi enote (cena ⚡)</div>
           {UNIT.map(([k, ic, lbl]) => (
