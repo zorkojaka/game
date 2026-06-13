@@ -3599,8 +3599,14 @@ function HexMap({ tiles, draftPath, draftReturn, aiUnits, wpGarrison, draftKind,
               {/* vrsta 3: obroki + (izvidniki: raziskovanje/lootanje) + skrivanje (oboje) */}
               {(() => {
                 const isScout = draftKind === 'scout';
-                const artifactWp = !isScout && selectedWpId
-                  ? wps.find(w => w.id === selectedWpId && w.discovered && !w.exploited)
+                // Artefakt cilja na šibko točko, KAMOR KAŽE NAPAD na mapi (konec poti);
+                // če poti ni, pade nazaj na izbrano točko (selectedWpId).
+                const draftEndTile = !isScout && draftPath.length >= 2
+                  ? tiles.find(t => t.q === draftPath[draftPath.length - 1].q && t.r === draftPath[draftPath.length - 1].r)
+                  : undefined;
+                const artifactWpId = draftEndTile?.hidesWeakPointId || selectedWpId;
+                const artifactWp = !isScout && artifactWpId
+                  ? wps.find(w => w.id === artifactWpId && w.discovered && !w.exploited)
                   : undefined;
                 const canUseArtifact = !!artifactWp && artifactCount > 0;
                 const ratX = isScout || canUseArtifact ? cx - 22 : cx - 16;
@@ -3624,12 +3630,12 @@ function HexMap({ tiles, draftPath, draftReturn, aiUnits, wpGarrison, draftKind,
                       <g className="dc-artifact" style={{ cursor: 'pointer' }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          onArtifactTarget(artifactTargetWpId === selectedWpId ? '' : selectedWpId);
+                          onArtifactTarget(artifactTargetWpId === artifactWp!.id ? '' : artifactWp!.id);
                         }}>
-                        <title>{artifactTargetWpId === selectedWpId ? 'Artefakt izbran: klikni za preklic' : `Uniči ${artifactWp!.label} z artefaktom`}</title>
+                        <title>{artifactTargetWpId === artifactWp!.id ? 'Artefakt izbran: klikni za preklic' : `💎 Uniči ${artifactWp!.label} z artefaktom (ob izvedbi)`}</title>
                         <circle cx={cx} cy={cy + 30} r={9}
-                          fill={artifactTargetWpId === selectedWpId ? '#2a2308' : '#0a0a0a'}
-                          stroke={artifactTargetWpId === selectedWpId ? '#ffd84a' : '#806a25'}
+                          fill={artifactTargetWpId === artifactWp!.id ? '#2a2308' : '#0a0a0a'}
+                          stroke={artifactTargetWpId === artifactWp!.id ? '#ffd84a' : '#806a25'}
                           strokeWidth="1.5" />
                         <text x={cx} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>💎</text>
                       </g>
