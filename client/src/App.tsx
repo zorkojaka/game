@@ -1465,6 +1465,15 @@ function aiUnitFromPhase(phase: AIWeakPoint['phase']): AIRobotType {
   return 'peopleKillers';
 }
 
+function availableAIGuardUnit(units?: AIUnits, preferred?: AIRobotType): AIRobotType | null {
+  const u = units ?? { scouts: 0, attackers: 0, peopleKillers: 0 };
+  if (preferred && (u[preferred] ?? 0) > 0) return preferred;
+  const available = (['peopleKillers', 'attackers', 'scouts'] as AIRobotType[])
+    .filter(unit => (u[unit] ?? 0) > 0)
+    .sort((a, b) => AI_UNIT_DEFS[b].defense - AI_UNIT_DEFS[a].defense);
+  return available[0] ?? null;
+}
+
 function AIUnitPips({ units }: { units?: AIUnits }) {
   const u = units ?? { scouts: 0, attackers: 0, peopleKillers: 0 };
   return (
@@ -2409,13 +2418,13 @@ function expeditionImageHref(kind: Expedition['kind']): string {
   return kind === 'mission' ? '/assets/map/exp-attackers.png' : '/assets/map/exp-scouts.png';
 }
 
-function aiGuardImageHref(phase: AIWeakPoint['phase']): string {
-  return aiUnitIconHref(aiUnitFromPhase(phase));
+function aiGuardImageHref(unit: AIRobotType): string {
+  return aiUnitIconHref(unit);
 }
 
-function aiGuardLabel(phase: AIWeakPoint['phase']): string {
-  if (phase === 'find') return 'izvidniška straža';
-  if (phase === 'understand') return 'napadalna straža';
+function aiGuardLabel(unit: AIRobotType): string {
+  if (unit === 'scouts') return 'izvidniška straža';
+  if (unit === 'attackers') return 'napadalna straža';
   return 'people-killer straža';
 }
 
@@ -2531,10 +2540,11 @@ function respliceWaypoint(original: Hex[], index: number, y: Hex): Hex[] {
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, artifactCount, artifactTargetWpId, onArtifactTarget, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, rationsLocked, onRations, workshopObj, onWorkshop, researchObj, onResearch, researchHighlight, workshop, research, pop, draftPeople, draftRations, draftStealth, draftLoot, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onDraftLoot, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
+function HexMap({ tiles, draftPath, draftReturn, aiUnits, wpGarrison, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, artifactCount, artifactTargetWpId, onArtifactTarget, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, rationsLocked, onRations, workshopObj, onWorkshop, researchObj, onResearch, researchHighlight, workshop, research, pop, draftPeople, draftRations, draftStealth, draftLoot, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onDraftLoot, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   draftReturn: Array<{ q: number; r: number }>;
+  aiUnits?: AIUnits;
   wpGarrison: number;
   draftKind: 'scout' | 'attack';
   plannedPaths: Array<{ path: Array<{ q: number; r: number }>; returnPath?: Array<{ q: number; r: number }>; kind: 'scout' | 'mission' }>;
@@ -2845,14 +2855,16 @@ function HexMap({ tiles, draftPath, draftReturn, wpGarrison, draftKind, plannedP
               {/* Garnizija — straža ODKRITE šibke točke (ne izda skritih). Napadi jo redčijo. */}
               {wpVisible && wp && !wp.exploited && (wpGarrison - (wp.garrisonLoss ?? 0)) > 0 && (() => {
                 const effGarrison = wpGarrison - (wp.garrisonLoss ?? 0);
-                const guardImg = aiGuardImageHref(wp.phase);
-                const guardLabel = aiGuardLabel(wp.phase);
-                const guardColor = wp.phase === 'find'
+                const guardUnit = availableAIGuardUnit(aiUnits, aiUnitFromPhase(wp.phase));
+                if (!guardUnit) return null;
+                const guardImg = aiGuardImageHref(guardUnit);
+                const guardLabel = aiGuardLabel(guardUnit);
+                const guardColor = guardUnit === 'scouts'
                   ? '#3377cc'
-                  : wp.phase === 'understand'
+                  : guardUnit === 'attackers'
                     ? '#cc6633'
                     : '#cc3344';
-                const guardSize = wp.phase === 'eliminate' ? 24 : 22;
+                const guardSize = guardUnit === 'peopleKillers' ? 24 : 22;
                 const gy = p.y - SIZE * 0.45;  // ZGORAJ na heksu (prej prenizko — ni bilo vidno)
                 return (
                   <g className="wp-guard" pointerEvents="none">
@@ -5402,6 +5414,7 @@ export default function App() {
           </div>
           <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
             draftReturn={draftReturn}
+            aiUnits={game.aiUnits}
             wpGarrison={wpGarrisonUnits(game.aiUnits)}
             draftKind={draftKind}
             plannedPaths={pendingExpeditions.map(e => ({ path: e.path, returnPath: e.returnPath, kind: e.kind }))}
