@@ -928,6 +928,9 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
     const r = tickExpedition(e, mapTiles, aiKnowledge, rng, scoutEncounterUnits, patrolFactor, wipeMult);
     rng = r.rng;
     mapTiles = r.tiles;
+    // Srečanja: ljudje VEDNO izvedo o AI enotah (+intel); AI izve o nas le, če skrivanje ni uspelo.
+    intelligence += r.intelGained;
+    aiKnowledge = Math.min(1, aiKnowledge + r.aiInfoGained);
 
     // Najdbe med potjo — NE gredo takoj v kamp; odprava jih NOSI in dostavi ob vrnitvi
     const carried = {

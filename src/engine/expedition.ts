@@ -17,6 +17,7 @@ import {
   DEFAULT_RATIONS,
   SCOUT_CAPTURE_BASE, SCOUT_CAPTURE_PER_SCOUT, SCOUT_AI_KNOWLEDGE_BONUS,
   SCOUT_CAPTURED_LOSS_MIN, SCOUT_CAPTURED_LOSS_MAX,
+  STEALTH_COMBAT_CHANCE, ENCOUNTER_INTEL_GAIN, ENCOUNTER_AI_KNOWLEDGE_GAIN,
   ENCOUNTER_SCOUT_REFERENCE, ENCOUNTER_MIN_FACTOR,
   GUARD_TILE_ENCOUNTER_MULT, NEAR_CORE_ENCOUNTER_MULT,
 } from './constants.js';
@@ -172,13 +173,15 @@ export function tickExpedition(
   aiScouts: number = ENCOUNTER_SCOUT_REFERENCE,
   patrolFactor: number = 1,   // AI patrulja (Poveljstvo): >1 veča verjetnost srečanja
   wipeMult: number = 1,       // velikost AI ekip: >1 večje izgube ob srečanju
-): { exp: Expedition; tiles: HexTile[]; rng: RNGState; populationDelta: number; events: string[]; finds: ExpeditionFinds } {
+): { exp: Expedition; tiles: HexTile[]; rng: RNGState; populationDelta: number; events: string[]; finds: ExpeditionFinds; intelGained: number; aiInfoGained: number } {
   // Premikamo se na ODHODNEM ('traveling') in POVRATNEM ('returning') legu — oba raziskujeta polja po poti.
-  if (exp.status !== 'traveling' && exp.status !== 'returning') return { exp, tiles, rng, populationDelta: 0, events: [], finds: { material: 0, weapons: 0, artifacts: 0 } };
+  if (exp.status !== 'traveling' && exp.status !== 'returning') return { exp, tiles, rng, populationDelta: 0, events: [], finds: { material: 0, weapons: 0, artifacts: 0 }, intelGained: 0, aiInfoGained: 0 };
 
   let newTiles = [...tiles];
   let popLoss = 0;
   let lostAll = false;
+  let intelGained = 0;   // info, ki ga ljudje pridobijo o AI enotah (vedno ob srečanju)
+  let aiInfoGained = 0;  // info, ki ga AI pridobi o nas (le če skrivanje ni uspelo)
   const events: string[] = [];
   const finds: ExpeditionFinds = { material: 0, weapons: 0, artifacts: 0 };
   let curIdx = exp.currentIndex;
@@ -213,17 +216,29 @@ export function tickExpedition(
     const pEnc = Math.min(0.9, stealth ? pEncBase * 0.5 : pEncBase);
     const [encRoll, rng2] = rngNext(rng); rng = rng2;
     if (encRoll < pEnc) {
-      const [pctRoll, rng3] = rngInt(rng, SCOUT_CAPTURED_LOSS_MIN * 100, SCOUT_CAPTURED_LOSS_MAX * 100);
-      rng = rng3;
-      // Večja AI ekipa = večje izgube (wipeMult). Lahko tudi izbriše celo odpravo.
-      const lossFrac = Math.min(1, (pctRoll / 100) * Math.max(0.1, wipeMult));
-      const lost = Math.max(1, Math.floor(assignedNow * lossFrac));
-      assignedNow = Math.max(0, assignedNow - lost);
-      popLoss += lost;
-      events.push(`Srečanje na ${hexLabel(tile)}: ${lost} izgub`);
-      if (assignedNow < 1) {
-        lostAll = true;
-        break;
+      // SREČANJE z AI enotami na tem polju.
+      // Ne-skrit → boj vedno. Skrit → 50/50 ali pride do boja.
+      let combat = true;
+      if (stealth) {
+        const [scRoll, rngS] = rngNext(rng); rng = rngS;
+        combat = scRoll < STEALTH_COMBAT_CHANCE;
+      }
+      // Ljudje VEDNO izvedo o AI enotah (vidijo jih na polju).
+      intelGained += ENCOUNTER_INTEL_GAIN;
+      // AI izve o nas le, če skrivanje NI uspelo (boj ali nismo skriti).
+      if (combat || !stealth) aiInfoGained += ENCOUNTER_AI_KNOWLEDGE_GAIN;
+      if (combat) {
+        const [pctRoll, rng3] = rngInt(rng, SCOUT_CAPTURED_LOSS_MIN * 100, SCOUT_CAPTURED_LOSS_MAX * 100);
+        rng = rng3;
+        // Večja AI ekipa = večje izgube (wipeMult). Lahko izbriše celo odpravo.
+        const lossFrac = Math.min(1, (pctRoll / 100) * Math.max(0.1, wipeMult));
+        const lost = Math.max(1, Math.floor(assignedNow * lossFrac));
+        assignedNow = Math.max(0, assignedNow - lost);
+        popLoss += lost;
+        events.push(`⚔️ Spopad z AI na ${hexLabel(tile)}: ${lost} izgub · 👁 vpogled v AI enote (+${ENCOUNTER_INTEL_GAIN} intel)`);
+        if (assignedNow < 1) { lostAll = true; break; }
+      } else {
+        events.push(`🌙 Skrita odprava je opazila AI enote na ${hexLabel(tile)} in se izognila boju · 👁 vpogled (+${ENCOUNTER_INTEL_GAIN} intel)`);
       }
     }
 
@@ -270,5 +285,7 @@ export function tickExpedition(
     populationDelta: -popLoss,
     events,
     finds,
+    intelGained,
+    aiInfoGained,
   };
 }

@@ -355,3 +355,10 @@ export const SCOUT_AI_KNOWLEDGE_BONUS  = 0.20;  // +do 20 % ujetja če AI ve vel
 export const SCOUT_PARTIAL_EFFECTIVE   = 0.60;  // če misija delno spodleti, donos × 0.6
 export const SCOUT_CAPTURED_LOSS_MIN   = 0.20;  // pri ujetju izgubimo 20–50 % izvidnikov
 export const SCOUT_CAPTURED_LOSS_MAX   = 0.50;
+
+// ─── Srečanje AI⇄človek na istem polju ─────────────────────────────────────────
+// Ne-skrit → boj. Skrit → 50/50 boj. Ljudje VEDNO dobijo info o AI enotah;
+// AI dobi info o nas le, če skrivanje NI uspelo (boj se zgodi ali nismo skriti).
+export const STEALTH_COMBAT_CHANCE       = 0.5;   // skriti: verjetnost, da vseeno pride do boja
+export const ENCOUNTER_INTEL_GAIN        = 10;    // ljudje ob srečanju izvedo o AI enotah (+intel)
+export const ENCOUNTER_AI_KNOWLEDGE_GAIN = 0.04;  // AI izve o nas (le če skrivanje ni uspelo)
