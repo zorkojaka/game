@@ -20,14 +20,15 @@ export async function getGame(runId: string): Promise<GameState> {
 
 export async function playRound(
   runId: string,
-  action: { assignment: Assignment; targetWeakPoint?: string }
+  action: { assignment: Assignment; targetWeakPoint?: string },
+  aiAction?: unknown,   // 2-player: poteza igralca 2 (AI). 1P: izpusti.
 ): Promise<{ state: GameState }> {
   // Opt-out: brskalnik z localStorage 'avh-noStats' = '1' se ne šteje v globalni števec.
   const noStats = typeof localStorage !== 'undefined' && localStorage.getItem('avh-noStats') === '1';
   const res = await fetch(`${BASE}/game/${runId}/round`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(noStats ? { 'x-no-stats': '1' } : {}) },
-    body: JSON.stringify(action),
+    body: JSON.stringify(aiAction ? { ...action, aiAction } : action),
   });
   return res.json();
 }

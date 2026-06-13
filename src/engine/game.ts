@@ -203,6 +203,18 @@ export function decideAIAction(state: GameState): AIAction {
   return { production, upgrade, raidForcePct: raid, roles, focusWeakPoint: focus };
 }
 
+/** Zgradi TOČNO želene enote (2-player: izbira igralca 2), omejeno z energijo. */
+export function aiBuild(units: AIUnits, energy: number, want: AIUnits): { units: AIUnits; energy: number } {
+  let e = energy;
+  const out: AIUnits = { ...units };
+  for (const tier of ['peopleKillers', 'attackers', 'scouts'] as (keyof AIUnits)[]) {
+    const cost = AI_UNIT_ENERGY_COST[tier as 'scouts' | 'attackers' | 'peopleKillers'];
+    const n = Math.min(Math.max(0, Math.floor(want[tier] ?? 0)), Math.floor(e / cost));
+    out[tier] += n; e -= n * cost;
+  }
+  return { units: out, energy: e };
+}
+
 /** Porabi energijo za NADOMEŠČANJE izgub do ciljne vojske (drage enote prej). */
 export function aiReinforce(units: AIUnits, energy: number, target: AIUnits): { units: AIUnits; energy: number } {
   let e = energy;
@@ -475,7 +487,9 @@ export function newGame(seed?: number, difficulty?: DifficultyId): GameState {
 
 // ─── Mesečna zanka ─────────────────────────────────────────────────────────────
 
-export function processRound(state: GameState, action: PlayerAction): GameState {
+// aiActionOverride: v 2-player ga poda IGRALEC 2 (sicer ga izpelje decideAIAction).
+// 1-player pot je nespremenjena (override je undefined).
+export function processRound(state: GameState, action: PlayerAction, aiActionOverride?: AIAction): GameState {
   if (state.status !== 'active') return state;
 
   let rng: RNGState = { seed: state.rngSeed, calls: state.rngCallCount };
@@ -1190,15 +1204,16 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     const coreDestroyed = !!aiWeakPoints.find(w => w.id === AI_ENERGY_CORE_WEAKPOINT && w.exploited);
     const coreMult = coreDestroyed ? AI_ENERGY_CORE_DESTROYED_MULT : 1;
     aiEnergy += difficultyProfile(state.difficulty).aiEnergyInflow * coreMult * (1 + aiEnergyLevel * AI_ENERGY_PER_LEVEL);
-    // AI POLITIKA: izpelji odločitve iz stanja po izgubah (aiEnergy/Level + post-loss enote).
-    const decided = decideAIAction({ ...state, aiUnits, aiRobots, aiEnergy, aiEnergyLevel, aiWeakPoints });
+    // AI POLITIKA: 1-player → skripta (decideAIAction); 2-player → odločitev igralca 2 (override).
+    const decided = aiActionOverride ?? decideAIAction({ ...state, aiUnits, aiRobots, aiEnergy, aiEnergyLevel, aiWeakPoints });
     if (aiRobots > 0) {
-      // 1) PRODUKCIJA: nadomesti izgube do cilja.
-      const target = aiTargetArmy(state, state.totalRounds + 1);
-      const rein = aiReinforce(aiUnits, aiEnergy, target);
+      // 1) PRODUKCIJA: 2P gradi natanko izbrane enote; 1P nadomesti izgube do cilja.
+      const rein = aiActionOverride
+        ? aiBuild(aiUnits, aiEnergy, decided.production)
+        : aiReinforce(aiUnits, aiEnergy, aiTargetArmy(state, state.totalRounds + 1));
       const built = totalAIRobots(rein.units) - aiRobots;
       aiUnits = rein.units; aiEnergy = rein.energy; aiRobots = totalAIRobots(aiUnits);
-      if (built > 0) expeditionEvents.push(`⚡ AI je iz jedra obnovil ${built} ${built === 1 ? 'enoto' : 'enot'}.`);
+      if (built > 0) expeditionEvents.push(`⚡ AI je zgradil ${built} ${built === 1 ? 'enoto' : 'enot'}.`);
       // 2) NADGRADNJA: vloži presežek v dvig pritoka.
       if (decided.upgrade && aiEnergyLevel < AI_ENERGY_LEVEL_MAX && aiEnergy >= AI_ENERGY_LEVEL_COST) {
         aiEnergy -= AI_ENERGY_LEVEL_COST; aiEnergyLevel += 1;

@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan, AIUnits, TacticsAgg } from './types';
+import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundLog, CombatResult, AIPhase, Mission, HexTile, Expedition, NewExpeditionInput, WorkshopObjective, ResearchObjective, OtherClan, AIUnits, AIAction, Assignment, TacticsAgg } from './types';
 import { tileId, hexLabel } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback, getStats } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
 import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT, wpGarrisonUnits, RESEARCH_LEVEL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS } from '../../src/engine/constants';
 import { missionSuccessProbability, aiEnergyInflow, aiCoreDestroyed, aiTargetArmy, wpEffectiveGarrison, effectiveRaidAttackPower, raidProbability } from '../../src/engine/game';
-import { aiAttackPower } from '../../src/engine/constants';
+import { aiAttackPower, AI_UNIT_ENERGY_COST, AI_ENERGY_LEVEL_COST, AI_ENERGY_LEVEL_MAX } from '../../src/engine/constants';
 import { expeditionMonthsForSteps } from '../../src/engine/expedition';
 import { logicalWeaknessBonus, logicalWeaknessByRobot } from '../../src/engine/combat';
 import { MAP_COLS, MAP_ROWS, collapseCampRuns } from '../../src/engine/map';
@@ -4277,9 +4277,10 @@ function ScreenMenu({ onNewGame, game }: { onNewGame?: () => void; game?: GameSt
   );
 }
 
-function StartScreen({ onNew, loading, soundEnabled, onToggleSound }: { onNew: (tactic: StartTacticId, difficulty: DifficultyId) => void; loading: boolean; soundEnabled: boolean; onToggleSound: () => void }) {
+function StartScreen({ onNew, loading, soundEnabled, onToggleSound }: { onNew: (tactic: StartTacticId, difficulty: DifficultyId, players: 1 | 2) => void; loading: boolean; soundEnabled: boolean; onToggleSound: () => void }) {
   const [selectedTactic, setSelectedTactic] = useState<StartTacticId>('food');
   const [difficulty, setDifficulty] = useState<DifficultyId>('normal');
+  const [numPlayers, setNumPlayers] = useState<1 | 2>(1);
   const tactic = START_TACTICS.find(t => t.id === selectedTactic) ?? START_TACTICS[0];
   const alloc = [
     { key: 'foragers', label: 'Prehrana', value: tactic.allocation.foragers, color: '#66aa44' },
@@ -4319,6 +4320,18 @@ function StartScreen({ onNew, loading, soundEnabled, onToggleSound }: { onNew: (
         <div className="start-legend dim small">
           12 mesecev na fazo · 36 skupaj · Vsaka odločitev šteje · Izumrli ne vstanejo
         </div>
+        {/* Izbira števila igralcev */}
+        <div className="diff-row" style={{ marginBottom: '.5rem' }}>
+          <button className={`diff-btn${numPlayers === 1 ? ' on' : ''}`} onClick={() => setNumPlayers(1)} title="Ti proti AI (računalnik)">
+            🧍 1 igralec
+          </button>
+          <button className={`diff-btn${numPlayers === 2 ? ' on' : ''}`} onClick={() => setNumPlayers(2)} title="Igralec 2 vodi AI (hotseat — izmenično na isti napravi)">
+            🧍🤖 2 igralca
+          </button>
+        </div>
+        {numPlayers === 2 && (
+          <div className="diff-facts dim small">🤖 Igralec 2 vodi AI — po klanovi potezi se naprava preda igralcu 2 (hotseat). Ločena zaslona/online pridejo kasneje.</div>
+        )}
         {/* Izbira težavnosti — multiplikatorji v engine/difficulty.ts */}
         <div className="diff-row">
           {(Object.values(DIFFICULTIES)).map(d => (
@@ -4336,8 +4349,8 @@ function StartScreen({ onNew, loading, soundEnabled, onToggleSound }: { onNew: (
             · 🧱 +{(p.wallDefensePct * 100).toFixed(1).replace('.0', '')} %/zid · ⚔️ ×{p.weaponResearchMult}/stopnjo
           </div>
         ); })()}
-        <button className="start-btn" onClick={() => onNew(selectedTactic, difficulty)} disabled={loading}>
-          {loading ? '⟳ Nalagam…' : '▶  ZAČNI IGRO'}
+        <button className="start-btn" onClick={() => onNew(selectedTactic, difficulty, numPlayers)} disabled={loading}>
+          {loading ? '⟳ Nalagam…' : numPlayers === 2 ? '▶  ZAČNI 2-PLAYER' : '▶  ZAČNI IGRO'}
         </button>
         <div className="start-stats dim small" title="Globalno vsi igralci (brez simulacij in razvijalca)">
           🌍 odigranih <b>{stats ? stats.played : '…'}</b> · 🏆 zmag <b style={{ color: '#22cc66' }}>{stats ? stats.wins : '…'}</b> · 💀 porazov <b style={{ color: '#cc5555' }}>{stats ? stats.losses : '…'}</b>
@@ -4513,6 +4526,84 @@ function TacticsReview({ game }: { game: GameState }) {
   );
 }
 
+/** 🤖 Zaslon IGRALCA 2 (AI) v 2-player hotseat: vnese AI potezo (produkcija + nadgradnja).
+ *  Najprej "predaja naprave" za skrivnost; vloge/raid/lov pridejo v naslednjih stopnjah. */
+function AIControlScreen({ game, onConfirm, onBack, loading }: {
+  game: GameState; onConfirm: (a: AIAction) => void; onBack: () => void; loading: boolean;
+}) {
+  const [revealed, setRevealed] = useState(false);
+  const units = game.aiUnits ?? { scouts: game.aiRobots, attackers: 0, peopleKillers: 0 };
+  const target = aiTargetArmy(game, game.totalRounds + 1);
+  const budget = Math.floor((game.aiEnergy ?? 0) + aiEnergyInflow(game));
+  const level = game.aiEnergyLevel ?? 0;
+  const def = (k: keyof typeof units) => Math.max(0, (target[k] ?? 0) - (units[k] ?? 0));
+  // Predlog: pohlepno zapolni primanjkljaj znotraj proračuna (kar bi AI naredil sam).
+  const suggest = (() => { let e = budget; const s = { scouts: 0, attackers: 0, peopleKillers: 0 };
+    (['peopleKillers', 'attackers', 'scouts'] as const).forEach(t => { const c = AI_UNIT_ENERGY_COST[t]; const n = Math.min(def(t), Math.floor(e / c)); s[t] = n; e -= n * c; }); return s; })();
+  const [build, setBuild] = useState(suggest);
+  const [upgrade, setUpgrade] = useState(false);
+  const cost = build.scouts * AI_UNIT_ENERGY_COST.scouts + build.attackers * AI_UNIT_ENERGY_COST.attackers + build.peopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
+  const remaining = budget - cost;
+  const canUpgrade = level < AI_ENERGY_LEVEL_MAX && remaining >= AI_ENERGY_LEVEL_COST;
+  const adj = (k: 'scouts' | 'attackers' | 'peopleKillers', d: number) => {
+    const c = AI_UNIT_ENERGY_COST[k];
+    setBuild(b => { const n = Math.max(0, b[k] + d); const newCost = cost - b[k] * c + n * c; return newCost <= budget ? { ...b, [k]: n } : b; });
+  };
+  const UNIT: Array<['scouts' | 'attackers' | 'peopleKillers', string, string]> = [
+    ['scouts', '🔭', 'izvidniki'], ['attackers', '⚔️', 'napadalci'], ['peopleKillers', '☠', 'people-killerji'],
+  ];
+
+  if (!revealed) return (
+    <div className="gameover" style={{ '--go-image': 'none' } as React.CSSProperties}>
+      <div className="gameover-inner" style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: '2rem', marginBottom: '.6rem' }}>🤖</div>
+        <h2 style={{ color: '#e0564a' }}>Naprava → IGRALEC 2 (AI)</h2>
+        <p className="dim">Klan je oddal potezo. Predaj napravo igralcu, ki vodi AI.</p>
+        <button className="start-btn" onClick={() => setRevealed(true)}>Sem igralec 2 — pokaži potezo AI</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="gameover" style={{ '--go-image': 'none' } as React.CSSProperties}>
+      <div className="gameover-inner" style={{ maxWidth: 560, textAlign: 'left' }}>
+        <h2 style={{ color: '#e0564a', textAlign: 'center' }}>🤖 Poteza AI — igralec 2</h2>
+        <div className="dim small" style={{ textAlign: 'center', marginBottom: '.6rem' }}>
+          Mesec {game.totalRounds + 1} · ⚡ proračun <b style={{ color: '#ffd84a' }}>{budget}</b> energije · nivo pritoka {level}
+        </div>
+        <div style={{ background: '#0d141b', border: '1px solid #223344', borderRadius: 10, padding: '.7rem .9rem' }}>
+          <div style={{ fontSize: '.8rem', color: '#9fd0ff', fontWeight: 700, marginBottom: 6 }}>Zgradi enote (cena ⚡)</div>
+          {UNIT.map(([k, ic, lbl]) => (
+            <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #161f29' }}>
+              <span>{ic} {lbl} <span className="dim small">({AI_UNIT_ENERGY_COST[k]}⚡ · imaš {units[k]}, cilj {target[k]})</span></span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button className="ph-menu-btn" onClick={() => adj(k, -1)} disabled={build[k] <= 0}>−</button>
+                <b style={{ minWidth: 24, textAlign: 'center' }}>{build[k]}</b>
+                <button className="ph-menu-btn" onClick={() => adj(k, 1)}>+</button>
+              </span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: '.8rem' }}>
+            <span className="dim">poraba {cost}⚡ · ostane <b style={{ color: remaining >= 0 ? '#8df0a5' : '#e0564a' }}>{remaining}⚡</b></span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: canUpgrade ? 1 : 0.4 }}>
+              <input type="checkbox" checked={upgrade && canUpgrade} disabled={!canUpgrade} onChange={e => setUpgrade(e.target.checked)} />
+              ⚙️ nadgradi pritok ({AI_ENERGY_LEVEL_COST}⚡)
+            </label>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: '.8rem' }}>
+          <button className="start-btn" style={{ flex: 1 }} disabled={loading}
+            onClick={() => onConfirm({ production: build, upgrade: upgrade && canUpgrade, raidForcePct: 0.2, roles: { raid: 0.2, garrison: 0, patrol: 0, hunt: 0 } })}>
+            {loading ? '⟳' : 'Izvedi potezo AI →'}
+          </button>
+          <button className="ph-menu-btn" onClick={onBack} title="Nazaj na klanovo potezo">↩</button>
+        </div>
+        <div className="dim small" style={{ marginTop: '.5rem' }}>Naslednje stopnje: razporeditev robotov (raid / straža / patrulja / lov na odprave).</div>
+      </div>
+    </div>
+  );
+}
+
 function GameOverScreen({ game, onNew, loading, soundEnabled, onToggleSound }: { game: GameState; onNew: () => void; loading: boolean; soundEnabled: boolean; onToggleSound: () => void }) {
   const won = game.status === 'victory';
   const exploited = game.aiWeakPoints.filter(w => w.exploited).length;
@@ -4605,6 +4696,9 @@ export default function App() {
   const [game,       setGame]       = useState<GameState | null>(null);
   const [loading,    setLoading]    = useState(false);
   const [showStart,  setShowStart]  = useState(false);
+  const [players,    setPlayers]    = useState<1 | 2>(1);   // 1 = single, 2 = hotseat (igralec 2 vodi AI)
+  // 2-player: ko klan odda potezo, počakamo na potezo igralca 2 (AI). Hrani zamrznjeno klan-potezo.
+  const [aiTurn, setAiTurn] = useState<null | { clanAction: { assignment: Assignment; targetWeakPoint?: string } }>(null);
 
   const [axis,       setAxis]       = useState<HumanAxis>('obzidje');
   const [combatants,   setCombatants]   = useState(0);
@@ -4824,12 +4918,14 @@ export default function App() {
     if (normalized !== researchObj) setResearchObj(normalized);
   }, [game?.robotsResearchLevel, game?.weaponResearchLevel, game?.wallResearchLevel, researchObj, game]);
 
-  const handleNew = async (startTactic: StartTacticId = 'food', difficulty: DifficultyId = 'normal') => {
+  const handleNew = async (startTactic: StartTacticId = 'food', difficulty: DifficultyId = 'normal', numPlayers: 1 | 2 = 1) => {
     const tactic = START_TACTICS.find(t => t.id === startTactic) ?? START_TACTICS[0];
     setLoading(true);
     try {
       const g = await createGame(undefined, difficulty);
       setGame(g);
+      setPlayers(numPlayers);
+      setAiTurn(null);
       setShowStart(false);
       localStorage.setItem(STORAGE_KEY, g.runId);
       setAxis('obzidje'); setCombatants(0); setDefenders(tactic.allocation.defenders); setForagers(tactic.allocation.foragers); setWorkers(tactic.allocation.workers); setResearchers(tactic.allocation.researchers); setWorkshopObj('weapon'); setResearchObj('robots'); setTargetWP(''); setRations(3); setMissions({}); setMissionR({}); setScoutTargets(new Set()); setEventLog([]); setRoundCards([]); setDraftPath([]); setDraftReturn([]); setDraftPeople(5); setDraftRations(3); setDraftStealth(false); setDraftLoot(false); setPendingExpeditions([]); setArtifactTargetWp('');
@@ -4845,28 +4941,35 @@ export default function App() {
     setAppMenuOpen(false);
   };
 
+  // Klan odda potezo. 1-player → takoj razreši; 2-player → predaj igralcu 2 (AI zaslon).
   const handleRound = async () => {
+    if (!game || loading || aiTurn) return;
+    const newExps: NewExpeditionInput[] = [...pendingExpeditions];
+    if (draftPath.length >= 2 && draftPeople > 0) newExps.push(buildDraftInput(draftKind));
+    const safeResearchObj = normalizeResearchObjective(
+      researchObj, game.robotsResearchLevel ?? 0, game.weaponResearchLevel ?? 0, game.wallResearchLevel ?? 0);
+    const clanAction = {
+      assignment: { axis, combatants: 0, defenders, foragers, workers, researchers,
+        workshopObjective: workshopObj, researchObjective: safeResearchObj, rations: effectiveRations,
+        newExpeditions: newExps.length > 0 ? newExps : undefined,
+        useArtifactOnWpId: artifactTargetWp || undefined },
+      targetWeakPoint: targetWP || undefined,
+    };
+    if (players === 2) { setAiTurn({ clanAction }); return; }  // predaj igralcu 2
+    await resolveRound(clanAction);
+  };
+
+  // Dejanska razrešitev poteze (klan + neobvezna AI poteza igralca 2).
+  const resolveRound = async (
+    clanAction: { assignment: Assignment; targetWeakPoint?: string },
+    aiAction?: unknown,
+  ) => {
     if (!game || loading) return;
     setLoading(true);
     try {
-      const newExps: NewExpeditionInput[] = [...pendingExpeditions];
-      // Če uporabnik ni potrdil tekoče poti a ima veljaven draft, ga pošlji tudi z dejansko izbrano vrsto.
-      if (draftPath.length >= 2 && draftPeople > 0) {
-        newExps.push(buildDraftInput(draftKind));
-      }
-      const safeResearchObj = normalizeResearchObjective(
-        researchObj,
-        game.robotsResearchLevel ?? 0,
-        game.weaponResearchLevel ?? 0,
-        game.wallResearchLevel ?? 0,
-      );
-      const { state } = await playRound(game.runId, {
-        assignment: { axis, combatants: 0, defenders, foragers, workers, researchers,
-          workshopObjective: workshopObj, researchObjective: safeResearchObj, rations: effectiveRations,
-          newExpeditions: newExps.length > 0 ? newExps : undefined,
-          useArtifactOnWpId: artifactTargetWp || undefined },
-        targetWeakPoint: targetWP || undefined,
-      });
+      const safeResearchObj = clanAction.assignment.researchObjective ?? researchObj;
+      const { state } = await playRound(game.runId, clanAction, aiAction);
+      setAiTurn(null);
       setMissions({});
       setScoutTargets(new Set());
       setPendingExpeditions([]);
@@ -5174,6 +5277,13 @@ export default function App() {
         }} />}
       <GameOverScreen game={game} onNew={openStartScreen} loading={loading} soundEnabled={soundEnabled} onToggleSound={toggleSound} />
     </>
+  );
+
+  // 2-player: po klanovi potezi zaslon IGRALCA 2 (AI). 1-player nikoli ne pride sem.
+  if (aiTurn) return (
+    <AIControlScreen game={game} loading={loading}
+      onConfirm={(ai) => resolveRound(aiTurn.clanAction, ai)}
+      onBack={() => setAiTurn(null)} />
   );
 
   const inCampPop    = Math.max(0, game.population);

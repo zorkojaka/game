@@ -8,7 +8,7 @@ import { GameSession } from '../db/models/GameSession.js';
 import { CompletedRun } from '../db/models/CompletedRun.js';
 import { Feedback } from '../db/models/Feedback.js';
 import { newGame, processRound, previewOdds } from '../engine/game.js';
-import type { PlayerAction } from '../engine/types.js';
+import type { PlayerAction, AIAction } from '../engine/types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -64,6 +64,21 @@ function validateAssignment(a: unknown): string | null {
   return null;
 }
 
+/** Površinska validacija AI poteze (2-player). Vrne očiščeno akcijo ali undefined. */
+function validateAIAction(a: unknown): AIAction | undefined {
+  if (!a || typeof a !== 'object') return undefined;
+  const o = a as Record<string, unknown>;
+  const p = (o.production ?? {}) as Record<string, unknown>;
+  const intOr0 = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1_000_000 ? Math.floor(v) : 0);
+  return {
+    production: { scouts: intOr0(p.scouts), attackers: intOr0(p.attackers), peopleKillers: intOr0(p.peopleKillers) },
+    upgrade: o.upgrade === true,
+    raidForcePct: typeof o.raidForcePct === 'number' ? Math.min(1, Math.max(0, o.raidForcePct)) : 0.2,
+    roles: { raid: 0.2, garrison: 0, patrol: 0, hunt: 0 },
+    focusWeakPoint: typeof o.focusWeakPoint === 'string' ? o.focusWeakPoint : undefined,
+  };
+}
+
 // ─── API ──────────────────────────────────────────────────────────────────────
 
 // Nova igra
@@ -94,7 +109,9 @@ app.post('/api/game/:runId/round', async (req, res) => {
   const invalid = validateAssignment(action?.assignment);
   if (invalid) return res.status(400).json({ error: invalid });
 
-  const newState = processRound(doc as ReturnType<typeof newGame>, action);
+  // 2-player: neobvezna AI poteza igralca 2 (površinsko validirana). 1P: undefined → skripta.
+  const aiAction = validateAIAction((req.body as { aiAction?: unknown }).aiAction);
+  const newState = processRound(doc as ReturnType<typeof newGame>, action, aiAction);
   await GameSession.updateOne({ runId: doc.runId }, { $set: newState });
 
   // Če je igra končana, shrani v CompletedRun z dejansko zgodovino osi.
