@@ -972,3 +972,16 @@ describe('Laboratorij — AI bojne nadgradnje', () => {
     expect(lv2).toBeCloseTo(lv0 * 1.3 * 1.3, 3);
   });
 });
+
+describe('Vez šibkih točk ↔ AI funkcija', () => {
+  const exploit = (g: GameState, id: string): GameState =>
+    ({ ...g, aiWeakPoints: g.aiWeakPoints.map(w => w.id === id ? { ...w, exploited: true } : w) });
+  it('uničen Laboratorij (wp_comm) izniči nadgradnjo napada', () => {
+    const base: GameState = { ...newGame(3, 'normal'), aiAttackLevel: 2 };
+    expect(effectiveRaidAttackPower(exploit(base, 'wp_comm'))).toBeLessThan(effectiveRaidAttackPower(base));
+  });
+  it('uničeno Poveljstvo (wp_core) oslabi raid moč na 55 %', () => {
+    const base = newGame(3, 'normal');
+    expect(effectiveRaidAttackPower(exploit(base, 'wp_core'))).toBeCloseTo(effectiveRaidAttackPower(base) * 0.55, 3);
+  });
+});

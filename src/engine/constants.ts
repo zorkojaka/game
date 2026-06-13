@@ -100,7 +100,10 @@ export const INITIAL_AI_KNOWLEDGE = 0.1; // AI malo ve o nas na začetku
 // Z energijo AI NADOMEŠČA izgubljene enote (do ciljne velikosti vojske za to fazo) —
 // česar prej ni počel, zato je izčrpavanje zdaj pravi izziv. Če igralec uniči jedro,
 // pritok strmo pade → izčrpavalna (obrambna) zmaga postane dosegljiva.
-export const AI_ENERGY_CORE_WEAKPOINT = 'wp_power';     // katera šibka točka je jedro
+export const AI_ENERGY_CORE_WEAKPOINT = 'wp_power';     // ⚡ Jedro — uničenje zniža pritok
+export const AI_LAB_WEAKPOINT         = 'wp_comm';      // 🧪 Laboratorij — uničenje onemogoči nadgradnje
+export const AI_COMMAND_WEAKPOINT     = 'wp_core';      // ⚔️ Poveljstvo — uničenje oslabi napade
+export const AI_COMMAND_DISRUPTED_MULT = 0.55;          // raid moč × to, ko je Poveljstvo uničeno
 export const AI_ENERGY_START = 0;
 export const AI_ENERGY_CORE_DESTROYED_MULT = 0.25;      // uničeno jedro → pritok na 25 %
 export const AI_ENERGY_PER_LEVEL = 0.5;                 // +50 % pritoka na stopnjo AI nadgradnje

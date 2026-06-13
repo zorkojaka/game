@@ -66,9 +66,11 @@ export function calcAIStrength(
   state: GameState,
   _phase: AIPhase
 ): number {
-  // AI brani z obrambno močjo enot (po tipih) × laboratorijska nadgradnja obrambe
+  // AI brani z obrambno močjo enot × laboratorijska nadgradnja obrambe
+  // (če je Laboratorij wp_comm uničen, nadgradnje obrambe odpadejo).
   const units = state.aiUnits ?? { scouts: state.aiRobots, attackers: 0, peopleKillers: 0 };
-  const base = aiDefensePower(units) * aiLabMult(state.aiDefenseLevel ?? 0);
+  const labOff = !!state.aiWeakPoints?.find(w => w.id === 'wp_comm' && w.exploited);
+  const base = aiDefensePower(units) * (labOff ? 1 : aiLabMult(state.aiDefenseLevel ?? 0));
   // Bonus, če AI ve za nas
   const foreknowledge = state.aiKnowledge > 0.5 ? AI_FOREKNOWLEDGE_BONUS : 1.0;
   return base * foreknowledge;

@@ -4054,13 +4054,15 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
           <Row k="raid plan (meseci)" v={game.raidPlan?.months?.map(m => m + 1).join(', ') || '—'} hint="načrtovani napadi tega obdobja" />
         </Sec>
 
-        <Sec t="◆ Šibke točke / straža" sub="straža = del AI vojske; uničena znižuje skupne robote">
-          {wps.map(w => (
+        <Sec t="◆ Šibke točke = AI funkcije" sub="uničiš = oslabiš tisto funkcijo (kot AI uniči cono kampa)">
+          {wps.map(w => { const fn = w.id === 'wp_power' ? '⚡ Jedro' : w.id === 'wp_comm' ? '🧪 Laboratorij' : '⚔️ Poveljstvo';
+            const eff = w.id === 'wp_power' ? 'pritok ×0.25' : w.id === 'wp_comm' ? 'nadgradnje odpadejo' : 'raid ×0.55';
+            return (
             <Row key={w.id} kc={w.discovered && !w.exploited ? C.straza : undefined}
-              k={`${w.exploited ? '💥' : w.discovered ? '◆' : '❔'} ${w.label}`}
-              v={w.exploited ? 'UNIČENA' : w.discovered ? `straža ${wpEffectiveGarrison(game, w.id)} · uspeh z 10 ljudmi ${pct(missionSuccessProbability(game, w.id, 10, 3))}` : 'neodkrita'}
-              hint={w.id === 'wp_power' ? 'ENERGIJSKO JEDRO — uničenje zniža AI pritok na 25 %' : undefined} />
-          ))}
+              k={`${w.exploited ? '💥' : w.discovered ? '◆' : '❔'} ${fn}`}
+              v={w.exploited ? `UNIČENA → ${eff}` : w.discovered ? `straža ${wpEffectiveGarrison(game, w.id)} · uspeh z 10 ${pct(missionSuccessProbability(game, w.id, 10, 3))}` : 'neodkrita'}
+              hint={`${w.label} — uničenje: ${eff}`} />
+          ); })}
         </Sec>
         </div>
 

@@ -20,7 +20,7 @@ import {
   AI_ENERGY_CORE_WEAKPOINT, AI_ENERGY_START, AI_ENERGY_CORE_DESTROYED_MULT,
   AI_ENERGY_PER_LEVEL, AI_UNIT_ENERGY_COST, AI_ENERGY_LEVEL_COST, AI_ENERGY_LEVEL_MAX,
   SEARCH_KNOWLEDGE_PER_ROBOT, PATROL_ENCOUNTER_PER_ROBOT, PATROL_ENCOUNTER_MAX_MULT,
-  AI_LAB_LEVEL_COST, AI_LAB_LEVEL_MAX, aiLabMult,
+  AI_LAB_LEVEL_COST, AI_LAB_LEVEL_MAX, aiLabMult, AI_LAB_WEAKPOINT, AI_COMMAND_WEAKPOINT, AI_COMMAND_DISRUPTED_MULT,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
   AI_UNIT_DEFS, aiAttackPower, aiDefensePower,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
@@ -113,7 +113,11 @@ export function effectiveRaidAttackPower(state: GameState): number {
   const raw = units.scouts * AI_UNIT_DEFS.scouts.attack * reduce('scouts')
     + units.attackers * AI_UNIT_DEFS.attackers.attack * reduce('attackers')
     + units.peopleKillers * AI_UNIT_DEFS.peopleKillers.attack * reduce('peopleKillers');
-  return raw * aiLabMult(state.aiAttackLevel ?? 0);  // × laboratorijska nadgradnja napada
+  // Laboratorij (wp_comm uničen → nadgradnje napada odpadejo) × Poveljstvo (wp_core uničen → oslabljen napad)
+  const wp = (id: string) => !!state.aiWeakPoints?.find(w => w.id === id && w.exploited);
+  const labMult = wp(AI_LAB_WEAKPOINT) ? 1 : aiLabMult(state.aiAttackLevel ?? 0);
+  const cmdMult = wp(AI_COMMAND_WEAKPOINT) ? AI_COMMAND_DISRUPTED_MULT : 1;
+  return raw * labMult * cmdMult;
 }
 
 /**
@@ -204,7 +208,9 @@ export function decideAIAction(state: GameState): AIAction {
   const raid = RAID_AI_FORCE_PCT;
   const roles = { raid, garrison, patrol, search };
   // Laboratorij: zgodaj brani (ščiti šibke točke), pozneje krepi napad.
-  const labTarget: 'attack' | 'defense' = (ph === 'find' || ph === 'understand') ? 'defense' : 'attack';
+  // Če je Laboratorij (wp_comm) uničen, nadgradenj ni.
+  const labDead = !!state.aiWeakPoints?.find(w => w.id === AI_LAB_WEAKPOINT && w.exploited);
+  const labTarget: 'attack' | 'defense' | null = labDead ? null : (ph === 'find' || ph === 'understand') ? 'defense' : 'attack';
   // Fokus obrambe: odkrita, neuničena točka, ki je igralcu najlažja (najverjetnejši cilj).
   const focus = (state.aiWeakPoints ?? [])
     .filter(w => w.discovered && !w.exploited)
