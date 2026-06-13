@@ -1401,6 +1401,9 @@ type CardSoundId =
   | 'expedition-good'
   | 'expedition-bad'
   | 'phase-ai'
+  | 'phase-understand'
+  | 'phase-eliminate'
+  | 'phase-assault'
   | 'ambient-menu'
   | 'ambient-victory'
   | 'ambient-defeat'
@@ -1419,6 +1422,9 @@ const CARD_SOUND_PATH: Record<CardSoundId, string> = {
   'expedition-good': '/assets/audio/card-expedition-good.wav',
   'expedition-bad': '/assets/audio/card-expedition-bad.wav',
   'phase-ai': '/assets/audio/card-phase-ai.wav',
+  'phase-understand': '/assets/audio/phase-transition-understand.wav',
+  'phase-eliminate': '/assets/audio/phase-transition-eliminate.wav',
+  'phase-assault': '/assets/audio/phase-transition-assault.wav',
   'ambient-menu': '/assets/audio/ambient-menu.wav',
   'ambient-victory': '/assets/audio/ambient-victory.wav',
   'ambient-defeat': '/assets/audio/ambient-defeat.wav',
@@ -1465,6 +1471,12 @@ function playCardSound(id: CardSoundId, volume = 0.72) {
 
 function playRoundCardSound(card: RoundEventCardData) {
   playCardSound(cardSoundId(card));
+}
+
+function phaseTransitionSoundId(toPhase: AIPhase): CardSoundId {
+  if (toPhase === 'understand') return 'phase-understand';
+  if (toPhase === 'eliminate') return 'phase-eliminate';
+  return 'phase-assault';
 }
 
 function setAmbientSound(id: CardSoundId | null, enabled: boolean) {
@@ -3878,14 +3890,18 @@ function phaseTransitionUnit(toPhase: AIPhase): AIRobotType {
   return 'scouts';
 }
 
-function PhaseTransitionBanner({ toPhase, narrative, onClose }: {
-  toPhase: keyof typeof PHASE; narrative: string; onClose: () => void;
+function PhaseTransitionBanner({ toPhase, narrative, onClose, soundEnabled }: {
+  toPhase: keyof typeof PHASE; narrative: string; onClose: () => void; soundEnabled: boolean;
 }) {
   const to = PHASE[toPhase];
   const phaseLines = splitPhaseNarrative(narrative);
   const unit = phaseTransitionUnit(toPhase);
   const order: Array<keyof typeof PHASE> = ['find', 'understand', 'eliminate'];
   const curIdx = order.indexOf(toPhase);
+  useEffect(() => {
+    if (!soundEnabled) return;
+    playCardSound(phaseTransitionSoundId(toPhase), 0.84);
+  }, [toPhase, soundEnabled]);
   return (
     <div className="ptb-overlay" onClick={onClose}>
       <div className="ptb-card" style={{ borderColor: to.color, ['--ptb-color' as string]: to.color }} onClick={e => e.stopPropagation()}>
@@ -5453,6 +5469,7 @@ export default function App() {
           toPhase={phaseTrans.to}
           narrative={phaseTrans.narrative}
           onClose={() => setPhaseTrans(null)}
+          soundEnabled={soundEnabled}
         />
       )}
       {showFeedback && <FeedbackModal game={game} onClose={() => setShowFeedback(false)} />}
