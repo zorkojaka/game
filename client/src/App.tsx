@@ -2685,7 +2685,7 @@ function respliceWaypoint(original: Hex[], index: number, y: Hex): Hex[] {
 }
 
 /** Heksa mapa — z risanjem poti in vizualizacijo aktivnih odprav */
-function HexMap({ tiles, draftPath, draftReturn, aiUnits, wpGarrison, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, artifactCount, artifactTargetWpId, onArtifactTarget, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, rationsLocked, onRations, workshopObj, onWorkshop, researchObj, onResearch, researchHighlight, workshop, research, pop, draftPeople, draftRations, draftStealth, draftLoot, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onDraftLoot, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
+function HexMap({ observer = false, tiles, draftPath, draftReturn, aiUnits, wpGarrison, draftKind, plannedPaths, onPathClick, onWaypointMove, onWpSelect, selectedWpId, artifactCount, artifactTargetWpId, onArtifactTarget, expeditions, wps, otherClans, drawingMode, camp, freePeople, onCampAdjust, onCampSet, repelProbability, defenseContribution, rations, rationsLocked, onRations, workshopObj, onWorkshop, researchObj, onResearch, researchHighlight, workshop, research, pop, draftPeople, draftRations, draftStealth, draftLoot, onDraftKind, onDraftPeople, onDraftRations, onDraftStealth, onDraftLoot, onConfirmDraft, canConfirmDraft, draftAddDisabled }: {
   tiles: HexTile[];
   draftPath: Array<{ q: number; r: number }>;
   draftReturn: Array<{ q: number; r: number }>;
@@ -2728,6 +2728,7 @@ function HexMap({ tiles, draftPath, draftReturn, aiUnits, wpGarrison, draftKind,
   onConfirmDraft: () => void;
   canConfirmDraft: boolean;
   draftAddDisabled: boolean;
+  observer?: boolean;   // AI/opazovalni pogled: skrije igralčeve kampove kontrole
 }) {
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null);
   const [hoveredExpId, setHoveredExpId]   = useState<string | null>(null);
@@ -3238,8 +3239,8 @@ function HexMap({ tiles, draftPath, draftReturn, aiUnits, wpGarrison, draftKind,
           );
         })()}
 
-        {/* KAMP — 4 hex zoni z +/- gumbi (tanke notranje obrobe) */}
-        {CAMP_ZONES.map(z => {
+        {/* KAMP — 4 hex zoni z +/- gumbi (tanke notranje obrobe). V observer pogledu skrito. */}
+        {!observer && CAMP_ZONES.map(z => {
           const p = shift(hexToPixel(z.q, z.r, SIZE));
           const clipId = `campclip-${z.q}-${z.r}`;
           const zoneInfo =
@@ -3326,8 +3327,8 @@ function HexMap({ tiles, draftPath, draftReturn, aiUnits, wpGarrison, draftKind,
 
         {/* Populacija je prikazana v zgornji vrstici (top-bar). */}
 
-        {/* Zunanji kontrolni gumbi vsake zone (na zunanji strani) */}
-        {(() => {
+        {/* Zunanji kontrolni gumbi vsake zone (na zunanji strani). V observer pogledu skrito. */}
+        {!observer && (() => {
           // Centroid kampa za določitev "zunanje" smeri
           const cs = CAMP_ZONES.map(z => shift(hexToPixel(z.q, z.r, SIZE)));
           const cx = cs.reduce((s, p) => s + p.x, 0) / cs.length;
@@ -4573,10 +4574,29 @@ function AIControlScreen({ game, onConfirm, onBack, loading }: {
 
   return (
     <div className="gameover" style={{ '--go-image': 'none' } as React.CSSProperties}>
-      <div className="gameover-inner" style={{ maxWidth: 560, textAlign: 'left' }}>
+      <div className="gameover-inner" style={{ maxWidth: 620, textAlign: 'left' }}>
         <h2 style={{ color: '#e0564a', textAlign: 'center' }}>🤖 Poteza AI — igralec 2</h2>
         <div className="dim small" style={{ textAlign: 'center', marginBottom: '.6rem' }}>
-          Mesec {game.totalRounds + 1} · ⚡ proračun <b style={{ color: '#ffd84a' }}>{budget}</b> energije · nivo pritoka {level}
+          Mesec {game.totalRounds + 1} · ⚡ proračun <b style={{ color: '#ffd84a' }}>{budget}</b> energije · nivo pritoka {level} · ☣ tvoja baza je zgoraj
+        </div>
+        {/* Isti zemljevid kot igralec 1 (read-only): ☣ AI baza zgoraj, ⛺ kamp spodaj. */}
+        <div style={{ background: '#0d141b', border: '1px solid #223344', borderRadius: 10, padding: '.4rem', marginBottom: '.6rem' }}>
+          <HexMap observer
+            tiles={game.mapTiles ?? []} draftPath={[]} draftReturn={[]}
+            aiUnits={game.aiUnits} wpGarrison={0} draftKind={'scout'} plannedPaths={[]}
+            onPathClick={() => {}} onWaypointMove={() => {}} onWpSelect={() => {}}
+            selectedWpId={''} artifactCount={0} artifactTargetWpId={''} onArtifactTarget={() => {}}
+            expeditions={game.expeditions ?? []} wps={game.aiWeakPoints ?? []} otherClans={game.otherClans ?? []}
+            drawingMode={false} camp={{ defenders: 0, researchers: 0, workers: 0, foragers: 0 }} freePeople={0}
+            onCampAdjust={() => {}} onCampSet={() => {}} repelProbability={0}
+            defenseContribution={{ people: 0, walls: 0, missing: 1 }} rations={3} rationsLocked={{}} onRations={() => {}}
+            workshopObj={'weapon'} onWorkshop={() => {}} researchObj={'robots'} onResearch={() => {}}
+            workshop={{ wallsBuilt: game.wallsBuilt ?? 0, weaponProgress: 0, wallProgress: 0, artifactProgress: 0, workers: 0 }}
+            research={{ robotsLevel: 0, robotsProgress: 0, weaponLevel: 0, weaponProgress: 0, wallLevel: 0, wallProgress: 0, researchers: 0 }}
+            pop={{ total: 0, inCamp: 0, away: 0, free: 0 }}
+            draftPeople={0} draftRations={3} draftStealth={false} draftLoot={false}
+            onDraftKind={() => {}} onDraftPeople={() => {}} onDraftRations={() => {}} onDraftStealth={() => {}} onDraftLoot={() => {}}
+            onConfirmDraft={() => {}} canConfirmDraft={false} draftAddDisabled={true} />
         </div>
         <div style={{ background: '#0d141b', border: '1px solid #223344', borderRadius: 10, padding: '.7rem .9rem' }}>
           <div style={{ fontSize: '.8rem', color: '#9fd0ff', fontWeight: 700, marginBottom: 6 }}>Zgradi enote (cena ⚡)</div>
