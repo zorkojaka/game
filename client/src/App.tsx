@@ -1703,9 +1703,25 @@ function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardD
         kind: 'artifact',
         tone: 'good',
         eyebrow: 'Artefakt',
-        title: /UPORABLJEN/.test(line) ? 'Artefakt sprožen' : 'Artefakt izdelan',
-        body: line.replace(/^[^\s]+ /, ''),
+        title: /UPORABLJEN/.test(line) ? 'Artefakt sprožen' : 'Artefakt dokončan',
+        body: /UPORABLJEN/.test(line)
+          ? line.replace(/^[^\s]+ /, '')
+          : 'Delavnice so dokončale artefakt. To je preboj, ki lahko brez neposrednega napada izbriše eno odkrito šibko točko AI.',
         stats: [{ label: 'Status', value: /UPORABLJEN/.test(line) ? 'uporabljen' : 'izdelan', tone: 'good' }],
+      });
+    } else if (/Odprava se je vrnila.*artefakt/i.test(line)) {
+      const count = line.match(/(\d+)\s+artefakt/i)?.[1] ?? '1';
+      add({
+        id: `artifact-found-${log.round}-${idx}`,
+        kind: 'artifact',
+        tone: 'good',
+        eyebrow: 'Izjemna najdba',
+        title: 'Artefakt najden',
+        body: 'Odprava se je vrnila z artefaktom. To je skoraj največji preobrat, ki ga lahko klan doseže pred končno zmago.',
+        stats: [
+          { label: 'Artefakti', value: `+${count}`, tone: 'good' },
+          { label: 'Možnost', value: 'uniči šibko točko', tone: 'good' },
+        ],
       });
     } else if (/ŠIBKA TOČKA UNIČENA/.test(line)) {
       add({
