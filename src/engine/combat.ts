@@ -84,6 +84,11 @@ export function calcSuccessProbability(
 
 type Outcome = CombatResult['outcome'];
 
+function defeatLoss(humanCombatants: number, fraction: number): number {
+  if (humanCombatants <= 0) return 0;
+  return Math.max(1, Math.floor(humanCombatants * fraction));
+}
+
 // Kako odločilen mora biti rezultat (razdalja od praga uspeha), da je zmaga "popolna"
 // oz. poraz "pokol". Manjše vrednosti = pogostejši ekstremi.
 export const DECISIVE_MARGIN = 0.25;
@@ -146,7 +151,7 @@ function calcSpoils(
       };
     case 'defeat':
       return {
-        humanLost: Math.floor(humanCombatants * 0.55),
+        humanLost: defeatLoss(humanCombatants, 0.55),
         aiRobotsDestroyed: Math.floor(aiRobotsEngaged * 0.2),
         spoils: { intelligence: 3 },
         aiInfoGained: 0.12,

@@ -282,6 +282,11 @@ export function missionSuccessProbability(state: GameState, weakPointId: string,
   return (teamPower * (1 + intelB)) / (teamPower * (1 + intelB) + diff);
 }
 
+function expeditionDefeatLoss(survivors: number, fraction: number): number {
+  if (survivors <= 0) return 0;
+  return Math.max(1, Math.round(survivors * fraction));
+}
+
 /** Resolve raid — vsi branilci se borijo + uničenje neuporabljenega orožja. */
 function resolveRaid(
   state: GameState, assignment: Assignment, rng: RNGState, campPopulation = state.population
@@ -926,7 +931,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
               if (effG > 0) applyDestroy(effG);  // straža je padla z njo
               arrivalLog.push(`💥 ŠIBKA TOČKA UNIČENA: ${wpLabel} — ${lost} padlih${effG > 0 ? `, pobita straža (${effG} enot)` : ''}.`);
             } else {
-              const lost = Math.round(survivors * 0.5);
+              const lost = expeditionDefeatLoss(survivors, 0.5);
               survivors = Math.max(0, survivors - lost);
               const killedG = Math.min(effG, Math.round(attackersNow * 0.35));
               if (wpIdx >= 0 && killedG > 0) {
@@ -953,7 +958,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
               const destroyed = Math.min(aiRobots, Math.round(survivors * 0.5));
               applyDestroy(destroyed);
               carried.material += destroyed;  // plen nosijo s seboj, dostavijo ob vrnitvi
-              const lost = Math.round(survivors * 0.6);
+              const lost = expeditionDefeatLoss(survivors, 0.6);
               survivors = Math.max(0, survivors - lost);
               arrivalLog.push(`⚔️ Napad odbit na ${hexLabel(target)}: ${destroyed} robotov, a ${lost} padlih.`);
             }
@@ -973,7 +978,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
         if (survivors <= 0) {
           // vsi padli na cilju → nihče se ni vrnil; brez poročila, brez plena
           expeditionEvents.push(`☠ Odprava (${departed} ljudi) se ni vrnila. Nihče ne ve, kaj se je zgodilo.`);
-          finishedExps.push({ ...r.exp, carried });
+          finishedExps.push({ ...r.exp, status: 'lost', assigned: 0, carried });
         } else if (retPath.length <= 1) {
           // cilj je kamp — takoj doma (vrne tudi orožje preživelih) + poročilo
           returnedThisMonth += survivors;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
 import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability, missionSuccessProbability , aiEnergyInflow, aiReinforce, aiCoreDestroyed, aiTargetArmy } from './game.js';
-import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus } from './combat.js';
+import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus, resolveCombat } from './combat.js';
 import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp, tileEncounterProbability, expeditionMonthsForSteps } from './expedition.js';
 import { wpGarrisonMult } from './constants.js';
 import { weaponEffectMult } from './difficulty.js';
@@ -73,6 +73,28 @@ describe('rollOutcome — dejanski RNG roll (#8/#9)', () => {
   it('DECISIVE_MARGIN je razumna meja (0,1)', () => {
     expect(DECISIVE_MARGIN).toBeGreaterThan(0);
     expect(DECISIVE_MARGIN).toBeLessThan(1);
+  });
+
+  it('en človek ob izgubljenem boju pade, ne ostane vedno živ zaradi zaokroževanja', () => {
+    const base = newGame(17, 'brutal');
+    const g: GameState = {
+      ...base,
+      resources: { ...base.resources, combat: 0, intelligence: 0 },
+      aiKnowledge: 1,
+      aiUnits: { scouts: 200, attackers: 75, peopleKillers: 25 },
+      aiRobots: 300,
+    };
+    const { result } = resolveCombat(g, {
+      axis: 'obzidje',
+      combatants: 1,
+      defenders: 0,
+      foragers: 0,
+      workers: 0,
+      researchers: 0,
+      rations: 1,
+    }, createRNG(1));
+    expect(['defeat', 'annihilation']).toContain(result.outcome);
+    expect(result.humanLost).toBe(1);
   });
 });
 
@@ -581,6 +603,36 @@ describe('orožje gre z odpravo v napad', () => {
     const exp = (r.expeditions ?? []).find(e => e.kind === 'mission');
     expect(exp?.equippedWeapons).toBe(5);          // 5 orožja vzeli s seboj
     expect(r.resources.combat).toBeLessThanOrEqual(25);  // odšlo iz kampa (morda še raid)
+  });
+
+  it('napad odprave z enim človekom ob porazu ne pusti preživelega zaradi zaokroževanja', () => {
+    const base = newGame(1, 'brutal');
+    const exp = {
+      id: 'solo_attack',
+      kind: 'mission' as const,
+      weakPointId: 'wp_power',
+      path: [{ q: 0, r: 4 }, { q: 1, r: 2 }],
+      currentIndex: 1,
+      assigned: 1,
+      rations: 1,
+      status: 'traveling' as const,
+      monthsElapsed: 1,
+      encountersLog: [],
+      equippedWeapons: 0,
+      departedCount: 1,
+    };
+    const g: GameState = {
+      ...base,
+      population: 20,
+      resources: { ...base.resources, combat: 0, intelligence: 0, survival: 1000 },
+      aiKnowledge: 1,
+      aiUnits: { scouts: 200, attackers: 75, peopleKillers: 25 },
+      aiRobots: 300,
+      expeditions: [exp],
+    };
+    const r = processRound(g, action({ foragers: 0, defenders: 0, workers: 0, researchers: 0 }));
+    expect(r.expeditions.find(e => e.id === 'solo_attack')).toBeUndefined();
+    expect(r.completedExpeditions?.find(e => e.id === 'solo_attack')?.status).toBe('lost');
   });
 });
 
