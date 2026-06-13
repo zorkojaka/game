@@ -164,6 +164,16 @@ export function aiTargetArmy(state: GameState, totalRounds: number): AIUnits {
   };
 }
 
+/** AI ob PREHODU FAZE izbere SESTAVO pošiljke iz danega proračuna (energija).
+ *  v1 skripta: kupi signaturno enoto faze (reproducira sedanji lok). Kasneje:
+ *  genom iz self-improvement loopa → človeški drugi igralec (2-player). */
+export function aiChoosePhaseShipment(phase: AIPhase, budgetEnergy: number): AIUnits {
+  const add: AIUnits = { scouts: 0, attackers: 0, peopleKillers: 0 };
+  if (phase === 'understand') add.attackers = Math.floor(budgetEnergy / AI_UNIT_ENERGY_COST.attackers);
+  else if (phase === 'eliminate') add.peopleKillers = Math.floor(budgetEnergy / AI_UNIT_ENERGY_COST.peopleKillers);
+  return add;
+}
+
 /** Porabi energijo za NADOMEŠČANJE izgub do ciljne vojske (drage enote prej). */
 export function aiReinforce(units: AIUnits, energy: number, target: AIUnits): { units: AIUnits; energy: number } {
   let e = energy;
@@ -910,12 +920,16 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
           // SPOPAD OB PRIHODU — napadalci udarijo na cilju, preživeli se nato vračajo
           const aTier = RATIONS_LEVELS[r.exp.rations] ?? RATIONS_LEVELS[DEFAULT_RATIONS];
           const stealthBonus = r.exp.stealth ? 1.2 : 1.0;  // +20 % uspeha v boju
-          if (r.exp.weakPointId) {
+          // POENOTENJE: napad na hex, KJER JE šibka točka, VEDNO šteje kot napad NANJO —
+          // tudi če odprava ni bila izrecno označena (weakPointId). Tako je "napad na hex"
+          // in "napad na šibko točko" ista stvar, kadar je na tem polju.
+          const effectiveWpId = r.exp.weakPointId ?? arrTile?.hidesWeakPointId;
+          if (effectiveWpId) {
             // Napad na šibko točko AI
-            const wpIdx = aiWeakPoints.findIndex(wp => wp.id === r.exp.weakPointId);
+            const wpIdx = aiWeakPoints.findIndex(wp => wp.id === effectiveWpId);
             const pBase = missionSuccessProbability(
               { ...state, resources: { ...state.resources, intelligence } },
-              r.exp.weakPointId, survivors, r.exp.rations);
+              effectiveWpId, survivors, r.exp.rations);
             const p = Math.min(0.98, pBase * stealthBonus);
             const [roll, rngA] = tacticalRoll(rng); rng = rngA;
             const wpLabel = wpIdx >= 0 ? aiWeakPoints[wpIdx].label : 'šibka točka';
@@ -1120,13 +1134,18 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
   // Fazni prihod novih AI enot (ob prehodu v novo fazo)
   if (phaseComplete) {
     if (phase === 'understand') {
-      aiUnits = { ...aiUnits, attackers: aiUnits.attackers + difficultyProfile(state.difficulty).aiAttackers };
+      // AI iz proračuna (= načrtovane napadalne enote × cena) IZBERE sestavo pošiljke.
+      const budget = difficultyProfile(state.difficulty).aiAttackers * AI_UNIT_ENERGY_COST.attackers;
+      const ship = aiChoosePhaseShipment('understand', budget);
+      aiUnits = { scouts: aiUnits.scouts + ship.scouts, attackers: aiUnits.attackers + ship.attackers, peopleKillers: aiUnits.peopleKillers + ship.peopleKillers };
       aiRobots = totalAIRobots(aiUnits);
-      expeditionEvents.push(`🤖 AI je pripeljal ${difficultyProfile(state.difficulty).aiAttackers} napadalnih enot — pričakuj napade na kamp.`);
+      expeditionEvents.push(`🤖 AI je pripeljal ${ship.attackers} napadalnih enot — pričakuj napade na kamp.`);
     } else if (phase === 'eliminate' && state.phase === 'understand') {
-      aiUnits = { ...aiUnits, peopleKillers: aiUnits.peopleKillers + difficultyProfile(state.difficulty).aiPeopleKillers };
+      const budget = difficultyProfile(state.difficulty).aiPeopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
+      const ship = aiChoosePhaseShipment('eliminate', budget);
+      aiUnits = { scouts: aiUnits.scouts + ship.scouts, attackers: aiUnits.attackers + ship.attackers, peopleKillers: aiUnits.peopleKillers + ship.peopleKillers };
       aiRobots = totalAIRobots(aiUnits);
-      expeditionEvents.push(`☠ AI je pripeljal ${difficultyProfile(state.difficulty).aiPeopleKillers} people-killer enot — napadi so zdaj smrtonosnejši.`);
+      expeditionEvents.push(`☠ AI je pripeljal ${ship.peopleKillers} people-killer enot — napadi so zdaj smrtonosnejši.`);
     }
     // (Konec 3. faze NI poraz — sledi era totalnega napada; napoved gre prek raidPlan-a.)
   }
