@@ -4048,6 +4048,7 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
             ); })()}
           <Row kc={C.aiMoc} k="AI raid moč" v={`${f1(aiAttackPower(units))} × ${pct(RAID_AI_FORCE_PCT)} = ${f1(raidPow)}`} hint="del napadalne moči, ki sodeluje v raidu" />
           <Row k="obrambna moč (ko jih napadeš)" v={f1(aiDefensePower(units))} />
+          <Row k="🧪 laboratorij (napad/obramba)" v={`Lv${game.aiAttackLevel ?? 0} / Lv${game.aiDefenseLevel ?? 0} → ×${(1.3 ** (game.aiAttackLevel ?? 0)).toFixed(1)} / ×${(1.3 ** (game.aiDefenseLevel ?? 0)).toFixed(1)}`} hint="AI bojne nadgradnje (×1.3 na stopnjo)" />
           <Row k="cilj vojske / bo obnovil" v={`🔭${target.scouts} ⚔️${target.attackers} ☠${target.peopleKillers} → ▲🔭${deficit('scouts')} ⚔️${deficit('attackers')} ☠${deficit('peopleKillers')}`} hint="z energijo nadomesti izgube do cilja (drage enote prej)" />
           <Row k="AI ve o nas" v={`${pct(game.aiKnowledge)} ${game.aiKnowledge >= 0.95 ? '· vidi SKRITE' : game.aiKnowledge > 0.5 ? '· +foreknowledge' : ''}`} hint="≥50 % → bonus v boju; ≥95 % → doseže skrite ljudi" />
           <Row k="raid plan (meseci)" v={game.raidPlan?.months?.map(m => m + 1).join(', ') || '—'} hint="načrtovani napadi tega obdobja" />
@@ -4548,6 +4549,7 @@ function AIControlScreen({ game, onConfirm, onBack, loading }: {
   const defPatrol = ph === 'find' ? 0 : ph === 'understand' ? 0.08 : ph === 'eliminate' ? 0.12 : 0.16;
   const defSearch = ph === 'find' ? 0 : ph === 'understand' ? 0.05 : ph === 'eliminate' ? 0.10 : 0.14;
   const [roles, setRoles] = useState({ raid: 0.2, patrol: defPatrol, search: defSearch });
+  const [lab, setLab] = useState<'attack' | 'defense' | null>(null);
   const adjRole = (k: 'raid' | 'patrol' | 'search', d: number) =>
     setRoles(r => ({ ...r, [k]: Math.max(0, Math.min(1, Math.round((r[k] + d) * 100) / 100)) }));
   const cost = build.scouts * AI_UNIT_ENERGY_COST.scouts + build.attackers * AI_UNIT_ENERGY_COST.attackers + build.peopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
@@ -4610,12 +4612,18 @@ function AIControlScreen({ game, onConfirm, onBack, loading }: {
               </span>
             </div>
           ))}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: '.8rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: '.8rem', flexWrap: 'wrap', gap: 6 }}>
             <span className="dim">poraba {cost}⚡ · ostane <b style={{ color: remaining >= 0 ? '#8df0a5' : '#e0564a' }}>{remaining}⚡</b></span>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: canUpgrade ? 1 : 0.4 }}>
               <input type="checkbox" checked={upgrade && canUpgrade} disabled={!canUpgrade} onChange={e => setUpgrade(e.target.checked)} />
               ⚙️ nadgradi pritok ({AI_ENERGY_LEVEL_COST}⚡)
             </label>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: '.78rem' }}>
+            <span className="dim">🧪 laboratorij (80⚡):</span>
+            {([[null, '—'], ['attack', '⚔️ napad'], ['defense', '🛡 obramba']] as const).map(([v, lbl]) => (
+              <button key={String(v)} className={`ph-menu-btn${lab === v ? ' on' : ''}`} style={lab === v ? { borderColor: '#9fd0ff' } : undefined} onClick={() => setLab(v)}>{lbl}</button>
+            ))}
           </div>
         </div>
         <div style={{ background: '#0d141b', border: '1px solid #223344', borderRadius: 10, padding: '.7rem .9rem', marginTop: '.6rem' }}>
@@ -4634,7 +4642,7 @@ function AIControlScreen({ game, onConfirm, onBack, loading }: {
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: '.8rem' }}>
           <button className="start-btn" style={{ flex: 1 }} disabled={loading}
-            onClick={() => onConfirm({ production: build, upgrade: upgrade && canUpgrade, raidForcePct: roles.raid, roles: { raid: roles.raid, garrison: 0, patrol: roles.patrol, search: roles.search } })}>
+            onClick={() => onConfirm({ production: build, upgrade: upgrade && canUpgrade, raidForcePct: roles.raid, roles: { raid: roles.raid, garrison: 0, patrol: roles.patrol, search: roles.search }, labTarget: lab })}>
             {loading ? '⟳' : 'Izvedi potezo AI →'}
           </button>
           <button className="ph-menu-btn" onClick={onBack} title="Nazaj na klanovo potezo">↩</button>

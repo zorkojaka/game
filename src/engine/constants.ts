@@ -112,6 +112,15 @@ export const AI_UNIT_ENERGY_COST: Record<'scouts' | 'attackers' | 'peopleKillers
 export const AI_ENERGY_LEVEL_COST = 60;  // energije za +1 nivo pritoka
 export const AI_ENERGY_LEVEL_MAX  = 3;   // največ +150 % pritoka
 
+// LABORATORIJ — AI bojne nadgradnje (zrcalo igralčevih raziskav). Zmernejši učinek
+// kot igralčev ×2, da AI ne pobegne: ×AI_LAB_MULT_PER_LEVEL na stopnjo.
+export const AI_LAB_LEVEL_COST = 80;   // energije za +1 stopnjo (napad ali obramba)
+export const AI_LAB_LEVEL_MAX  = 3;
+export const AI_LAB_MULT_PER_LEVEL = 1.3;  // ×1.3 na stopnjo (max ~×2.2)
+export function aiLabMult(level: number): number {
+  return Math.pow(AI_LAB_MULT_PER_LEVEL, Math.max(0, level | 0));
+}
+
 // POVELJSTVO — vloge robotov (zrcalo razporeditve ljudi):
 // ISKANJE: roboti, dodeljeni iskanju, dvigajo znanje o kampu (najde te → raidi).
 export const SEARCH_KNOWLEDGE_PER_ROBOT = 0.0006;  // dvig aiKnowledge na robota/mesec

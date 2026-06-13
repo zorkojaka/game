@@ -20,6 +20,7 @@ import {
   AI_ENERGY_CORE_WEAKPOINT, AI_ENERGY_START, AI_ENERGY_CORE_DESTROYED_MULT,
   AI_ENERGY_PER_LEVEL, AI_UNIT_ENERGY_COST, AI_ENERGY_LEVEL_COST, AI_ENERGY_LEVEL_MAX,
   SEARCH_KNOWLEDGE_PER_ROBOT, PATROL_ENCOUNTER_PER_ROBOT, PATROL_ENCOUNTER_MAX_MULT,
+  AI_LAB_LEVEL_COST, AI_LAB_LEVEL_MAX, aiLabMult,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
   AI_UNIT_DEFS, aiAttackPower, aiDefensePower,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
@@ -109,9 +110,10 @@ export function effectiveRaidAttackPower(state: GameState): number {
   const units = readAIUnits(state);
   const logical = logicalWeaknessByRobot(state);
   const reduce = (robot: keyof AIUnits) => Math.max(0, 1 - (logical[robot] ? LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS : 0));
-  return units.scouts * AI_UNIT_DEFS.scouts.attack * reduce('scouts')
+  const raw = units.scouts * AI_UNIT_DEFS.scouts.attack * reduce('scouts')
     + units.attackers * AI_UNIT_DEFS.attackers.attack * reduce('attackers')
     + units.peopleKillers * AI_UNIT_DEFS.peopleKillers.attack * reduce('peopleKillers');
+  return raw * aiLabMult(state.aiAttackLevel ?? 0);  // × laboratorijska nadgradnja napada
 }
 
 /**
@@ -201,11 +203,13 @@ export function decideAIAction(state: GameState): AIAction {
   const garrison = wpGarrisonUnits(units) / total;
   const raid = RAID_AI_FORCE_PCT;
   const roles = { raid, garrison, patrol, search };
+  // Laboratorij: zgodaj brani (ščiti šibke točke), pozneje krepi napad.
+  const labTarget: 'attack' | 'defense' = (ph === 'find' || ph === 'understand') ? 'defense' : 'attack';
   // Fokus obrambe: odkrita, neuničena točka, ki je igralcu najlažja (najverjetnejši cilj).
   const focus = (state.aiWeakPoints ?? [])
     .filter(w => w.discovered && !w.exploited)
     .sort((a, b) => (MISSION_WP_DIFFICULTY[a.id] ?? 100) - (MISSION_WP_DIFFICULTY[b.id] ?? 100))[0]?.id;
-  return { production, upgrade, raidForcePct: raid, roles, focusWeakPoint: focus };
+  return { production, upgrade, raidForcePct: raid, roles, focusWeakPoint: focus, labTarget };
 }
 
 /** Zgradi TOČNO želene enote (2-player: izbira igralca 2), omejeno z energijo. */
@@ -456,6 +460,8 @@ export function newGame(seed?: number, difficulty?: DifficultyId): GameState {
     aiKnowledge: INITIAL_AI_KNOWLEDGE,
     aiEnergy: AI_ENERGY_START,
     aiEnergyLevel: 0,
+    aiAttackLevel: 0,
+    aiDefenseLevel: 0,
     aiTree: generateAITree(),
     aiWeakPoints: generateAIWeakPoints(),
     clanActivity: 0,
@@ -1211,6 +1217,8 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
   // Ne oživlja popolnoma iztrebljene vojske (aiRobots = 0 ostane zmaga igralca).
   let aiEnergy = state.aiEnergy ?? AI_ENERGY_START;
   let aiEnergyLevel = state.aiEnergyLevel ?? 0;
+  let aiAttackLevel = state.aiAttackLevel ?? 0;
+  let aiDefenseLevel = state.aiDefenseLevel ?? 0;
   let aiLastAction: AIAction | undefined;
   {
     const coreDestroyed = !!aiWeakPoints.find(w => w.id === AI_ENERGY_CORE_WEAKPOINT && w.exploited);
@@ -1230,6 +1238,16 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
       if (decided.upgrade && aiEnergyLevel < AI_ENERGY_LEVEL_MAX && aiEnergy >= AI_ENERGY_LEVEL_COST) {
         aiEnergy -= AI_ENERGY_LEVEL_COST; aiEnergyLevel += 1;
         expeditionEvents.push(`⚙️ AI je nadgradil energijsko jedro (nivo ${aiEnergyLevel}) — odslej hitrejši pritok.`);
+      }
+      // 3) LABORATORIJ: vloži presežek v bojno nadgradnjo (napad ali obramba).
+      if (decided.labTarget && aiEnergy >= AI_LAB_LEVEL_COST) {
+        if (decided.labTarget === 'attack' && aiAttackLevel < AI_LAB_LEVEL_MAX) {
+          aiEnergy -= AI_LAB_LEVEL_COST; aiAttackLevel += 1;
+          expeditionEvents.push(`🧪 AI laboratorij: nadgradnja NAPADA (stopnja ${aiAttackLevel}).`);
+        } else if (decided.labTarget === 'defense' && aiDefenseLevel < AI_LAB_LEVEL_MAX) {
+          aiEnergy -= AI_LAB_LEVEL_COST; aiDefenseLevel += 1;
+          expeditionEvents.push(`🧪 AI laboratorij: nadgradnja OBRAMBE (stopnja ${aiDefenseLevel}).`);
+        }
       }
     }
     aiLastAction = { ...decided, upgrade: aiEnergyLevel > (state.aiEnergyLevel ?? 0) };
@@ -1307,6 +1325,8 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
     aiKnowledge: finalAiKnowledge,
     aiEnergy,
     aiEnergyLevel,
+    aiAttackLevel,
+    aiDefenseLevel,
     aiLastAction,
     aiTree: finalTree,
     aiWeakPoints,

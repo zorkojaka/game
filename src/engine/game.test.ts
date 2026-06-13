@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability, missionSuccessProbability , aiEnergyInflow, aiReinforce, aiCoreDestroyed, aiTargetArmy, aiChoosePhaseShipment, decideAIAction } from './game.js';
+import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability, missionSuccessProbability , aiEnergyInflow, aiReinforce, aiCoreDestroyed, aiTargetArmy, aiChoosePhaseShipment, decideAIAction, effectiveRaidAttackPower } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus, resolveCombat } from './combat.js';
 import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp, tileEncounterProbability, expeditionMonthsForSteps } from './expedition.js';
 import { wpGarrisonMult } from './constants.js';
@@ -961,5 +961,14 @@ describe('AI vloge (Poveljstvo) — iskanje dviga znanje', () => {
     const none = processRound(base, action({ foragers: 5 }), aiAct(0));
     const lots = processRound(base, action({ foragers: 5 }), aiAct(0.5));
     expect(lots.aiKnowledge).toBeGreaterThan(none.aiKnowledge);
+  });
+});
+
+describe('Laboratorij — AI bojne nadgradnje', () => {
+  it('nadgradnja napada poveča raid moč (×1.3 na stopnjo)', () => {
+    const base = newGame(3, 'normal');
+    const lv0 = effectiveRaidAttackPower(base);
+    const lv2 = effectiveRaidAttackPower({ ...base, aiAttackLevel: 2 });
+    expect(lv2).toBeCloseTo(lv0 * 1.3 * 1.3, 3);
   });
 });

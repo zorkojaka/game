@@ -139,6 +139,7 @@ export interface AIAction {
   production: AIUnits;       // nove enote, zgrajene iz energije ta mesec
   upgrade: boolean;          // dvig energijskega nivoja (vlaganje presežka)
   raidForcePct: number;      // delež napadalne moči v raidu
+  labTarget?: 'attack' | 'defense' | null;  // kaj AI nadgrajuje v laboratoriju to potezo
   // razporeditev robotov po vlogah (deleži): napad / straža točk / patrulja (ujame
   // odprave na poti) / iskanje (dviga znanje o kampu). Zrcalo razporeditve ljudi.
   roles: { raid: number; garrison: number; patrol: number; search: number };
@@ -292,6 +293,8 @@ export interface GameState {
   // NADOMEŠČANJE izgubljenih enot. Uničeno jedro → pritok strmo pade.
   aiEnergy?: number;        // trenutna zaloga energije
   aiEnergyLevel?: number;   // AI nadgradnja pritoka (AI ga dviguje sam, ko ima presežek)
+  aiAttackLevel?: number;   // Laboratorij: nadgradnja napada robotov (×1.3^level)
+  aiDefenseLevel?: number;  // Laboratorij: nadgradnja obrambe robotov (×1.3^level)
   aiLastAction?: AIAction;  // odločitve AI v zadnji potezi (za inšpektor / 2-player)
   aiTree: AITreeNode[];
   aiWeakPoints: AIWeakPoint[];

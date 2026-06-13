@@ -12,6 +12,7 @@ import {
   AI_FOREKNOWLEDGE_BONUS,
   AI_WEAK_POINT_EXPLOIT_BONUS,
   aiDefensePower,
+  aiLabMult,
   researchMult,
   LOGICAL_WEAKNESS_COMBAT_BONUS,
   RATIONS_LEVELS,
@@ -65,9 +66,9 @@ export function calcAIStrength(
   state: GameState,
   _phase: AIPhase
 ): number {
-  // AI brani z obrambno močjo enot (po tipih)
+  // AI brani z obrambno močjo enot (po tipih) × laboratorijska nadgradnja obrambe
   const units = state.aiUnits ?? { scouts: state.aiRobots, attackers: 0, peopleKillers: 0 };
-  const base = aiDefensePower(units);
+  const base = aiDefensePower(units) * aiLabMult(state.aiDefenseLevel ?? 0);
   // Bonus, če AI ve za nas
   const foreknowledge = state.aiKnowledge > 0.5 ? AI_FOREKNOWLEDGE_BONUS : 1.0;
   return base * foreknowledge;

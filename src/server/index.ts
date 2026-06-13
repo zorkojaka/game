@@ -77,6 +77,7 @@ function validateAIAction(a: unknown): AIAction | undefined {
     upgrade: o.upgrade === true,
     raidForcePct: typeof o.raidForcePct === 'number' ? Math.min(1, Math.max(0, o.raidForcePct)) : 0.2,
     roles: { raid: frac(r.raid, 0.2), garrison: frac(r.garrison, 0), patrol: frac(r.patrol, 0), search: frac(r.search, 0) },
+    labTarget: o.labTarget === 'attack' || o.labTarget === 'defense' ? o.labTarget : null,
     focusWeakPoint: typeof o.focusWeakPoint === 'string' ? o.focusWeakPoint : undefined,
   };
 }
