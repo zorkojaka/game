@@ -48,6 +48,22 @@ const RATIONS: Record<number, RationsRow> = Object.fromEntries(
 const STORAGE_KEY = 'avh-runId';
 const SOUND_STORAGE_KEY = 'avh-soundEnabled';
 
+// Števec ODIGRANIH iger (samo resnične, v brskalniku — simulator jih ne dotika).
+const STATS_KEY = 'avh-stats';
+const STATS_SEED_KEY = 'avh-lastResultSeed';
+type GameStats = { played: number; wins: number; losses: number };
+function readStats(): GameStats {
+  try { const s = JSON.parse(localStorage.getItem(STATS_KEY) || ''); if (s && typeof s.played === 'number') return s; } catch { /* ignore */ }
+  return { played: 0, wins: 0, losses: 0 };
+}
+function recordResult(seed: number, won: boolean): void {
+  if (localStorage.getItem(STATS_SEED_KEY) === String(seed)) return;  // ista igra → ne štej dvakrat
+  localStorage.setItem(STATS_SEED_KEY, String(seed));
+  const s = readStats();
+  s.played++; if (won) s.wins++; else s.losses++;
+  localStorage.setItem(STATS_KEY, JSON.stringify(s));
+}
+
 type StartTacticId = 'food' | 'research' | 'workshop' | 'defense';
 
 type StartTactic = {
@@ -4246,6 +4262,29 @@ function SoundButton({ enabled, onToggle, className = '' }: { enabled: boolean; 
   );
 }
 
+/** Meni-gumb (☰) za začetni/končni zaslon — samostojen (Pravila, Predlogi, opc. Nova igra). */
+function ScreenMenu({ onNewGame, game }: { onNewGame?: () => void; game?: GameState | null }) {
+  const [open, setOpen] = useState(false);
+  const [rules, setRules] = useState(false);
+  const [feedback, setFeedback] = useState(false);
+  return (
+    <>
+      <button className="ph-menu-btn screen-menu" onClick={() => setOpen(o => !o)} title="Meni" aria-label="Meni">☰</button>
+      {open && (
+        <div className="app-menu-overlay" onClick={() => setOpen(false)}>
+          <div className="app-menu" onClick={e => e.stopPropagation()}>
+            {onNewGame && <button onClick={() => { setOpen(false); onNewGame(); }}>↺ Nova igra</button>}
+            <button onClick={() => { setOpen(false); setFeedback(true); }}>💡 Predlogi za izboljšave</button>
+            <button onClick={() => { setOpen(false); setRules(true); }}>📖 Pravila</button>
+          </div>
+        </div>
+      )}
+      {rules && <RulesModal onClose={() => setRules(false)} />}
+      {feedback && <FeedbackModal game={game ?? null} onClose={() => setFeedback(false)} />}
+    </>
+  );
+}
+
 function StartScreen({ onNew, loading, soundEnabled, onToggleSound }: { onNew: (tactic: StartTacticId, difficulty: DifficultyId) => void; loading: boolean; soundEnabled: boolean; onToggleSound: () => void }) {
   const [selectedTactic, setSelectedTactic] = useState<StartTacticId>('food');
   const [difficulty, setDifficulty] = useState<DifficultyId>('normal');
@@ -4258,10 +4297,12 @@ function StartScreen({ onNew, loading, soundEnabled, onToggleSound }: { onNew: (
   ];
   const assignedStart = alloc.reduce((s, a) => s + a.value, 0);
   const freeStart = 15;
+  const stats = readStats();
 
   return (
     <div className="start">
       <SoundButton enabled={soundEnabled} onToggle={onToggleSound} className="screen-sound" />
+      <ScreenMenu />
       <div className="start-inner">
         <div className="start-logo">
           <span className="start-ai">AI</span>
@@ -4305,6 +4346,11 @@ function StartScreen({ onNew, loading, soundEnabled, onToggleSound }: { onNew: (
         <button className="start-btn" onClick={() => onNew(selectedTactic, difficulty)} disabled={loading}>
           {loading ? '⟳ Nalagam…' : '▶  ZAČNI IGRO'}
         </button>
+        {stats.played > 0 && (
+          <div className="start-stats dim small" title="Samo tvoje resnične igre (brez simulacij)">
+            🎮 odigranih <b>{stats.played}</b> · 🏆 zmag <b style={{ color: '#22cc66' }}>{stats.wins}</b> · 💀 porazov <b style={{ color: '#cc5555' }}>{stats.losses}</b>
+          </div>
+        )}
       </div>
       <div className="start-tactics" aria-label="Začetna taktika">
         <div className="st-tabs">
@@ -4484,6 +4530,7 @@ function GameOverScreen({ game, onNew, loading, soundEnabled, onToggleSound }: {
   return (
     <div className="gameover" style={{ '--go-image': `url(${endScreenImage(game.status)})` } as React.CSSProperties}>
       <SoundButton enabled={soundEnabled} onToggle={onToggleSound} className="screen-sound" />
+      <ScreenMenu onNewGame={onNew} game={game} />
       <div className="gameover-inner">
         <div className="go-header" style={{ borderColor: c }}>
           <div className="go-status" style={{ color: c }}>
@@ -4567,6 +4614,11 @@ export default function App() {
   const [game,       setGame]       = useState<GameState | null>(null);
   const [loading,    setLoading]    = useState(false);
   const [showStart,  setShowStart]  = useState(false);
+
+  // Zabeleži izid resnične igre (zmaga/poraz) v števec — enkrat na igro (po seedu).
+  useEffect(() => {
+    if (game && game.status !== 'active') recordResult(game.rngSeed, game.status === 'victory');
+  }, [game?.status, game?.rngSeed]);
   const [axis,       setAxis]       = useState<HumanAxis>('obzidje');
   const [combatants,   setCombatants]   = useState(0);
   const [defenders,    setDefenders]    = useState(15);
@@ -5278,6 +5330,9 @@ export default function App() {
           })()}
         </div>
         <div className="top-menu-wrap">
+          {(() => { const d = difficultyProfile(game.difficulty); const e = d.id === 'easy' ? '🌱' : d.id === 'normal' ? '⚖️' : d.id === 'hard' ? '💀' : '🔥'; return (
+            <span className="diff-badge" title={`Težavnost: ${d.label} — ${d.desc}`}>{e} {d.label}</span>
+          ); })()}
           <SoundButton enabled={soundEnabled} onToggle={toggleSound} />
           <button className={`ph-menu-btn ph-info-btn${helpOverlay ? ' on' : ''}`} onClick={() => setHelpOverlay(o => !o)}
             title="Pomoč — razlaga gumbov" aria-label="Pomoč">ⓘ</button>

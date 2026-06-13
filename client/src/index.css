@@ -1019,6 +1019,14 @@ b      { color: var(--text); font-weight: 600; }
   background: rgba(12, 16, 22, .82);
   backdrop-filter: blur(8px);
 }
+.screen-menu {
+  position: fixed;
+  top: 14px;
+  right: 62px;
+  z-index: 5;
+  background: rgba(12, 16, 22, .82);
+  backdrop-filter: blur(8px);
+}
 .app-menu-overlay { position: fixed; inset: 0; z-index: 1100; background: rgba(0,0,0,.35); }
 .app-menu {
   position: absolute; top: .5rem; right: .5rem;
@@ -3536,3 +3544,12 @@ input[type=range].cz-slider::-moz-range-track { height: 6px; border-radius: 3px;
 .go-strat-fill.invest { background: #6aa6d9; }
 .go-strat-val { font-size: .68rem; color: #cfe0ee; text-align: right; }
 .go-strat-facts { margin-top: .25rem; line-height: 1.35; }
+
+/* Značka težavnosti v zgornji vrstici med igro */
+.diff-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: #161b22; border: 1px solid #2a3442; border-radius: 8px;
+  color: #cdd6e0; font-size: .8rem; padding: .35rem .55rem; white-space: nowrap;
+}
+/* Števec iger na začetnem zaslonu */
+.start-stats { margin-top: .6rem; }
