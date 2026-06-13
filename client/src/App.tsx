@@ -3583,7 +3583,7 @@ function HexMap({ observer = false, incomingRaids = [], tiles, draftPath, draftR
           const pk = shift(hexToPixel(camp.q, camp.r, SIZE));
           const LEAD = 4;
           return incomingRaids.filter(r => r.monthsAway >= 0 && r.monthsAway <= LEAD).map((r, i) => {
-            const t = Math.max(0, Math.min(1, 1 - r.monthsAway / LEAD));
+            const t = Math.max(0, Math.min(0.82, (1 - r.monthsAway / LEAD) * 0.82));  // ustavi pred kampom, ne v prehrani
             const x = pc.x + (pk.x - pc.x) * t, y = pc.y + (pk.y - pc.y) * t;
             return (
               <g key={`raid_${i}`} style={{ pointerEvents: 'none' }}>
@@ -4085,7 +4085,7 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
             return (
               <Row k="🧠 odločitve (zadnja poteza)"
                 v={`gradnja 🔭${prod.scouts} ⚔️${prod.attackers} ☠${prod.peopleKillers}${pb === 0 ? ' (nič)' : ''}${a.upgrade ? ' · ⚙️ nadgradnja' : ''} · brani: ${focusLbl}`}
-                hint={`razporeditev: raid ${pct(a.roles.raid)} · straža ${pct(a.roles.garrison)} · patrulja ${pct(a.roles.patrol)} · iskanje ${pct(a.roles.search)}`} />
+                hint={`razporeditev: raid ${pct(a.roles.raid)} · straža ${pct(a.roles.garrison)} · patrulja ${pct(a.roles.patrol)} · iskanje ${pct(a.roles.search)} · ekipe ${a.teamSize === 1 ? 'majhne' : a.teamSize === 3 ? 'velike' : 'srednje'}`} />
             ); })()}
           <Row kc={C.aiMoc} k="AI raid moč" v={`${f1(aiAttackPower(units))} × ${pct(RAID_AI_FORCE_PCT)} = ${f1(raidPow)}`} hint="del napadalne moči, ki sodeluje v raidu" />
           <Row k="obrambna moč (ko jih napadeš)" v={f1(aiDefensePower(units))} />
@@ -4573,7 +4573,7 @@ function TacticsReview({ game }: { game: GameState }) {
 
 /** 🤖 Zaslon IGRALCA 2 (AI) v 2-player hotseat: vnese AI potezo (produkcija + nadgradnja).
  *  Najprej "predaja naprave" za skrivnost; vloge/raid/lov pridejo v naslednjih stopnjah. */
-type AIPlan = { roles: { raid: number; patrol: number; search: number }; lab: 'attack' | 'defense' | null; upgrade: boolean };
+type AIPlan = { roles: { raid: number; patrol: number; search: number }; lab: 'attack' | 'defense' | null; upgrade: boolean; teamSize: 1 | 2 | 3 };
 
 function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading }: {
   game: GameState; plan: AIPlan; onPlanChange: (p: AIPlan) => void;
@@ -4682,16 +4682,23 @@ function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading 
               </span>
             </div>
           ))}
-          <div className="dim small" style={{ marginTop: 4 }}>Straža šibkih točk se določi samodejno iz vojske.</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: '.78rem', flexWrap: 'wrap' }}>
+            <span className="dim">terenske ekipe:</span>
+            {([[1, 'majhne'], [2, 'srednje'], [3, 'velike']] as const).map(([v, lbl]) => (
+              <button key={v} className={`ph-menu-btn${plan.teamSize === v ? ' on' : ''}`} style={plan.teamSize === v ? { borderColor: '#9fd0ff' } : undefined}
+                onClick={() => onPlanChange({ ...plan, teamSize: v })}>{lbl}</button>
+            ))}
+          </div>
+          <div className="dim small" style={{ marginTop: 4 }}>Več majhnih = več srečanj (šibke); manj velikih = redka srečanja, a izbrišejo odpravo. Straža točk samodejno.</div>
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: '.8rem' }}>
           <button className="start-btn" style={{ flex: 1 }} disabled={loading}
-            onClick={() => onConfirm({ production: build, upgrade: upgrade && canUpgrade, raidForcePct: roles.raid, roles: { raid: roles.raid, garrison: 0, patrol: roles.patrol, search: roles.search }, labTarget: lab })}>
+            onClick={() => onConfirm({ production: build, upgrade: upgrade && canUpgrade, raidForcePct: roles.raid, roles: { raid: roles.raid, garrison: 0, patrol: roles.patrol, search: roles.search }, labTarget: lab, teamSize: plan.teamSize })}>
             {loading ? '⟳' : 'Izvedi potezo AI →'}
           </button>
           <button className="ph-menu-btn" onClick={onBack} title="Nazaj na klanovo potezo">↩</button>
         </div>
-        <div className="dim small" style={{ marginTop: '.5rem' }}>Naslednje stopnje: razporeditev robotov (raid / straža / patrulja / lov na odprave).</div>
+        <div className="dim small" style={{ marginTop: '.5rem' }}>Nastavitve ostanejo v naslednji rundi, dokler jih ne spremeniš.</div>
       </div>
     </div>
   );
@@ -4793,7 +4800,7 @@ export default function App() {
   // 2-player: ko klan odda potezo, počakamo na potezo igralca 2 (AI). Hrani zamrznjeno klan-potezo.
   const [aiTurn, setAiTurn] = useState<null | { clanAction: { assignment: Assignment; targetWeakPoint?: string } }>(null);
   // VZTRAJNI AI načrt igralca 2 — nastaviš enkrat, ostane v naslednjih rundah.
-  const [aiPlan, setAiPlan] = useState<AIPlan>({ roles: { raid: 0.2, patrol: 0, search: 0 }, lab: null, upgrade: false });
+  const [aiPlan, setAiPlan] = useState<AIPlan>({ roles: { raid: 0.2, patrol: 0, search: 0 }, lab: null, upgrade: false, teamSize: 2 });
 
   const [axis,       setAxis]       = useState<HumanAxis>('obzidje');
   const [combatants,   setCombatants]   = useState(0);
@@ -6032,7 +6039,6 @@ export default function App() {
             </span>
           </div>
           <HexMap tiles={game.mapTiles ?? []} draftPath={draftPath}
-            incomingRaids={(game.raidPlan?.months ?? []).filter(m => m >= game.totalRounds).map(m => ({ monthsAway: m - game.totalRounds, force: Math.floor(game.aiRobots * 0.2) }))}
             draftReturn={draftReturn}
             aiUnits={game.aiUnits}
             wpGarrison={wpGarrisonUnits(game.aiUnits)}

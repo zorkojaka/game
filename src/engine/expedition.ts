@@ -171,6 +171,7 @@ export function tickExpedition(
   rng: RNGState,
   aiScouts: number = ENCOUNTER_SCOUT_REFERENCE,
   patrolFactor: number = 1,   // AI patrulja (Poveljstvo): >1 veča verjetnost srečanja
+  wipeMult: number = 1,       // velikost AI ekip: >1 večje izgube ob srečanju
 ): { exp: Expedition; tiles: HexTile[]; rng: RNGState; populationDelta: number; events: string[]; finds: ExpeditionFinds } {
   // Premikamo se na ODHODNEM ('traveling') in POVRATNEM ('returning') legu — oba raziskujeta polja po poti.
   if (exp.status !== 'traveling' && exp.status !== 'returning') return { exp, tiles, rng, populationDelta: 0, events: [], finds: { material: 0, weapons: 0, artifacts: 0 } };
@@ -214,7 +215,9 @@ export function tickExpedition(
     if (encRoll < pEnc) {
       const [pctRoll, rng3] = rngInt(rng, SCOUT_CAPTURED_LOSS_MIN * 100, SCOUT_CAPTURED_LOSS_MAX * 100);
       rng = rng3;
-      const lost = Math.max(1, Math.floor(assignedNow * pctRoll / 100));
+      // Večja AI ekipa = večje izgube (wipeMult). Lahko tudi izbriše celo odpravo.
+      const lossFrac = Math.min(1, (pctRoll / 100) * Math.max(0.1, wipeMult));
+      const lost = Math.max(1, Math.floor(assignedNow * lossFrac));
       assignedNow = Math.max(0, assignedNow - lost);
       popLoss += lost;
       events.push(`Srečanje na ${hexLabel(tile)}: ${lost} izgub`);

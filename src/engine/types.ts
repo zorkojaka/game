@@ -140,6 +140,7 @@ export interface AIAction {
   upgrade: boolean;          // dvig energijskega nivoja (vlaganje presežka)
   raidForcePct: number;      // delež napadalne moči v raidu
   labTarget?: 'attack' | 'defense' | null;  // kaj AI nadgrajuje v laboratoriju to potezo
+  teamSize?: 1 | 2 | 3;      // velikost terenskih ekip: majhne(1)/srednje(2)/velike(3)
   // razporeditev robotov po vlogah (deleži): napad / straža točk / patrulja (ujame
   // odprave na poti) / iskanje (dviga znanje o kampu). Zrcalo razporeditve ljudi.
   roles: { raid: number; garrison: number; patrol: number; search: number };

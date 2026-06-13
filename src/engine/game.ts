@@ -19,7 +19,8 @@ import {
   MIN_CLAN_AT_PHASE_END,
   AI_ENERGY_CORE_WEAKPOINT, AI_ENERGY_START, AI_ENERGY_CORE_DESTROYED_MULT,
   AI_ENERGY_PER_LEVEL, AI_UNIT_ENERGY_COST, AI_ENERGY_LEVEL_COST, AI_ENERGY_LEVEL_MAX,
-  SEARCH_KNOWLEDGE_PER_ROBOT, PATROL_ENCOUNTER_PER_ROBOT, PATROL_ENCOUNTER_MAX_MULT,
+  SEARCH_KNOWLEDGE_PER_ROBOT, PATROL_ENCOUNTER_MAX_MULT,
+  AI_TEAM_ROBOTS, PATROL_ENCOUNTER_PER_TEAM, AI_TEAM_WIPE_REF,
   AI_LAB_LEVEL_COST, AI_LAB_LEVEL_MAX, aiLabMult, AI_LAB_WEAKPOINT, AI_COMMAND_WEAKPOINT, AI_COMMAND_DISRUPTED_MULT,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
   AI_UNIT_DEFS, aiAttackPower, aiDefensePower,
@@ -215,7 +216,7 @@ export function decideAIAction(state: GameState): AIAction {
   const focus = (state.aiWeakPoints ?? [])
     .filter(w => w.discovered && !w.exploited)
     .sort((a, b) => (MISSION_WP_DIFFICULTY[a.id] ?? 100) - (MISSION_WP_DIFFICULTY[b.id] ?? 100))[0]?.id;
-  return { production, upgrade, raidForcePct: raid, roles, focusWeakPoint: focus, labTarget };
+  return { production, upgrade, raidForcePct: raid, roles, focusWeakPoint: focus, labTarget, teamSize: 2 };
 }
 
 /** Zgradi TOČNO želene enote (2-player: izbira igralca 2), omejeno z energijo. */
@@ -722,7 +723,13 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
   // POVELJSTVO: AI poteza (1P = skripta, 2P = igralec 2). Določi vloge robotov za TO rundo.
   const aiAct: AIAction = aiActionOverride ?? decideAIAction(state);
   const aiTotal0 = totalAIRobots(aiUnits);
-  const patrolFactor = Math.min(PATROL_ENCOUNTER_MAX_MULT, 1 + aiAct.roles.patrol * aiTotal0 * PATROL_ENCOUNTER_PER_ROBOT);
+  // Velikost ekip: patruljne robote razdeli v ekipe. Več ekip → več srečanj;
+  // večja ekipa → večje izgube ob srečanju (wipeMult).
+  const teamRobots = AI_TEAM_ROBOTS[(aiAct.teamSize ?? 2) as 1 | 2 | 3];
+  const patrolRobots = aiAct.roles.patrol * aiTotal0;
+  const teams = patrolRobots / Math.max(1, teamRobots);
+  const patrolFactor = Math.min(PATROL_ENCOUNTER_MAX_MULT, 1 + teams * PATROL_ENCOUNTER_PER_TEAM);
+  const wipeMult = teamRobots / AI_TEAM_WIPE_REF;
   const searchKnowledge = aiAct.roles.search * aiTotal0 * SEARCH_KNOWLEDGE_PER_ROBOT;
 
   const isExploiting = targetWeakPoint
@@ -918,7 +925,7 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
 
   for (const e of oldExps) {
     const scoutEncounterUnits = Math.round(aiUnits.scouts * (1 - (logicalWeaknessByRobot({ ...state, aiTree } as GameState).scouts ? LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION : 0)));
-    const r = tickExpedition(e, mapTiles, aiKnowledge, rng, scoutEncounterUnits, patrolFactor);
+    const r = tickExpedition(e, mapTiles, aiKnowledge, rng, scoutEncounterUnits, patrolFactor, wipeMult);
     rng = r.rng;
     mapTiles = r.tiles;
 

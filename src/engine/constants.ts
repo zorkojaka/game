@@ -128,8 +128,14 @@ export function aiLabMult(level: number): number {
 // ISKANJE: roboti, dodeljeni iskanju, dvigajo znanje o kampu (najde te → raidi).
 export const SEARCH_KNOWLEDGE_PER_ROBOT = 0.0006;  // dvig aiKnowledge na robota/mesec
 // PATRULJA: roboti na patrulji večajo verjetnost srečanja TVOJIH odprav na poti.
-export const PATROL_ENCOUNTER_PER_ROBOT = 0.004;   // +faktor srečanja na robota
+export const PATROL_ENCOUNTER_PER_ROBOT = 0.004;   // (legacy) +faktor na robota
 export const PATROL_ENCOUNTER_MAX_MULT  = 2.5;     // zgornja meja množitelja
+// VELIKOST EKIP: AI razdeli patruljne robote v ekipe. Več manjših = več srečanj
+// (vsaka ekipa = priložnost za srečanje), a šibkejše; manj večjih = redka srečanja,
+// a večja verjetnost, da izbrišejo odpravo.
+export const AI_TEAM_ROBOTS: Record<1 | 2 | 3, number> = { 1: 10, 2: 25, 3: 50 };  // robotov/ekipo (majhne/srednje/velike)
+export const PATROL_ENCOUNTER_PER_TEAM = 0.06;     // +faktor srečanja na ekipo na terenu
+export const AI_TEAM_WIPE_REF = 25;                // ekipa te velikosti = ×1 na izgube; večja = več
 // Ko AI ve toliko o nas, vidi tudi SKRITE (nerazporejene) ljudi in jih raid lahko doseže.
 export const AI_KNOWLEDGE_EXPOSE_HIDDEN = 0.95;  // prej 0.99 — skrivanje je bilo skoraj zastonj
 // Če je ob KONCU FAZE cel klan ≤ toliko, je igre konec (kapica na neskončno vračanje preživelih).
