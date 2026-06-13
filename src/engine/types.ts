@@ -275,6 +275,10 @@ export interface GameState {
   aiRobots: number;         // skupno število robotov (= vsota aiUnits)
   aiUnits: AIUnits;         // razčlemba po tipu enote (evidenca)
   aiKnowledge: number;      // [0,1] koliko AI ve o nas
+  // AI ekonomija (temelj): energija iz jedra (= šibka točka wp_power) poganja
+  // NADOMEŠČANJE izgubljenih enot. Uničeno jedro → pritok strmo pade.
+  aiEnergy?: number;        // trenutna zaloga energije
+  aiEnergyLevel?: number;   // AI nadgradnja pritoka (zaenkrat 0; kasneje ga AI dviguje sam)
   aiTree: AITreeNode[];
   aiWeakPoints: AIWeakPoint[];
 

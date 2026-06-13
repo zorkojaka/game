@@ -1,7 +1,7 @@
 // Glavni game engine — čiste funkcije (state, action) → new state
 // Brez side effectov, brez IO
 
-import type { GameState, PlayerAction, RoundLog, Assignment, AIPhase, RaidResult, ScoutResult, HumanAxis, Mission, AIUnits, ResearchObjective, CampArea } from './types.js';
+import type { GameState, PlayerAction, RoundLog, Assignment, AIPhase, RaidResult, ScoutResult, HumanAxis, Mission, AIUnits, AIWeakPoint, ResearchObjective, CampArea } from './types.js';
 import type { RNGState } from './rng.js';
 import { rngInt, rngNext, seedFromString } from './rng.js';
 import { resolveCombat } from './combat.js';
@@ -17,6 +17,8 @@ import {
   INITIAL_AI_KNOWLEDGE,
   AI_KNOWLEDGE_EXPOSE_HIDDEN,
   MIN_CLAN_AT_PHASE_END,
+  AI_ENERGY_CORE_WEAKPOINT, AI_ENERGY_START, AI_ENERGY_CORE_DESTROYED_MULT,
+  AI_ENERGY_PER_LEVEL, AI_UNIT_ENERGY_COST,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
   AI_UNIT_DEFS, aiAttackPower, aiDefensePower,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
@@ -138,6 +140,43 @@ export function destroyAIUnits(units: AIUnits, count: number): AIUnits {
   const order: (keyof AIUnits)[] = ['scouts', 'attackers', 'peopleKillers']; // ostanek: najprej najšibkejši
   for (const k of order) { if (remainder <= 0) break; const take = Math.min(res[k], remainder); res[k] -= take; remainder -= take; }
   return res;
+}
+
+/** Je energijsko jedro (šibka točka wp_power) uničeno? */
+export function aiCoreDestroyed(state: { aiWeakPoints: AIWeakPoint[] }): boolean {
+  return !!state.aiWeakPoints.find(w => w.id === AI_ENERGY_CORE_WEAKPOINT && w.exploited);
+}
+
+/** Pritok energije AI na mesec (iz jedra; uničeno jedro → strmo pade; +nadgradnja). */
+export function aiEnergyInflow(state: GameState): number {
+  const lvl = state.aiEnergyLevel ?? 0;
+  const coreMult = aiCoreDestroyed(state) ? AI_ENERGY_CORE_DESTROYED_MULT : 1;
+  return difficultyProfile(state.difficulty).aiEnergyInflow * coreMult * (1 + lvl * AI_ENERGY_PER_LEVEL);
+}
+
+/** Ciljna velikost vojske za dani mesec (enote, ki so do zdaj prispele). */
+export function aiTargetArmy(state: GameState, totalRounds: number): AIUnits {
+  const p = difficultyProfile(state.difficulty);
+  return {
+    scouts: p.aiScouts,
+    attackers: totalRounds > 12 ? p.aiAttackers : 0,
+    peopleKillers: totalRounds > 24 ? p.aiPeopleKillers : 0,
+  };
+}
+
+/** Porabi energijo za NADOMEŠČANJE izgub do ciljne vojske (drage enote prej). */
+export function aiReinforce(units: AIUnits, energy: number, target: AIUnits): { units: AIUnits; energy: number } {
+  let e = energy;
+  const out: AIUnits = { ...units };
+  for (const tier of ['peopleKillers', 'attackers', 'scouts'] as (keyof AIUnits)[]) {
+    const cost = AI_UNIT_ENERGY_COST[tier as 'scouts' | 'attackers' | 'peopleKillers'];
+    const deficit = Math.max(0, (target[tier] ?? 0) - (out[tier] ?? 0));
+    if (deficit <= 0) continue;
+    const build = Math.min(deficit, Math.floor(e / cost));
+    out[tier] += build;
+    e -= build * cost;
+  }
+  return { units: out, energy: e };
 }
 
 /** Obdobje raidov za dani mesec: meje + razpon števila napadov.
@@ -354,6 +393,8 @@ export function newGame(seed?: number, difficulty?: DifficultyId): GameState {
     aiRobots: difficultyProfile(difficulty).aiScouts,
     aiUnits: { scouts: difficultyProfile(difficulty).aiScouts, attackers: 0, peopleKillers: 0 },
     aiKnowledge: INITIAL_AI_KNOWLEDGE,
+    aiEnergy: AI_ENERGY_START,
+    aiEnergyLevel: 0,
     aiTree: generateAITree(),
     aiWeakPoints: generateAIWeakPoints(),
     clanActivity: 0,
@@ -1085,6 +1126,24 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     // (Konec 3. faze NI poraz — sledi era totalnega napada; napoved gre prek raidPlan-a.)
   }
 
+  // AI EKONOMIJA (temelj): pritok energije iz jedra + NADOMEŠČANJE izgub do ciljne vojske.
+  // Uničeno jedro (wp_power) strmo zniža pritok → izčrpavalna zmaga postane dosegljiva.
+  // Ne oživlja popolnoma iztrebljene vojske (aiRobots = 0 ostane zmaga igralca).
+  let aiEnergy = state.aiEnergy ?? AI_ENERGY_START;
+  const aiEnergyLevel = state.aiEnergyLevel ?? 0;
+  {
+    const coreDestroyed = !!aiWeakPoints.find(w => w.id === AI_ENERGY_CORE_WEAKPOINT && w.exploited);
+    const coreMult = coreDestroyed ? AI_ENERGY_CORE_DESTROYED_MULT : 1;
+    aiEnergy += difficultyProfile(state.difficulty).aiEnergyInflow * coreMult * (1 + aiEnergyLevel * AI_ENERGY_PER_LEVEL);
+    if (aiRobots > 0) {
+      const target = aiTargetArmy(state, state.totalRounds + 1);
+      const rein = aiReinforce(aiUnits, aiEnergy, target);
+      const built = totalAIRobots(rein.units) - aiRobots;
+      aiUnits = rein.units; aiEnergy = rein.energy; aiRobots = totalAIRobots(aiUnits);
+      if (built > 0) expeditionEvents.push(`⚡ AI je iz jedra obnovil ${built} ${built === 1 ? 'enoto' : 'enot'}.`);
+    }
+  }
+
   // Zmaga — AI popolnoma iztrebljen (tudi v fazi 1: če pobijemo vse izvidnike, AI ne more nadaljevati),
   // ali vse šibke točke izkoriščene.
   if (aiRobots <= 0 || aiWeakPoints.every(wp => wp.exploited)) {
@@ -1155,6 +1214,8 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     aiUnits,
     aiInsight,
     aiKnowledge: finalAiKnowledge,
+    aiEnergy,
+    aiEnergyLevel,
     aiTree: finalTree,
     aiWeakPoints,
     clanActivity,

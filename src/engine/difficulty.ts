@@ -21,6 +21,8 @@ export interface DifficultyProfile {
   // Učinkovitost naše tehnologije (vidno v opisih obrambe/raziskav)
   wallDefensePct: number;     // doprinos enega obzidja k obrambni moči (× 2^stopnja raziskave)
   weaponResearchMult: number; // množitelj učinka orožja na stopnjo raziskave (normal = ×2)
+  // AI ekonomija — pritok energije na mesec iz jedra (poganja nadomeščanje izgub)
+  aiEnergyInflow: number;
 }
 
 export const DIFFICULTIES: Record<DifficultyId, DifficultyProfile> = {
@@ -28,25 +30,25 @@ export const DIFFICULTIES: Record<DifficultyId, DifficultyProfile> = {
     id: 'easy', label: 'Lahka', desc: 'Več ljudi in zalog, manjša AI vojska, izdatnejša tehnologija.',
     startPopulation: 90, startFood: 140, startWeapons: 70,
     aiScouts: 80, aiAttackers: 55, aiPeopleKillers: 15,
-    wallDefensePct: 0.03, weaponResearchMult: 2.25,
+    wallDefensePct: 0.03, weaponResearchMult: 2.25, aiEnergyInflow: 3,
   },
   normal: {
     id: 'normal', label: 'Normalna', desc: 'Uravnotežena izkušnja — privzeto.',
     startPopulation: 80, startFood: 120, startWeapons: 60,
     aiScouts: 100, aiAttackers: 75, aiPeopleKillers: 25,
-    wallDefensePct: 0.02, weaponResearchMult: 2,
+    wallDefensePct: 0.02, weaponResearchMult: 2, aiEnergyInflow: 5,
   },
   hard: {
     id: 'hard', label: 'Težka', desc: 'Manj ljudi in zalog, večja AI vojska, skromnejša tehnologija.',
     startPopulation: 70, startFood: 100, startWeapons: 50,
     aiScouts: 120, aiAttackers: 95, aiPeopleKillers: 35,
-    wallDefensePct: 0.015, weaponResearchMult: 1.8,
+    wallDefensePct: 0.015, weaponResearchMult: 1.8, aiEnergyInflow: 7,
   },
   brutal: {
     id: 'brutal', label: 'Brutalna', desc: 'Maloštevilen klan proti ogromni AI vojski. Vsaka napaka je zadnja.',
     startPopulation: 60, startFood: 85, startWeapons: 40,
     aiScouts: 145, aiAttackers: 115, aiPeopleKillers: 50,
-    wallDefensePct: 0.012, weaponResearchMult: 1.6,
+    wallDefensePct: 0.012, weaponResearchMult: 1.6, aiEnergyInflow: 10,
   },
 };
 
