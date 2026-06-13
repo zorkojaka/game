@@ -173,6 +173,8 @@ export function tickExpedition(
   aiScouts: number = ENCOUNTER_SCOUT_REFERENCE,
   patrolFactor: number = 1,   // AI patrulja (Poveljstvo): >1 veča verjetnost srečanja
   wipeMult: number = 1,       // velikost AI ekip: >1 večje izgube ob srečanju
+  aiTeamCount: number = 0,    // robotov v AI ekipi (za poročilo borbe)
+  aiTeamLabel: string = 'robotov',  // tip robotov v ekipi (za poročilo)
 ): { exp: Expedition; tiles: HexTile[]; rng: RNGState; populationDelta: number; events: string[]; finds: ExpeditionFinds; intelGained: number; aiInfoGained: number } {
   // Premikamo se na ODHODNEM ('traveling') in POVRATNEM ('returning') legu — oba raziskujeta polja po poti.
   if (exp.status !== 'traveling' && exp.status !== 'returning') return { exp, tiles, rng, populationDelta: 0, events: [], finds: { material: 0, weapons: 0, artifacts: 0 }, intelGained: 0, aiInfoGained: 0 };
@@ -235,10 +237,12 @@ export function tickExpedition(
         const lost = Math.max(1, Math.floor(assignedNow * lossFrac));
         assignedNow = Math.max(0, assignedNow - lost);
         popLoss += lost;
-        events.push(`⚔️ Spopad z AI na ${hexLabel(tile)}: ${lost} izgub · 👁 vpogled v AI enote (+${ENCOUNTER_INTEL_GAIN} intel)`);
+        const vs = aiTeamCount > 0 ? ` (${assignedNow + lost} ljudi vs ~${aiTeamCount} ${aiTeamLabel})` : '';
+        events.push(`⚔️ Spopad na ${hexLabel(tile)}${vs}: ${lost} izgub · 👁 vpogled v AI enote (+${ENCOUNTER_INTEL_GAIN} intel)`);
         if (assignedNow < 1) { lostAll = true; break; }
       } else {
-        events.push(`🌙 Skrita odprava je opazila AI enote na ${hexLabel(tile)} in se izognila boju · 👁 vpogled (+${ENCOUNTER_INTEL_GAIN} intel)`);
+        const vs = aiTeamCount > 0 ? ` (~${aiTeamCount} ${aiTeamLabel})` : '';
+        events.push(`🌙 Skrita odprava je opazila AI enote${vs} na ${hexLabel(tile)} in se izognila boju · 👁 vpogled (+${ENCOUNTER_INTEL_GAIN} intel)`);
       }
     }
 

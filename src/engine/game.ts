@@ -730,6 +730,9 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
   const teams = patrolRobots / Math.max(1, teamRobots);
   const patrolFactor = Math.min(PATROL_ENCOUNTER_MAX_MULT, 1 + teams * PATROL_ENCOUNTER_PER_TEAM);
   const wipeMult = teamRobots / AI_TEAM_WIPE_REF;
+  // Prevladujoč tip robotov v AI ekipi (za poročilo borbe).
+  const aiTeamLabel = aiUnits.peopleKillers > aiUnits.attackers && aiUnits.peopleKillers > aiUnits.scouts ? 'people-killerjev'
+    : aiUnits.attackers > aiUnits.scouts ? 'napadalcev' : 'izvidnikov';
   const searchKnowledge = aiAct.roles.search * aiTotal0 * SEARCH_KNOWLEDGE_PER_ROBOT;
 
   const isExploiting = targetWeakPoint
@@ -925,7 +928,7 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
 
   for (const e of oldExps) {
     const scoutEncounterUnits = Math.round(aiUnits.scouts * (1 - (logicalWeaknessByRobot({ ...state, aiTree } as GameState).scouts ? LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION : 0)));
-    const r = tickExpedition(e, mapTiles, aiKnowledge, rng, scoutEncounterUnits, patrolFactor, wipeMult);
+    const r = tickExpedition(e, mapTiles, aiKnowledge, rng, scoutEncounterUnits, patrolFactor, wipeMult, Math.round(teamRobots), aiTeamLabel);
     rng = r.rng;
     mapTiles = r.tiles;
     // Srečanja: ljudje VEDNO izvedo o AI enotah (+intel); AI izve o nas le, če skrivanje ni uspelo.
