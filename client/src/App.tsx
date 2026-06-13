@@ -45,6 +45,7 @@ const RATIONS: Record<number, RationsRow> = Object.fromEntries(
 );
 
 const STORAGE_KEY = 'avh-runId';
+const SOUND_STORAGE_KEY = 'avh-soundEnabled';
 
 type StartTacticId = 'food' | 'research' | 'workshop' | 'defense';
 
@@ -1384,6 +1385,86 @@ interface RoundEventCardData {
   researchCompleted?: ResearchObjective;
 }
 
+let cardAudioCtx: AudioContext | null = null;
+
+function getCardAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtor) return null;
+  if (!cardAudioCtx) cardAudioCtx = new AudioCtor();
+  if (cardAudioCtx.state === 'suspended') void cardAudioCtx.resume();
+  return cardAudioCtx;
+}
+
+function tone(ctx: AudioContext, start: number, freq: number, duration: number, type: OscillatorType, volume: number) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + duration + 0.025);
+}
+
+function noiseHit(ctx: AudioContext, start: number, duration: number, volume: number) {
+  const buffer = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * duration)), ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+  const src = ctx.createBufferSource();
+  const gain = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(900, start);
+  gain.gain.setValueAtTime(volume, start);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  src.buffer = buffer;
+  src.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(start);
+  src.stop(start + duration);
+}
+
+function playRoundCardSound(card: RoundEventCardData) {
+  const ctx = getCardAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime + 0.015;
+  if (card.kind === 'raid') {
+    noiseHit(ctx, now, 0.18, card.tone === 'good' ? 0.055 : 0.085);
+    tone(ctx, now + 0.03, card.tone === 'good' ? 190 : 92, 0.24, 'sawtooth', 0.045);
+    tone(ctx, now + 0.18, card.tone === 'good' ? 330 : 78, 0.18, 'triangle', 0.04);
+  } else if (card.kind === 'combat-win') {
+    tone(ctx, now, 330, 0.09, 'square', 0.035);
+    tone(ctx, now + 0.09, 494, 0.11, 'square', 0.035);
+    tone(ctx, now + 0.19, 740, 0.16, 'triangle', 0.04);
+  } else if (card.kind === 'combat-loss') {
+    noiseHit(ctx, now, 0.12, 0.06);
+    tone(ctx, now + 0.02, 180, 0.16, 'sawtooth', 0.045);
+    tone(ctx, now + 0.15, 104, 0.24, 'sawtooth', 0.04);
+  } else if (card.kind === 'research') {
+    tone(ctx, now, 660, 0.08, 'sine', 0.032);
+    tone(ctx, now + 0.08, 880, 0.08, 'sine', 0.032);
+    tone(ctx, now + 0.17, 1320, 0.18, 'triangle', 0.038);
+  } else if (card.kind === 'artifact' || card.kind === 'weakpoint') {
+    tone(ctx, now, 220, 0.12, 'triangle', 0.04);
+    tone(ctx, now + 0.07, 660, 0.18, 'sine', 0.038);
+    tone(ctx, now + 0.22, 990, 0.22, 'sine', 0.034);
+  } else if (card.kind === 'expedition') {
+    tone(ctx, now, card.tone === 'bad' ? 196 : 392, 0.10, 'triangle', 0.034);
+    tone(ctx, now + 0.11, card.tone === 'bad' ? 147 : 523, 0.16, 'triangle', 0.034);
+  } else if (card.kind === 'phase') {
+    tone(ctx, now, 110, 0.14, 'sawtooth', 0.04);
+    tone(ctx, now + 0.11, 165, 0.18, 'sawtooth', 0.04);
+    tone(ctx, now + 0.26, 220, 0.20, 'triangle', 0.035);
+  } else {
+    tone(ctx, now, card.tone === 'bad' ? 160 : 520, 0.14, 'triangle', 0.032);
+  }
+}
+
 const AREA_LABELS: Record<string, string> = {
   food: 'Prehrana',
   workshop: 'Delavnice',
@@ -2011,10 +2092,18 @@ function ResearchContinuationChooser({
   );
 }
 
-function RoundEventOverlay({ cards, onClose, researchControls }: { cards: RoundEventCardData[]; onClose: () => void; researchControls?: ResearchOverlayControls }) {
+function RoundEventOverlay({ cards, onClose, researchControls, soundEnabled }: { cards: RoundEventCardData[]; onClose: () => void; researchControls?: ResearchOverlayControls; soundEnabled: boolean }) {
   const [idx, setIdx] = useState(0);
   const card = cards[idx];
   useEffect(() => setIdx(0), [cards]);
+  const lastSoundRef = useRef<string>('');
+  useEffect(() => {
+    if (!card || !soundEnabled) return;
+    const key = `${card.id}:${idx}`;
+    if (lastSoundRef.current === key) return;
+    lastSoundRef.current = key;
+    playRoundCardSound(card);
+  }, [card, idx, soundEnabled]);
   if (!card) return null;
   const isLast = idx >= cards.length - 1;
   const next = () => {
@@ -4260,6 +4349,10 @@ export default function App() {
   const [showRules,    setShowRules]    = useState(false);
   const [appMenuOpen,  setAppMenuOpen]  = useState(false);
   const [helpOverlay,  setHelpOverlay]  = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(SOUND_STORAGE_KEY) === '1';
+  });
   const [pendingExpeditions, setPendingExpeditions] = useState<NewExpeditionInput[]>([]);
   const [artifactTargetWp, setArtifactTargetWp] = useState<string>('');
   const [targetWP,   setTargetWP]   = useState('');
@@ -4275,6 +4368,21 @@ export default function App() {
     const id = localStorage.getItem(STORAGE_KEY);
     if (id) getGame(id).then(setGame).catch(() => localStorage.removeItem(STORAGE_KEY));
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(SOUND_STORAGE_KEY, soundEnabled ? '1' : '0');
+  }, [soundEnabled]);
+
+  function toggleSound() {
+    setSoundEnabled(on => {
+      const next = !on;
+      if (next) {
+        const ctx = getCardAudioContext();
+        if (ctx) tone(ctx, ctx.currentTime + 0.015, 660, 0.1, 'sine', 0.025);
+      }
+      return next;
+    });
+  }
 
   // Reveal flash — osvetli vozlišča, ki so bila pravkar odkrita
   useEffect(() => {
@@ -4760,6 +4868,7 @@ export default function App() {
   if (game.status !== 'active') return (
     <>
       {roundCards.length > 0 && <RoundEventOverlay cards={roundCards} onClose={() => setRoundCards([])}
+        soundEnabled={soundEnabled}
         researchControls={{
           value: researchObj,
           onChange: setResearchObj,
@@ -4848,6 +4957,7 @@ export default function App() {
   return (
     <div className={`app-shell mob-tab-${tab}`}>
       {roundCards.length > 0 && <RoundEventOverlay cards={roundCards} onClose={() => setRoundCards([])}
+        soundEnabled={soundEnabled}
         researchControls={{
           value: researchObj,
           onChange: setResearchObj,
@@ -4910,6 +5020,11 @@ export default function App() {
           })()}
         </div>
         <div className="top-menu-wrap">
+          <button className={`ph-menu-btn sound-toggle${soundEnabled ? ' on' : ''}`} onClick={toggleSound}
+            title={soundEnabled ? 'Izklopi zvok kartic' : 'Vklopi zvok kartic'}
+            aria-label={soundEnabled ? 'Izklopi zvok kartic' : 'Vklopi zvok kartic'}>
+            {soundEnabled ? '🔊' : '🔇'}
+          </button>
           <button className={`ph-menu-btn ph-info-btn${helpOverlay ? ' on' : ''}`} onClick={() => setHelpOverlay(o => !o)}
             title="Pomoč — razlaga gumbov" aria-label="Pomoč">ⓘ</button>
           <button className="ph-menu-btn" onClick={() => setAppMenuOpen(true)} title="Meni" aria-label="Meni">

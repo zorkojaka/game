@@ -331,9 +331,14 @@ b      { color: var(--text); font-weight: 600; }
   text-align: right;
 }
 
-.top-menu-wrap { flex: 1 1 0; display: flex; justify-content: flex-end; }
+.top-menu-wrap { flex: 1 1 0; display: flex; justify-content: flex-end; gap: .35rem; }
 .top-spacer { flex: 1 1 0; }
 .top-sep { width: 1px; align-self: stretch; background: #2a3442; margin: 0 .25rem; }
+.sound-toggle.on {
+  color: #dfffea;
+  border-color: #2f9f70;
+  box-shadow: 0 0 0 1px rgba(47,159,112,.22) inset;
+}
 
 /* Številke nikoli ne prelomijo v novo vrstico */
 .big-stat, .bs-val, .bs-label { white-space: nowrap; }
