@@ -170,6 +170,7 @@ export function tickExpedition(
   aiKnowledge: number,
   rng: RNGState,
   aiScouts: number = ENCOUNTER_SCOUT_REFERENCE,
+  patrolFactor: number = 1,   // AI patrulja (Poveljstvo): >1 veča verjetnost srečanja
 ): { exp: Expedition; tiles: HexTile[]; rng: RNGState; populationDelta: number; events: string[]; finds: ExpeditionFinds } {
   // Premikamo se na ODHODNEM ('traveling') in POVRATNEM ('returning') legu — oba raziskujeta polja po poti.
   if (exp.status !== 'traveling' && exp.status !== 'returning') return { exp, tiles, rng, populationDelta: 0, events: [], finds: { material: 0, weapons: 0, artifacts: 0 } };
@@ -207,7 +208,7 @@ export function tickExpedition(
     newTiles[tIdx] = { ...tile, researchProgress: newProg, visibility: visibilityFromProgress(newProg) };
 
     // Srečanje — skrivanje razpolovi verjetnost; težavnost jo skalira
-    const pEncBase = tileEncounterProbability(newTiles[tIdx], assignedNow, aiKnowledge, aiScouts);
+    const pEncBase = tileEncounterProbability(newTiles[tIdx], assignedNow, aiKnowledge, aiScouts) * Math.max(1, patrolFactor);
     const pEnc = Math.min(0.9, stealth ? pEncBase * 0.5 : pEncBase);
     const [encRoll, rng2] = rngNext(rng); rng = rng2;
     if (encRoll < pEnc) {

@@ -70,11 +70,13 @@ function validateAIAction(a: unknown): AIAction | undefined {
   const o = a as Record<string, unknown>;
   const p = (o.production ?? {}) as Record<string, unknown>;
   const intOr0 = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1_000_000 ? Math.floor(v) : 0);
+  const r = (o.roles ?? {}) as Record<string, unknown>;
+  const frac = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1 ? v : d);
   return {
     production: { scouts: intOr0(p.scouts), attackers: intOr0(p.attackers), peopleKillers: intOr0(p.peopleKillers) },
     upgrade: o.upgrade === true,
     raidForcePct: typeof o.raidForcePct === 'number' ? Math.min(1, Math.max(0, o.raidForcePct)) : 0.2,
-    roles: { raid: 0.2, garrison: 0, patrol: 0, hunt: 0 },
+    roles: { raid: frac(r.raid, 0.2), garrison: frac(r.garrison, 0), patrol: frac(r.patrol, 0), search: frac(r.search, 0) },
     focusWeakPoint: typeof o.focusWeakPoint === 'string' ? o.focusWeakPoint : undefined,
   };
 }

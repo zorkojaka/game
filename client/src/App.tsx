@@ -4043,7 +4043,7 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
             return (
               <Row k="🧠 odločitve (zadnja poteza)"
                 v={`gradnja 🔭${prod.scouts} ⚔️${prod.attackers} ☠${prod.peopleKillers}${pb === 0 ? ' (nič)' : ''}${a.upgrade ? ' · ⚙️ nadgradnja' : ''} · brani: ${focusLbl}`}
-                hint={`razporeditev: raid ${pct(a.roles.raid)} · straža ${pct(a.roles.garrison)} · patrulja ${pct(a.roles.patrol)} · lov ${pct(a.roles.hunt)} (patrulja/lov v pripravi)`} />
+                hint={`razporeditev: raid ${pct(a.roles.raid)} · straža ${pct(a.roles.garrison)} · patrulja ${pct(a.roles.patrol)} · iskanje ${pct(a.roles.search)}`} />
             ); })()}
           <Row kc={C.aiMoc} k="AI raid moč" v={`${f1(aiAttackPower(units))} × ${pct(RAID_AI_FORCE_PCT)} = ${f1(raidPow)}`} hint="del napadalne moči, ki sodeluje v raidu" />
           <Row k="obrambna moč (ko jih napadeš)" v={f1(aiDefensePower(units))} />
@@ -4542,6 +4542,13 @@ function AIControlScreen({ game, onConfirm, onBack, loading }: {
     (['peopleKillers', 'attackers', 'scouts'] as const).forEach(t => { const c = AI_UNIT_ENERGY_COST[t]; const n = Math.min(def(t), Math.floor(e / c)); s[t] = n; e -= n * c; }); return s; })();
   const [build, setBuild] = useState(suggest);
   const [upgrade, setUpgrade] = useState(false);
+  // Privzete vloge po fazi (kar bi naredil naš AI) — igralec 2 jih lahko spremeni.
+  const ph = game.totalRounds > 36 ? 'assault' : game.phase;
+  const defPatrol = ph === 'find' ? 0 : ph === 'understand' ? 0.08 : ph === 'eliminate' ? 0.12 : 0.16;
+  const defSearch = ph === 'find' ? 0 : ph === 'understand' ? 0.05 : ph === 'eliminate' ? 0.10 : 0.14;
+  const [roles, setRoles] = useState({ raid: 0.2, patrol: defPatrol, search: defSearch });
+  const adjRole = (k: 'raid' | 'patrol' | 'search', d: number) =>
+    setRoles(r => ({ ...r, [k]: Math.max(0, Math.min(1, Math.round((r[k] + d) * 100) / 100)) }));
   const cost = build.scouts * AI_UNIT_ENERGY_COST.scouts + build.attackers * AI_UNIT_ENERGY_COST.attackers + build.peopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
   const remaining = budget - cost;
   const canUpgrade = level < AI_ENERGY_LEVEL_MAX && remaining >= AI_ENERGY_LEVEL_COST;
@@ -4591,9 +4598,23 @@ function AIControlScreen({ game, onConfirm, onBack, loading }: {
             </label>
           </div>
         </div>
+        <div style={{ background: '#0d141b', border: '1px solid #223344', borderRadius: 10, padding: '.7rem .9rem', marginTop: '.6rem' }}>
+          <div style={{ fontSize: '.8rem', color: '#9fd0ff', fontWeight: 700, marginBottom: 6 }}>Razporedi robote (vloge)</div>
+          {([['raid', '⚔️', 'raid (napad na kamp)'], ['patrol', '👁', 'patrulja (lovi odprave)'], ['search', '🔭', 'iskanje (najdi kamp)']] as const).map(([k, ic, lbl]) => (
+            <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #161f29' }}>
+              <span>{ic} {lbl}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button className="ph-menu-btn" onClick={() => adjRole(k, -0.05)} disabled={roles[k] <= 0}>−</button>
+                <b style={{ minWidth: 38, textAlign: 'center' }}>{Math.round(roles[k] * 100)}%</b>
+                <button className="ph-menu-btn" onClick={() => adjRole(k, 0.05)}>+</button>
+              </span>
+            </div>
+          ))}
+          <div className="dim small" style={{ marginTop: 4 }}>Straža šibkih točk se določi samodejno iz vojske.</div>
+        </div>
         <div style={{ display: 'flex', gap: 10, marginTop: '.8rem' }}>
           <button className="start-btn" style={{ flex: 1 }} disabled={loading}
-            onClick={() => onConfirm({ production: build, upgrade: upgrade && canUpgrade, raidForcePct: 0.2, roles: { raid: 0.2, garrison: 0, patrol: 0, hunt: 0 } })}>
+            onClick={() => onConfirm({ production: build, upgrade: upgrade && canUpgrade, raidForcePct: roles.raid, roles: { raid: roles.raid, garrison: 0, patrol: roles.patrol, search: roles.search } })}>
             {loading ? '⟳' : 'Izvedi potezo AI →'}
           </button>
           <button className="ph-menu-btn" onClick={onBack} title="Nazaj na klanovo potezo">↩</button>

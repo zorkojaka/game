@@ -111,6 +111,13 @@ export const AI_UNIT_ENERGY_COST: Record<'scouts' | 'attackers' | 'peopleKillers
 // AI sam vlaga PRESEŽEK energije v dvig pritoka (mirror igralčevih raziskav).
 export const AI_ENERGY_LEVEL_COST = 60;  // energije za +1 nivo pritoka
 export const AI_ENERGY_LEVEL_MAX  = 3;   // največ +150 % pritoka
+
+// POVELJSTVO — vloge robotov (zrcalo razporeditve ljudi):
+// ISKANJE: roboti, dodeljeni iskanju, dvigajo znanje o kampu (najde te → raidi).
+export const SEARCH_KNOWLEDGE_PER_ROBOT = 0.0006;  // dvig aiKnowledge na robota/mesec
+// PATRULJA: roboti na patrulji večajo verjetnost srečanja TVOJIH odprav na poti.
+export const PATROL_ENCOUNTER_PER_ROBOT = 0.004;   // +faktor srečanja na robota
+export const PATROL_ENCOUNTER_MAX_MULT  = 2.5;     // zgornja meja množitelja
 // Ko AI ve toliko o nas, vidi tudi SKRITE (nerazporejene) ljudi in jih raid lahko doseže.
 export const AI_KNOWLEDGE_EXPOSE_HIDDEN = 0.95;  // prej 0.99 — skrivanje je bilo skoraj zastonj
 // Če je ob KONCU FAZE cel klan ≤ toliko, je igre konec (kapica na neskončno vračanje preživelih).

@@ -950,3 +950,16 @@ describe('decideAIAction — AI politika (akcijski prostor)', () => {
     expect(decideAIAction(g).upgrade).toBe(false);
   });
 });
+
+describe('AI vloge (Poveljstvo) — iskanje dviga znanje', () => {
+  const aiAct = (search: number) => ({
+    production: { scouts: 0, attackers: 0, peopleKillers: 0 }, upgrade: false, raidForcePct: 0.2,
+    roles: { raid: 0.2, garrison: 0, patrol: 0, search },
+  });
+  it('več robotov na iskanju → hitrejši dvig aiKnowledge', () => {
+    const base = newGame(5, 'normal');
+    const none = processRound(base, action({ foragers: 5 }), aiAct(0));
+    const lots = processRound(base, action({ foragers: 5 }), aiAct(0.5));
+    expect(lots.aiKnowledge).toBeGreaterThan(none.aiKnowledge);
+  });
+});

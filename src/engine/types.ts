@@ -139,7 +139,9 @@ export interface AIAction {
   production: AIUnits;       // nove enote, zgrajene iz energije ta mesec
   upgrade: boolean;          // dvig energijskega nivoja (vlaganje presežka)
   raidForcePct: number;      // delež napadalne moči v raidu
-  roles: { raid: number; garrison: number; patrol: number; hunt: number };  // razporeditev robotov po vlogah (deleži)
+  // razporeditev robotov po vlogah (deleži): napad / straža točk / patrulja (ujame
+  // odprave na poti) / iskanje (dviga znanje o kampu). Zrcalo razporeditve ljudi.
+  roles: { raid: number; garrison: number; patrol: number; search: number };
   focusWeakPoint?: string;   // katero šibko točko AI prednostno brani
 }
 

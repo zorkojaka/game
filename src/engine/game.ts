@@ -19,6 +19,7 @@ import {
   MIN_CLAN_AT_PHASE_END,
   AI_ENERGY_CORE_WEAKPOINT, AI_ENERGY_START, AI_ENERGY_CORE_DESTROYED_MULT,
   AI_ENERGY_PER_LEVEL, AI_UNIT_ENERGY_COST, AI_ENERGY_LEVEL_COST, AI_ENERGY_LEVEL_MAX,
+  SEARCH_KNOWLEDGE_PER_ROBOT, PATROL_ENCOUNTER_PER_ROBOT, PATROL_ENCOUNTER_MAX_MULT,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
   AI_UNIT_DEFS, aiAttackPower, aiDefensePower,
   ROUNDS_PER_PHASE, SURVIVAL_PER_PERSON_PER_ROUND, FORAGER_YIELD,
@@ -192,10 +193,14 @@ export function decideAIAction(state: GameState): AIAction {
   };
   // Nadgradnja: vloži presežek (po nadomeščanju) v dvig pritoka, če ostane dovolj.
   const upgrade = level < AI_ENERGY_LEVEL_MAX && built.energy >= AI_ENERGY_LEVEL_COST;
-  // Razporeditev po vlogah (opisno; raid/garnizija aktivni, patrulja/lov pridejo v stopnji B).
+  // Razporeditev robotov po vlogah. Patrulja/iskanje nežno naraščata po fazah
+  // (zgodaj pusti igralcu prostor, pozneje aktivno lovi in išče kamp).
+  const ph = state.totalRounds > 36 ? 'assault' : state.phase;
+  const patrol = ph === 'find' ? 0 : ph === 'understand' ? 0.08 : ph === 'eliminate' ? 0.12 : 0.16;
+  const search = ph === 'find' ? 0 : ph === 'understand' ? 0.05 : ph === 'eliminate' ? 0.10 : 0.14;
   const garrison = wpGarrisonUnits(units) / total;
   const raid = RAID_AI_FORCE_PCT;
-  const roles = { raid, garrison, patrol: 0, hunt: 0 };
+  const roles = { raid, garrison, patrol, search };
   // Fokus obrambe: odkrita, neuničena točka, ki je igralcu najlažja (najverjetnejši cilj).
   const focus = (state.aiWeakPoints ?? [])
     .filter(w => w.discovered && !w.exploited)
@@ -702,6 +707,12 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
   let scoutsKilled = scoutResult.scoutsLost;
   const expeditionEvents: string[] = [];   // posebni dogodki (vrnitve, izgube, uničene šibke točke)
 
+  // POVELJSTVO: AI poteza (1P = skripta, 2P = igralec 2). Določi vloge robotov za TO rundo.
+  const aiAct: AIAction = aiActionOverride ?? decideAIAction(state);
+  const aiTotal0 = totalAIRobots(aiUnits);
+  const patrolFactor = Math.min(PATROL_ENCOUNTER_MAX_MULT, 1 + aiAct.roles.patrol * aiTotal0 * PATROL_ENCOUNTER_PER_ROBOT);
+  const searchKnowledge = aiAct.roles.search * aiTotal0 * SEARCH_KNOWLEDGE_PER_ROBOT;
+
   const isExploiting = targetWeakPoint
     ? aiWeakPoints.some(wp => wp.id === targetWeakPoint && wp.discovered)
     : false;
@@ -895,7 +906,7 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
 
   for (const e of oldExps) {
     const scoutEncounterUnits = Math.round(aiUnits.scouts * (1 - (logicalWeaknessByRobot({ ...state, aiTree } as GameState).scouts ? LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION : 0)));
-    const r = tickExpedition(e, mapTiles, aiKnowledge, rng, scoutEncounterUnits);
+    const r = tickExpedition(e, mapTiles, aiKnowledge, rng, scoutEncounterUnits, patrolFactor);
     rng = r.rng;
     mapTiles = r.tiles;
 
@@ -1117,7 +1128,8 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
   // 8. AI surveillance gain (skupna izpostavljenost: combatants + scouts)
   const exposure = (assignment.combatants + (assignment.researchers ?? 0)) / Math.max(1, state.population);
   const aiKnowledgeGain = calcAISurveillanceGain(DEFAULT_GENOME, exposure);
-  const finalAiKnowledge = Math.min(1, aiKnowledge + aiKnowledgeGain);
+  // POVELJSTVO/ISKANJE: roboti na iskanju dodatno dvigajo znanje o kampu.
+  const finalAiKnowledge = Math.min(1, aiKnowledge + aiKnowledgeGain + searchKnowledge);
 
   // 9. Stopnjevana lakota — če hrana pade pod 0, izgubljamo % populacije.
   // Ta-mesečni vrnjenci so IZVZETI iz lakote/obrokov (s seboj so imeli vnaprej plačano hrano) —
@@ -1204,8 +1216,8 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
     const coreDestroyed = !!aiWeakPoints.find(w => w.id === AI_ENERGY_CORE_WEAKPOINT && w.exploited);
     const coreMult = coreDestroyed ? AI_ENERGY_CORE_DESTROYED_MULT : 1;
     aiEnergy += difficultyProfile(state.difficulty).aiEnergyInflow * coreMult * (1 + aiEnergyLevel * AI_ENERGY_PER_LEVEL);
-    // AI POLITIKA: 1-player → skripta (decideAIAction); 2-player → odločitev igralca 2 (override).
-    const decided = aiActionOverride ?? decideAIAction({ ...state, aiUnits, aiRobots, aiEnergy, aiEnergyLevel, aiWeakPoints });
+    // AI POLITIKA: že določena zgoraj (aiAct) — 1P skripta / 2P igralec 2.
+    const decided = aiAct;
     if (aiRobots > 0) {
       // 1) PRODUKCIJA: 2P gradi natanko izbrane enote; 1P nadomesti izgube do cilja.
       const rein = aiActionOverride
