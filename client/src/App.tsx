@@ -5516,7 +5516,13 @@ export default function App() {
       )}
       {/* ─── ZGORNJA VRSTICA: faza + viri ─── */}
       <header className="top-bar">
-        <div className="top-spacer" />
+        <div className="top-spacer">
+          <button className={`ph-menu-btn${players === 2 ? ' on' : ''}`} style={players === 2 ? { borderColor: '#e0564a', color: '#ff9988' } : undefined}
+            onClick={() => setPlayers(p => (p === 2 ? 1 : 2))}
+            title={players === 2 ? 'AI vodiš TI (igralec 2). Klikni, da ga prevzame računalnik.' : 'AI vodi računalnik. Klikni, da ga prevzameš TI.'}>
+            🤖 {players === 2 ? 'jaz' : 'računalnik'}
+          </button>
+        </div>
         <div className="top-res">
           {(() => {
             const matAvail = game.resources.material ?? 0;
