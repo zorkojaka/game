@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability, missionSuccessProbability } from './game.js';
+import { newGame, processRound, destroyAIUnits, totalAIRobots, raidProbability, mechanicalTechUnlockLevel, raidRepelProbability, missionSuccessProbability , aiEnergyInflow, aiReinforce, aiCoreDestroyed, aiTargetArmy } from './game.js';
 import { rollOutcome, DECISIVE_MARGIN, logicalWeaknessBonus } from './combat.js';
 import { encounterScoutFactor, returnMonths, pathMonths, roundTripMonths, pathToCamp, tileEncounterProbability, expeditionMonthsForSteps } from './expedition.js';
 import { wpGarrisonMult } from './constants.js';
@@ -829,5 +829,39 @@ describe('tacticsByPhase — agregat taktike za pregled ob koncu', () => {
     expect(t!.forag).toBe(60);
     expect(t!.scoutsSent).toBe(1);
     expect(t!.raidsFaced).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('AI ekonomija — energija iz jedra poganja nadomeščanje', () => {
+  it('pritok energije: uničeno jedro (wp_power) ga zniža na 25 %', () => {
+    const intact = newGame(3, 'normal');                       // profil normal: inflow 5
+    expect(aiEnergyInflow(intact)).toBeCloseTo(5, 5);
+    const broken: GameState = { ...intact,
+      aiWeakPoints: intact.aiWeakPoints.map(w => w.id === 'wp_power' ? { ...w, exploited: true } : w) };
+    expect(aiEnergyInflow(broken)).toBeCloseTo(5 * 0.25, 5);
+  });
+
+  it('nadomeščanje refila izgube do cilja, a nikoli nad cilj', () => {
+    const target = { scouts: 100, attackers: 0, peopleKillers: 0 };
+    const r = aiReinforce({ scouts: 90, attackers: 0, peopleKillers: 0 }, 6, target);
+    expect(r.units.scouts).toBe(96);   // 6 energije × cena 1 = 6 izvidnikov
+    expect(r.energy).toBe(0);
+    const full = aiReinforce({ scouts: 100, attackers: 0, peopleKillers: 0 }, 50, target);
+    expect(full.units.scouts).toBe(100); // ne preseže cilja
+    expect(full.energy).toBe(50);        // energija se ne porabi
+  });
+
+  it('drage enote imajo prednost pri nadomeščanju', () => {
+    const target = { scouts: 100, attackers: 75, peopleKillers: 25 };
+    // primanjkljaj povsod, a le 10 energije: najprej people-killer (cena 10) → 1 enota
+    const r = aiReinforce({ scouts: 99, attackers: 74, peopleKillers: 24 }, 10, target);
+    expect(r.units.peopleKillers).toBe(25);
+    expect(r.energy).toBe(0);
+  });
+
+  it('energija narašča skozi rundo', () => {
+    const g = newGame(9, 'normal');
+    const r = processRound(g, action({ foragers: 10 }));
+    expect((r.aiEnergy ?? 0)).toBeGreaterThan(g.aiEnergy ?? 0);
   });
 });

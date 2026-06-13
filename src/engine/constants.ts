@@ -94,6 +94,20 @@ export const GUARD_TILE_ENCOUNTER_MULT = 2.2;
 export const NEAR_CORE_ENCOUNTER_MULT  = 1.5;
 
 export const INITIAL_AI_KNOWLEDGE = 0.1; // AI malo ve o nas na začetku
+
+// ─── AI EKONOMIJA — energija iz jedra poganja nadomeščanje enot ───────────────
+// AI jedro (= šibka točka 'wp_power', energijsko jedro) daje stalen pritok energije.
+// Z energijo AI NADOMEŠČA izgubljene enote (do ciljne velikosti vojske za to fazo) —
+// česar prej ni počel, zato je izčrpavanje zdaj pravi izziv. Če igralec uniči jedro,
+// pritok strmo pade → izčrpavalna (obrambna) zmaga postane dosegljiva.
+export const AI_ENERGY_CORE_WEAKPOINT = 'wp_power';     // katera šibka točka je jedro
+export const AI_ENERGY_START = 0;
+export const AI_ENERGY_CORE_DESTROYED_MULT = 0.25;      // uničeno jedro → pritok na 25 %
+export const AI_ENERGY_PER_LEVEL = 0.5;                 // +50 % pritoka na stopnjo AI nadgradnje
+// Cena enote v energiji (≈ sorazmerno z močjo: izvidnik poceni, people-killer drag)
+export const AI_UNIT_ENERGY_COST: Record<'scouts' | 'attackers' | 'peopleKillers', number> = {
+  scouts: 1, attackers: 4, peopleKillers: 10,
+};
 // Ko AI ve toliko o nas, vidi tudi SKRITE (nerazporejene) ljudi in jih raid lahko doseže.
 export const AI_KNOWLEDGE_EXPOSE_HIDDEN = 0.95;  // prej 0.99 — skrivanje je bilo skoraj zastonj
 // Če je ob KONCU FAZE cel klan ≤ toliko, je igre konec (kapica na neskončno vračanje preživelih).
