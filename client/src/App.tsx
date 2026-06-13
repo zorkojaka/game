@@ -3986,6 +3986,16 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
   const orozMult = weaponEffectMult(game.difficulty, wLv);
   const wallFactor = 1 + prof.wallDefensePct * researchMult(wallLv) * (game.wallsBuilt ?? 0);
   const intelMult = 1 + Math.min(0.25, 0.05 * (game.resources.intelligence / 100));
+  // Obrambna moč pri N branilcih (normalni obroki) + možnost odbitja proti trenutni AI raid moči.
+  const defStrFor = (n: number) => {
+    const base = n * COMBAT_BASE_HUMAN_MULTIPLIER;
+    const equip = Math.min(game.resources.combat, n) * DEFENDER_EQUIPMENT_MULT * orozMult;
+    return (base + equip) * intelMult * wallFactor;
+  };
+  const repelChance = (n: number) => { const d = defStrFor(n); return d / (d + Math.max(1, raidPow)); };
+  const band = (p: number) => p >= 0.8 ? '#4caf6a' : p <= 0.2 ? '#d05a5a' : '#d0a64a';  // barva po pasu
+  const lastCombat = game.lastRoundLog?.combat;
+  const lastRaid = game.lastRoundLog?.raid;
 
   // kc = barva spremenljivke: ime (in pika) dobi to barvo TUKAJ in v formulah.
   const Row = ({ k, v, hint, kc }: { k: string; v: React.ReactNode; hint?: string; kc?: string }) => (
@@ -4045,36 +4055,73 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
         </div>
 
         <div>
-        <Sec t="🧮 Kako se izračuna izid" sub="iste barve = iste spremenljivke levo">
-          {/* Grafični pas taktične kocke */}
-          <div style={{ margin: '2px 0 12px' }}>
-            <div style={{ fontSize: '.76rem', color: '#cfe0ee', marginBottom: 5 }}>Kdaj zmaga <b style={{ color: '#8df0a5' }}>moč</b> in kdaj odloča <b style={{ color: '#caa24a' }}>sreča</b>:</div>
-            <div style={{ display: 'flex', height: 22, borderRadius: 6, overflow: 'hidden', fontSize: '.6rem', fontWeight: 800, color: '#0a0a0a' }}>
-              <div style={{ flex: 20, background: '#d05a5a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>VEDNO IZGUBIŠ</div>
-              <div style={{ flex: 60, background: 'linear-gradient(90deg,#d0a64a,#9bbf63)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>ODLOČA SREČA</div>
-              <div style={{ flex: 20, background: '#4caf6a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>VEDNO ZMAGAŠ</div>
-            </div>
-            <div style={{ display: 'flex', fontSize: '.58rem', color: '#8aa0b6', marginTop: 2 }}>
-              <div style={{ flex: 20, textAlign: 'right' }}>20 %</div>
-              <div style={{ flex: 60, textAlign: 'right' }}>80 %</div>
-              <div style={{ flex: 20, textAlign: 'right' }}>100 %</div>
-            </div>
-            <div style={{ fontSize: '.66rem', color: '#7e90a0', marginTop: 4 }}>Spodnja lestvica = tvoja moč kot delež skupne moči obeh strani. Če imaš nad 80 % moči, vedno zmagaš; pod 20 %, vedno izgubiš; vmes odloča sreča. (Ali zmagovalec pobije čisto vse, ostane stvar sreče.)</div>
+        {(() => {
+          // Dashboard helperji (tabele) — minimalno besedila.
+          const Th = ({ children, w }: { children: React.ReactNode; w?: number }) => <th style={{ textAlign: w === 0 ? 'left' : 'right', fontWeight: 600, color: '#7e90a0', padding: '1px 5px', fontSize: '.62rem' }}>{children}</th>;
+          const Td = ({ children, c }: { children: React.ReactNode; c?: string }) => <td style={{ textAlign: 'right', padding: '1px 5px', color: c ?? '#e8eef4', fontWeight: 600 }}>{children}</td>;
+          const Chip = ({ k, v, c }: { k: string; v: React.ReactNode; c?: string }) => (
+            <span style={{ background: '#11171f', border: `1px solid ${c ?? '#2a3a4a'}`, borderRadius: 6, padding: '2px 7px', fontSize: '.68rem' }}>
+              <span style={{ color: c ?? '#9fb0c0' }}>{k}</span> <b style={{ color: '#e8eef4' }}>{v}</b>
+            </span>
+          );
+          const defRows = [5, 10, 20, 40].filter(n => n <= Math.max(40, Math.max(0, game.population)));
+          const teams = [5, 10, 20];
+          const liveWps = wps.filter(w => !w.exploited);
+          return (
+        <Sec t="🧮 Izračun izida" sub="dashboard">
+          {/* Pas: kdaj moč, kdaj sreča */}
+          <div style={{ display: 'flex', height: 20, borderRadius: 6, overflow: 'hidden', fontSize: '.58rem', fontWeight: 800, color: '#0a0a0a' }}>
+            <div style={{ flex: 20, background: '#d05a5a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>IZGUBIŠ</div>
+            <div style={{ flex: 60, background: 'linear-gradient(90deg,#d0a64a,#9bbf63)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>SREČA</div>
+            <div style={{ flex: 20, background: '#4caf6a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>ZMAGAŠ</div>
           </div>
-          <div style={{ fontSize: '.78rem', color: '#cfe0ee', padding: '4px 0', lineHeight: 1.8 }}>
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ color: '#9fd0ff', fontWeight: 700 }}>🛡 Bo tvoja obramba zdržala napad?</div>
-              <div style={{ color: '#9fb0c0', fontSize: '.72rem' }}>Primerja tvojo <b>obrambno moč</b> z <Tok c={C.aiMoc}>AI napadom</Tok> ({f1(raidPow)}). Več kot je tvoje proti njegovi, večja možnost, da napad odbiješ.</div>
-              <div style={{ paddingLeft: 8, marginTop: 2 }}>tvoja obramba = (<Tok c={C.ljudje}>branilci</Tok>×1.2×<Tok c={C.obroki}>obroki</Tok> + <Tok c={C.orozje}>orožje</Tok>×0.4×<Tok c={C.orozje}>učinek</Tok>) × <Tok c={C.intel}>intel</Tok> × <Tok c={C.obzidje}>obzidje</Tok></div>
-            </div>
-            <div>
-              <div style={{ color: '#9fd0ff', fontWeight: 700 }}>⚔️ Bo tvoj napad uničil šibko točko?</div>
-              <div style={{ color: '#9fb0c0', fontSize: '.72rem' }}>Primerja <b>moč ekipe</b> s trdoto točke × njeno <Tok c={C.straza}>stražo</Tok>. Močnejša ekipa (več ljudi + boljše orožje) = večja možnost.</div>
-              <div style={{ paddingLeft: 8, marginTop: 2 }}>moč ekipe = (√<Tok c={C.ljudje}>ljudje</Tok>×9.6 + <Tok c={C.orozje}>orožje</Tok>×1.2×<Tok c={C.orozje}>učinek</Tok>) × <Tok c={C.obroki}>obroki</Tok> × <Tok c={C.intel}>intel</Tok></div>
-            </div>
+          <div style={{ display: 'flex', fontSize: '.55rem', color: '#8aa0b6', marginTop: 1, marginBottom: 8 }}>
+            <div style={{ flex: 20, textAlign: 'right' }}>20%</div><div style={{ flex: 60, textAlign: 'right' }}>80%</div><div style={{ flex: 20, textAlign: 'right' }}>100%</div>
           </div>
-          <Row k="možnost napada na kamp ta mesec" v={pct(raidProbability(game))} />
+
+          {/* Obramba: branilci → moč → možnost (vs AI raid moč) */}
+          <div style={{ fontSize: '.72rem', color: '#9fd0ff', fontWeight: 700, marginBottom: 2 }}>🛡 Obramba zdrži? <span style={{ color: '#6a7c8c', fontWeight: 400 }}>(vs AI <Tok c={C.aiMoc}>{f1(raidPow)}</Tok>)</span></div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.72rem', marginBottom: 9 }}>
+            <thead><tr><Th w={0}>branilci</Th><Th>moč</Th><Th>možnost</Th></tr></thead>
+            <tbody>{defRows.map(n => { const p = repelChance(n); return (
+              <tr key={n}><Td c={C.ljudje}>{n}</Td><Td>{f0(defStrFor(n))}</Td><Td c={band(p)}>{pct(p)}</Td></tr>
+            ); })}</tbody>
+          </table>
+
+          {/* Napad: po šibkih točkah × velikost ekipe */}
+          <div style={{ fontSize: '.72rem', color: '#9fd0ff', fontWeight: 700, marginBottom: 2 }}>⚔️ Napad uniči točko? <span style={{ color: '#6a7c8c', fontWeight: 400 }}>(po velikosti ekipe)</span></div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.72rem', marginBottom: 9 }}>
+            <thead><tr><Th w={0}>točka</Th><Th>straža</Th>{teams.map(t => <Th key={t}>{t}</Th>)}</tr></thead>
+            <tbody>{liveWps.map(w => (
+              <tr key={w.id}>
+                <Td c={C.straza}>{w.label.length > 14 ? w.label.slice(0, 13) + '…' : w.label}</Td>
+                <Td c={C.straza}>{wpEffectiveGarrison(game, w.id)}</Td>
+                {teams.map(t => { const p = missionSuccessProbability(game, w.id, t, 3); return <Td key={t} c={band(p)}>{pct(p)}</Td>; })}
+              </tr>
+            ))}{liveWps.length === 0 && <tr><Td c="#6a7c8c">vse uničene</Td><Td>—</Td>{teams.map(t => <Td key={t}>—</Td>)}</tr>}</tbody>
+          </table>
+
+          {/* Vsi členi z živimi vrednostmi */}
+          <div style={{ fontSize: '.72rem', color: '#9fd0ff', fontWeight: 700, marginBottom: 4 }}>🧩 Členi (žive vrednosti)</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+            <Chip k="orožje" v={f0(game.resources.combat)} c={C.orozje} />
+            <Chip k="učinek" v={`×${f1(orozMult)}`} c={C.orozje} />
+            <Chip k="obzidje" v={`×${f1(wallFactor)}`} c={C.obzidje} />
+            <Chip k="intel" v={`×${f1(intelMult)}`} c={C.intel} />
+            <Chip k="obroki" v={`×${f1(RATIONS_LEVELS[3]?.strengthMult ?? 1)}`} c={C.obroki} />
+            <Chip k="AI raid" v={f1(raidPow)} c={C.aiMoc} />
+            <Chip k="AI obramba" v={f1(aiDefensePower(units))} c={C.aiMoc} />
+          </div>
+
+          {/* Zadnji boji — kako se je izšlo */}
+          <div style={{ fontSize: '.72rem', color: '#9fd0ff', fontWeight: 700, marginBottom: 2 }}>📜 Zadnji mesec</div>
+          {!lastCombat && !lastRaid?.occurred && <div style={{ fontSize: '.68rem', color: '#6a7c8c' }}>brez bojev</div>}
+          {lastRaid?.occurred && <Row k="🛡 AI napad na kamp" v={`${lastRaid.outcome} · −${(lastRaid.defendersLost ?? 0) + (lastRaid.foragersLost ?? 0) + (lastRaid.workersLost ?? 0) + (lastRaid.researchersLost ?? 0) + (lastRaid.hiddenLost ?? 0)} ljudi · ${lastRaid.aiRobotsDestroyed ?? 0} robotov`} />}
+          {lastCombat && <Row k="⚔️ tvoj napad" v={`${lastCombat.outcome} · ${lastCombat.aiRobotsDestroyed ?? 0} robotov · −${lastCombat.humanLost ?? 0} ljudi`} />}
+
+          <div style={{ marginTop: 8 }}><Row k="možnost napada ta mesec" v={pct(raidProbability(game))} /></div>
         </Sec>
+          ); })()}
         </div>
         </div>
       </div>
