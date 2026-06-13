@@ -296,6 +296,7 @@ export interface GameState {
   aiEnergyLevel?: number;   // AI nadgradnja pritoka (AI ga dviguje sam, ko ima presežek)
   aiAttackLevel?: number;   // Laboratorij: nadgradnja napada robotov (×1.3^level)
   aiDefenseLevel?: number;  // Laboratorij: nadgradnja obrambe robotov (×1.3^level)
+  aiCampFound?: boolean;    // ali je AI našel kamp (omogoči raid); ostane true
   aiLastAction?: AIAction;  // odločitve AI v zadnji potezi (za inšpektor / 2-player)
   aiTree: AITreeNode[];
   aiWeakPoints: AIWeakPoint[];

@@ -492,7 +492,7 @@ describe('raid — žrtve omejene na cono, odprave varne', () => {
       const base = newGame(seed);
       // pozna igra: people-killerji dvignejo smrtnost > 1; nizka obramba → raid prebije
       const g: GameState = {
-        ...base, phase: 'eliminate', population: 60, clanActivity: 0,
+        ...base, phase: 'eliminate', population: 60, clanActivity: 0, aiCampFound: true,
         aiUnits: { scouts: 100, attackers: 75, peopleKillers: 25 }, aiRobots: 200,
       };
       const r = processRound(g, action({ defenders: DEF, foragers: FOR, workers: WRK, researchers: RES }));
@@ -723,7 +723,7 @@ describe('dominacija v raidu', () => {
     let sawDefDom = false, sawAiDom = false;
     // 1) Močna obramba proti izvidnikom (faza 1) → dominacija obrambe
     for (let seed = 1; seed <= 400 && !sawDefDom; seed++) {
-      const g = newGame(seed);  // 100 izvidnikov, šibek napad
+      const g: GameState = { ...newGame(seed), aiCampFound: true };  // 100 izvidnikov, šibek napad
       const r = processRound(g, action({ defenders: 40, foragers: 20 }));
       const raid = r.lastRoundLog?.raid;
       if (!raid?.occurred) continue;
@@ -758,7 +758,7 @@ describe('zvezne žrtve raida — moč preboja določa izgube', () => {
   it('žrtve so omejene z (mult × premoč); močnejša obramba → manj izgub', () => {
     let checked = 0;
     for (let seed = 1; seed <= 600 && checked < 8; seed++) {
-      const g = newGame(seed);  // faza 1 → lethality = 1
+      const g: GameState = { ...newGame(seed), aiCampFound: true };  // faza 1 → lethality = 1
       const r = processRound(g, action({ defenders: 10, foragers: 20, workers: 8, researchers: 6 }));
       const raid = r.lastRoundLog?.raid;
       if (!raid?.occurred || raid.outcome !== 'partial') continue;
@@ -836,7 +836,7 @@ describe('taktika > sreča + rok AI-ja', () => {
   });
   it('tempo raidov: faza 1 ima 1–3 napade; era totalnega napada 8–10/leto', () => {
     // faza 1: odigraj 12 mesecev z močnim kampom in preštej raide
-    let s: GameState = { ...newGame(6), resources: { ...newGame(6).resources, survival: 2000 } };
+    let s: GameState = { ...newGame(6), aiCampFound: true, resources: { ...newGame(6).resources, survival: 2000 } };
     let raids = 0;
     for (let m = 0; m < 12 && s.status === 'active'; m++) {
       s = processRound(s, action({ defenders: 30, foragers: 30 }));

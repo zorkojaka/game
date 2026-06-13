@@ -21,6 +21,7 @@ import {
   AI_ENERGY_PER_LEVEL, AI_UNIT_ENERGY_COST, AI_ENERGY_LEVEL_COST, AI_ENERGY_LEVEL_MAX,
   SEARCH_KNOWLEDGE_PER_ROBOT, PATROL_ENCOUNTER_MAX_MULT,
   AI_TEAM_ROBOTS, PATROL_ENCOUNTER_PER_TEAM, AI_TEAM_WIPE_REF,
+  CAMP_FOUND_KNOWLEDGE, AI_ROLE_ENERGY_COST,
   AI_LAB_LEVEL_COST, AI_LAB_LEVEL_MAX, aiLabMult, AI_LAB_WEAKPOINT, AI_COMMAND_WEAKPOINT, AI_COMMAND_DISRUPTED_MULT,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
   AI_UNIT_DEFS, aiAttackPower, aiDefensePower,
@@ -200,13 +201,14 @@ export function decideAIAction(state: GameState): AIAction {
   };
   // Nadgradnja: vloži presežek (po nadomeščanju) v dvig pritoka, če ostane dovolj.
   const upgrade = level < AI_ENERGY_LEVEL_MAX && built.energy >= AI_ENERGY_LEVEL_COST;
-  // Razporeditev robotov po vlogah. Patrulja/iskanje nežno naraščata po fazah
-  // (zgodaj pusti igralcu prostor, pozneje aktivno lovi in išče kamp).
+  // Razporeditev robotov po vlogah. ISKANJE je na PRVEM mestu, dokler AI ne najde
+  // kampa; RAID je mogoč šele PO tem (zato na zadnjem mestu).
   const ph = state.totalRounds > 36 ? 'assault' : state.phase;
+  const found = (state.aiCampFound ?? false) || state.aiKnowledge >= CAMP_FOUND_KNOWLEDGE || state.totalRounds >= 36;
+  const search = found ? (ph === 'eliminate' || ph === 'assault' ? 0.08 : 0.04) : 0.20;  // dokler ne najde: prioriteta
   const patrol = ph === 'find' ? 0 : ph === 'understand' ? 0.08 : ph === 'eliminate' ? 0.12 : 0.16;
-  const search = ph === 'find' ? 0 : ph === 'understand' ? 0.05 : ph === 'eliminate' ? 0.10 : 0.14;
   const garrison = wpGarrisonUnits(units) / total;
-  const raid = RAID_AI_FORCE_PCT;
+  const raid = found ? RAID_AI_FORCE_PCT : 0;  // raid le, ko je kamp najden
   const roles = { raid, garrison, patrol, search };
   // Laboratorij: zgodaj brani (ščiti šibke točke), pozneje krepi napad.
   // Če je Laboratorij (wp_comm) uničen, nadgradenj ni.
@@ -734,6 +736,10 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
   const aiTeamLabel = aiUnits.peopleKillers > aiUnits.attackers && aiUnits.peopleKillers > aiUnits.scouts ? 'people-killerjev'
     : aiUnits.attackers > aiUnits.scouts ? 'napadalcev' : 'izvidnikov';
   const searchKnowledge = aiAct.roles.search * aiTotal0 * SEARCH_KNOWLEDGE_PER_ROBOT;
+  // KAMP NAJDEN: raid je mogoč šele po tem (z iskanjem dvigne znanje); v eri totalnega napada vedno.
+  const campFound = (state.aiCampFound ?? false) || state.aiKnowledge >= CAMP_FOUND_KNOWLEDGE || state.totalRounds >= 36;
+  // Operativni strošek vlog: roboti na raidu/patrulji/iskanju porabijo energijo → manj za gradnjo.
+  const roleEnergyCost = (aiAct.roles.raid + aiAct.roles.patrol + aiAct.roles.search) * aiTotal0 * AI_ROLE_ENERGY_COST;
 
   const isExploiting = targetWeakPoint
     ? aiWeakPoints.some(wp => wp.id === targetWeakPoint && wp.discovered)
@@ -789,7 +795,8 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
     }
   }
   let raidLog: RaidResult | null = null;
-  if (aiAttackPower(readAIUnits(state)) > 0 && raidPlan.months.includes(trNow)) {
+  // Raid je mogoč ŠELE, ko je AI našel kamp (campFound).
+  if (campFound && aiAttackPower(readAIUnits(state)) > 0 && raidPlan.months.includes(trNow)) {
     const { result: raidRes, rng: rngR2 } = resolveRaid(state, assignment, rng, population);
     rng = rngR2;
     // Obrambni nivo malo zmanjša žrtve med ljudmi
@@ -1243,6 +1250,8 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
     const coreDestroyed = !!aiWeakPoints.find(w => w.id === AI_ENERGY_CORE_WEAKPOINT && w.exploited);
     const coreMult = coreDestroyed ? AI_ENERGY_CORE_DESTROYED_MULT : 1;
     aiEnergy += difficultyProfile(state.difficulty).aiEnergyInflow * coreMult * (1 + aiEnergyLevel * AI_ENERGY_PER_LEVEL);
+    // VLOGE PORABIJO ENERGIJO → manj za gradnjo robotov (varčevanje = več robotov).
+    aiEnergy = Math.max(0, aiEnergy - roleEnergyCost);
     // AI POLITIKA: že določena zgoraj (aiAct) — 1P skripta / 2P igralec 2.
     const decided = aiAct;
     if (aiRobots > 0) {
@@ -1346,6 +1355,7 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
     aiEnergyLevel,
     aiAttackLevel,
     aiDefenseLevel,
+    aiCampFound: campFound,
     aiLastAction,
     aiTree: finalTree,
     aiWeakPoints,

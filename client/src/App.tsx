@@ -4659,6 +4659,9 @@ function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: '.7rem' }}>
                 <span style={{ background: '#11171f', border: '1px solid #2a3a4a', borderRadius: 6, padding: '2px 7px' }}>🤖 vojska <b>{game.aiRobots}</b></span>
                 <span style={{ background: '#11171f', border: '1px solid #2a3a4a', borderRadius: 6, padding: '2px 7px' }}>👁 znanje o klanu <b>{Math.round(game.aiKnowledge * 100)}%</b></span>
+                {(() => { const f = (game.aiCampFound ?? false) || game.aiKnowledge >= 0.25 || game.totalRounds >= 36; return (
+                  <span style={{ background: '#11171f', border: `1px solid ${f ? '#2a3a4a' : '#cc8800'}`, borderRadius: 6, padding: '2px 7px' }}>🎯 kamp <b style={{ color: f ? '#8df0a5' : '#ffcc66' }}>{f ? 'najden — raid mogoč' : 'iščem (raid zaklenjen)'}</b></span>
+                ); })()}
                 <span style={{ background: '#11171f', border: `1px solid ${intact === 3 ? '#2a3a4a' : '#cc5555'}`, borderRadius: 6, padding: '2px 7px' }}>🛡 cele funkcije <b style={{ color: intact === 3 ? '#8df0a5' : '#e0564a' }}>{intact}/3</b></span>
               </div>
             </div>
@@ -4692,16 +4695,17 @@ function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading 
         </div>
         <div style={{ background: '#0d141b', border: '1px solid #223344', borderRadius: 10, padding: '.7rem .9rem', marginTop: '.6rem' }}>
           <div style={{ fontSize: '.8rem', color: '#9fd0ff', fontWeight: 700, marginBottom: 6 }}>Razporedi robote (vloge)</div>
-          {([['raid', '⚔️', 'raid (napad na kamp)'], ['patrol', '👁', 'patrulja (lovi odprave)'], ['search', '🔭', 'iskanje (najdi kamp)']] as const).map(([k, ic, lbl]) => (
-            <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #161f29' }}>
-              <span>{ic} {lbl}</span>
+          {(() => { const campFound = (game.aiCampFound ?? false) || game.aiKnowledge >= 0.25 || game.totalRounds >= 36;
+            return ([['search', '🔭', 'iskanje (najdi kamp)', true], ['patrol', '👁', 'patrulja (lovi odprave)', true], ['raid', '⚔️', 'raid (napad na kamp)', campFound]] as const).map(([k, ic, lbl, enabled]) => (
+            <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #161f29', opacity: enabled ? 1 : 0.45 }}>
+              <span>{ic} {lbl}{!enabled && <span className="dim small"> — šele ko najdeš kamp</span>}</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button className="ph-menu-btn" onClick={() => adjRole(k, -0.05)} disabled={roles[k] <= 0}>−</button>
+                <button className="ph-menu-btn" onClick={() => adjRole(k, -0.05)} disabled={!enabled || roles[k] <= 0}>−</button>
                 <b style={{ minWidth: 38, textAlign: 'center' }}>{Math.round(roles[k] * 100)}%</b>
-                <button className="ph-menu-btn" onClick={() => adjRole(k, 0.05)}>+</button>
+                <button className="ph-menu-btn" onClick={() => adjRole(k, 0.05)} disabled={!enabled}>+</button>
               </span>
             </div>
-          ))}
+          )); })()}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: '.78rem', flexWrap: 'wrap' }}>
             <span className="dim">terenske ekipe:</span>
             {([[1, 'majhne'], [2, 'srednje'], [3, 'velike']] as const).map(([v, lbl]) => (

@@ -115,6 +115,13 @@ export const AI_UNIT_ENERGY_COST: Record<'scouts' | 'attackers' | 'peopleKillers
 export const AI_ENERGY_LEVEL_COST = 60;  // energije za +1 nivo pritoka
 export const AI_ENERGY_LEVEL_MAX  = 3;   // največ +150 % pritoka
 
+// RAID je mogoč šele, ko AI NAJDE kamp (z iskanjem dvigne znanje). Do takrat
+// iskanje na prvem mestu, raid izklopljen.
+export const CAMP_FOUND_KNOWLEDGE = 0.25;  // aiKnowledge, ko AI ve, kje je kamp
+// VLOGE PORABLJAJO ENERGIJO: vsak robot na operaciji (raid/patrulja/iskanje) stane
+// energijo na rundo → manj ostane za gradnjo novih robotov. Varčevanje = več robotov.
+export const AI_ROLE_ENERGY_COST = 0.06;
+
 // LABORATORIJ — AI bojne nadgradnje (zrcalo igralčevih raziskav). Zmernejši učinek
 // kot igralčev ×2, da AI ne pobegne: ×AI_LAB_MULT_PER_LEVEL na stopnjo.
 export const AI_LAB_LEVEL_COST = 80;   // energije za +1 stopnjo (napad ali obramba)
