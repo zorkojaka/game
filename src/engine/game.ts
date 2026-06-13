@@ -1029,6 +1029,7 @@ export function processRound(state: GameState, action: PlayerAction): GameState 
     const tile = mapTiles.find(t => t.hidesWeakPointId === wp.id);
     if (tile && tile.researchProgress >= 0.50) {
       aiWeakPoints[i] = { ...wp, discovered: true };
+      expeditionEvents.push(`◆ ŠIBKA TOČKA ODKRITA: ${wp.label} na ${hexLabel(tile)}. To je tarča, ki lahko prevesi vojno proti AI.`);
     }
   }
 

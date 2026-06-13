@@ -1011,6 +1011,14 @@ b      { color: var(--text); font-weight: 600; }
   padding: .35rem .6rem; cursor: pointer;
 }
 .ph-menu-btn:hover { background: #1d2733; border-color: #3a536e; }
+.screen-sound {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  background: rgba(12, 16, 22, .82);
+  backdrop-filter: blur(8px);
+}
 .app-menu-overlay { position: fixed; inset: 0; z-index: 1100; background: rgba(0,0,0,.35); }
 .app-menu {
   position: absolute; top: .5rem; right: .5rem;

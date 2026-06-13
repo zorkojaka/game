@@ -1372,6 +1372,7 @@ type RoundEventKind =
   | 'artifact'
   | 'expedition'
   | 'weakpoint'
+  | 'weakpoint-found'
   | 'phase';
 
 interface RoundEventCardData {
@@ -1395,9 +1396,13 @@ type CardSoundId =
   | 'research'
   | 'artifact'
   | 'weakpoint'
+  | 'weakpoint-found'
   | 'expedition-good'
   | 'expedition-bad'
   | 'phase-ai'
+  | 'ambient-menu'
+  | 'ambient-victory'
+  | 'ambient-defeat'
   | 'info';
 
 const CARD_SOUND_PATH: Record<CardSoundId, string> = {
@@ -1409,13 +1414,19 @@ const CARD_SOUND_PATH: Record<CardSoundId, string> = {
   research: '/assets/audio/card-research.wav',
   artifact: '/assets/audio/card-artifact.wav',
   weakpoint: '/assets/audio/card-weakpoint.wav',
+  'weakpoint-found': '/assets/audio/card-weakpoint-found.wav',
   'expedition-good': '/assets/audio/card-expedition-good.wav',
   'expedition-bad': '/assets/audio/card-expedition-bad.wav',
   'phase-ai': '/assets/audio/card-phase-ai.wav',
+  'ambient-menu': '/assets/audio/ambient-menu.wav',
+  'ambient-victory': '/assets/audio/ambient-victory.wav',
+  'ambient-defeat': '/assets/audio/ambient-defeat.wav',
   info: '/assets/audio/card-info.wav',
 };
 
 const cardAudioCache = new Map<CardSoundId, HTMLAudioElement>();
+let ambientAudio: HTMLAudioElement | null = null;
+let ambientId: CardSoundId | null = null;
 
 function preloadCardSounds() {
   if (typeof Audio === 'undefined') return;
@@ -1435,6 +1446,7 @@ function cardSoundId(card: RoundEventCardData): CardSoundId {
   if (card.kind === 'research') return 'research';
   if (card.kind === 'artifact') return 'artifact';
   if (card.kind === 'weakpoint') return 'weakpoint';
+  if (card.kind === 'weakpoint-found') return 'weakpoint-found';
   if (card.kind === 'expedition') return card.tone === 'bad' ? 'expedition-bad' : 'expedition-good';
   if (card.kind === 'phase') return 'phase-ai';
   return 'info';
@@ -1452,6 +1464,27 @@ function playCardSound(id: CardSoundId, volume = 0.72) {
 
 function playRoundCardSound(card: RoundEventCardData) {
   playCardSound(cardSoundId(card));
+}
+
+function setAmbientSound(id: CardSoundId | null, enabled: boolean) {
+  if (typeof Audio === 'undefined') return;
+  if (!enabled || !id) {
+    if (ambientAudio) {
+      ambientAudio.pause();
+      ambientAudio = null;
+      ambientId = null;
+    }
+    return;
+  }
+  if (ambientAudio && ambientId === id) return;
+  if (ambientAudio) ambientAudio.pause();
+  const audio = new Audio(CARD_SOUND_PATH[id]);
+  audio.loop = true;
+  audio.preload = 'auto';
+  audio.volume = 0.24;
+  ambientAudio = audio;
+  ambientId = id;
+  void audio.play().catch(() => {});
 }
 
 const AREA_LABELS: Record<string, string> = {
@@ -1722,6 +1755,20 @@ function roundEventCards(log: RoundLog | null, game: GameState): RoundEventCardD
         stats: [
           { label: 'Artefakti', value: `+${count}`, tone: 'good' },
           { label: 'Možnost', value: 'uniči šibko točko', tone: 'good' },
+        ],
+      });
+    } else if (/ŠIBKA TOČKA ODKRITA/.test(line)) {
+      const found = line.replace(/^[^:]+:\s*/, '').replace(/\.\s*To je tarča.*$/, '');
+      add({
+        id: `weakpoint-found-${log.round}-${idx}`,
+        kind: 'weakpoint-found',
+        tone: 'good',
+        eyebrow: 'Veliko odkritje',
+        title: 'AI šibka točka odkrita',
+        body: `${found}. To je eden redkih trenutkov, ko klan iz obrambe preide v lov. Ta tarča lahko odpre pot do zmage.`,
+        stats: [
+          { label: 'Tarča', value: 'razkrita', tone: 'good' },
+          { label: 'Naslednji korak', value: 'napad ali artefakt', tone: 'good' },
         ],
       });
     } else if (/ŠIBKA TOČKA UNIČENA/.test(line)) {
@@ -4098,7 +4145,17 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
   );
 }
 
-function StartScreen({ onNew, loading }: { onNew: (tactic: StartTacticId, difficulty: DifficultyId) => void; loading: boolean }) {
+function SoundButton({ enabled, onToggle, className = '' }: { enabled: boolean; onToggle: () => void; className?: string }) {
+  return (
+    <button className={`ph-menu-btn sound-toggle${enabled ? ' on' : ''} ${className}`} onClick={onToggle}
+      title={enabled ? 'Izklopi zvok' : 'Vklopi zvok'}
+      aria-label={enabled ? 'Izklopi zvok' : 'Vklopi zvok'}>
+      {enabled ? '🔊' : '🔇'}
+    </button>
+  );
+}
+
+function StartScreen({ onNew, loading, soundEnabled, onToggleSound }: { onNew: (tactic: StartTacticId, difficulty: DifficultyId) => void; loading: boolean; soundEnabled: boolean; onToggleSound: () => void }) {
   const [selectedTactic, setSelectedTactic] = useState<StartTacticId>('food');
   const [difficulty, setDifficulty] = useState<DifficultyId>('normal');
   const tactic = START_TACTICS.find(t => t.id === selectedTactic) ?? START_TACTICS[0];
@@ -4113,6 +4170,7 @@ function StartScreen({ onNew, loading }: { onNew: (tactic: StartTacticId, diffic
 
   return (
     <div className="start">
+      <SoundButton enabled={soundEnabled} onToggle={onToggleSound} className="screen-sound" />
       <div className="start-inner">
         <div className="start-logo">
           <span className="start-ai">AI</span>
@@ -4327,13 +4385,14 @@ function TacticsReview({ game }: { game: GameState }) {
   );
 }
 
-function GameOverScreen({ game, onNew, loading }: { game: GameState; onNew: () => void; loading: boolean }) {
+function GameOverScreen({ game, onNew, loading, soundEnabled, onToggleSound }: { game: GameState; onNew: () => void; loading: boolean; soundEnabled: boolean; onToggleSound: () => void }) {
   const won = game.status === 'victory';
   const exploited = game.aiWeakPoints.filter(w => w.exploited).length;
   const revealed  = game.aiTree.filter(n => n.visibility === 'revealed').length;
   const c = won ? '#22cc66' : '#cc3333';
   return (
     <div className="gameover" style={{ '--go-image': `url(${endScreenImage(game.status)})` } as React.CSSProperties}>
+      <SoundButton enabled={soundEnabled} onToggle={onToggleSound} className="screen-sound" />
       <div className="gameover-inner">
         <div className="go-header" style={{ borderColor: c }}>
           <div className="go-status" style={{ color: c }}>
@@ -4467,6 +4526,18 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(SOUND_STORAGE_KEY, soundEnabled ? '1' : '0');
   }, [soundEnabled]);
+
+  useEffect(() => {
+    const ambient: CardSoundId | null = showStart || !game
+      ? 'ambient-menu'
+      : game.status === 'victory'
+        ? 'ambient-victory'
+        : game.status !== 'active'
+          ? 'ambient-defeat'
+          : null;
+    setAmbientSound(ambient, soundEnabled);
+    return () => setAmbientSound(null, false);
+  }, [showStart, game?.status, !!game, soundEnabled]);
 
   function toggleSound() {
     setSoundEnabled(on => {
@@ -4957,8 +5028,8 @@ export default function App() {
     setMissions(newMap);
   }
 
-  if (showStart || (!game && !loading)) return <StartScreen onNew={handleNew} loading={loading} />;
-  if (!game && loading)  return <StartScreen onNew={handleNew} loading={true}  />;
+  if (showStart || (!game && !loading)) return <StartScreen onNew={handleNew} loading={loading} soundEnabled={soundEnabled} onToggleSound={toggleSound} />;
+  if (!game && loading)  return <StartScreen onNew={handleNew} loading={true} soundEnabled={soundEnabled} onToggleSound={toggleSound} />;
   if (!game) return null;
   if (game.status !== 'active') return (
     <>
@@ -4971,7 +5042,7 @@ export default function App() {
           weaponLevel: game.weaponResearchLevel ?? 0,
           wallLevel: game.wallResearchLevel ?? 0,
         }} />}
-      <GameOverScreen game={game} onNew={openStartScreen} loading={loading} />
+      <GameOverScreen game={game} onNew={openStartScreen} loading={loading} soundEnabled={soundEnabled} onToggleSound={toggleSound} />
     </>
   );
 
@@ -5116,11 +5187,7 @@ export default function App() {
           })()}
         </div>
         <div className="top-menu-wrap">
-          <button className={`ph-menu-btn sound-toggle${soundEnabled ? ' on' : ''}`} onClick={toggleSound}
-            title={soundEnabled ? 'Izklopi zvok kartic' : 'Vklopi zvok kartic'}
-            aria-label={soundEnabled ? 'Izklopi zvok kartic' : 'Vklopi zvok kartic'}>
-            {soundEnabled ? '🔊' : '🔇'}
-          </button>
+          <SoundButton enabled={soundEnabled} onToggle={toggleSound} />
           <button className={`ph-menu-btn ph-info-btn${helpOverlay ? ' on' : ''}`} onClick={() => setHelpOverlay(o => !o)}
             title="Pomoč — razlaga gumbov" aria-label="Pomoč">ⓘ</button>
           <button className={`ph-menu-btn${inspectorOpen ? ' on' : ''}`} onClick={() => setInspectorOpen(o => !o)}
