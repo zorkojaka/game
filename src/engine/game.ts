@@ -1256,7 +1256,7 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
       aiOil = Math.max(0, aiOil - shipmentOilCost(ship));
       aiUnits = { scouts: aiUnits.scouts + ship.scouts, attackers: aiUnits.attackers + ship.attackers, peopleKillers: aiUnits.peopleKillers + ship.peopleKillers };
       aiRobots = totalAIRobots(aiUnits);
-      expeditionEvents.push(`🤖 AI je iz olja zgradil pošiljko (🔭${ship.scouts} ⚔️${ship.attackers} ☠${ship.peopleKillers}) — pričakuj napade.`);
+      expeditionEvents.push(`🤖 AI OKREPITVE — pripeljal je ⚔️ ${ship.attackers} napadalcev. Pričakuj napade na kamp.`);
     } else if (phase === 'eliminate' && state.phase === 'understand') {
       const intended = difficultyProfile(state.difficulty).aiPeopleKillers;
       const cap = Math.round(intended * AI_SHIPMENT_MAX_MULT);
@@ -1266,7 +1266,7 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
       aiOil = Math.max(0, aiOil - shipmentOilCost(ship));
       aiUnits = { scouts: aiUnits.scouts + ship.scouts, attackers: aiUnits.attackers + ship.attackers, peopleKillers: aiUnits.peopleKillers + ship.peopleKillers };
       aiRobots = totalAIRobots(aiUnits);
-      expeditionEvents.push(`☠ AI je iz olja zgradil pošiljko (🔭${ship.scouts} ⚔️${ship.attackers} ☠${ship.peopleKillers}) — napadi smrtonosnejši.`);
+      expeditionEvents.push(`☠ AI IZTREBLJEVALCI — pripeljal je ☠ ${ship.peopleKillers} people-killerjev. Napadi so zdaj smrtonosni.`);
     }
     // (Konec 3. faze NI poraz — sledi era totalnega napada; napoved gre prek raidPlan-a.)
   }
@@ -1292,22 +1292,21 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
       const rein = aiActionOverride
         ? aiBuild(aiUnits, aiEnergy, decided.production)
         : aiReinforce(aiUnits, aiEnergy, aiTargetArmy(state, state.totalRounds + 1));
+      // (AI interna ekonomija — gradnja/nadgradnja/laboratorij — je SKRITA igralcu;
+      //  vidna le v AI pogledu in 🔬 inšpektorju. Igralec izve za moč AI le ob srečanju/raidu.)
       const built = totalAIRobots(rein.units) - aiRobots;
       aiUnits = rein.units; aiEnergy = rein.energy; aiRobots = totalAIRobots(aiUnits);
-      if (built > 0) expeditionEvents.push(`⚡ AI je zgradil ${built} ${built === 1 ? 'enoto' : 'enot'}.`);
+      void built;
       // 2) NADGRADNJA: vloži presežek v dvig pritoka.
       if (decided.upgrade && aiEnergyLevel < AI_ENERGY_LEVEL_MAX && aiEnergy >= AI_ENERGY_LEVEL_COST) {
         aiEnergy -= AI_ENERGY_LEVEL_COST; aiEnergyLevel += 1;
-        expeditionEvents.push(`⚙️ AI je nadgradil energijsko jedro (nivo ${aiEnergyLevel}) — odslej hitrejši pritok.`);
       }
       // 3) LABORATORIJ: vloži presežek v bojno nadgradnjo (napad ali obramba).
       if (decided.labTarget && aiEnergy >= AI_LAB_LEVEL_COST) {
         if (decided.labTarget === 'attack' && aiAttackLevel < AI_LAB_LEVEL_MAX) {
           aiEnergy -= AI_LAB_LEVEL_COST; aiAttackLevel += 1;
-          expeditionEvents.push(`🧪 AI laboratorij: nadgradnja NAPADA (stopnja ${aiAttackLevel}).`);
         } else if (decided.labTarget === 'defense' && aiDefenseLevel < AI_LAB_LEVEL_MAX) {
           aiEnergy -= AI_LAB_LEVEL_COST; aiDefenseLevel += 1;
-          expeditionEvents.push(`🧪 AI laboratorij: nadgradnja OBRAMBE (stopnja ${aiDefenseLevel}).`);
         }
       }
     }

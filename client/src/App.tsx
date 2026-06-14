@@ -2390,6 +2390,14 @@ function RulesModal({ onClose }: { onClose: () => void }) {
         <li>Preživeli se vrnejo v kamp; material iz uničenih robotov nesejo s seboj.</li>
       </ul>
     ) },
+    { id: 'ai', icon: '🤖', title: 'Narava AI', body: (
+      <ul>
+        <li>AI ima <b>svojo ekonomijo</b>: črpa ⚡ energijo in 🛢 surovino ter iz njiju gradi robote. <b>Manj kot ga pritiskaš, močnejši pride</b> — zato udari zgodaj in ne čakaj.</li>
+        <li><b>3 šibke točke = 3 funkcije AI</b> (najdeš jih z odpravami): ⚡ <b>Jedro</b> (uničiš → AI-ju upade pritok), 🧪 <b>Laboratorij</b> (uničiš → izgubi bojne nadgradnje), ⚔️ <b>Poveljstvo</b> (uničiš → napadi oslabijo). Vsak udarec ga torej resnično pohabi.</li>
+        <li><b>AI te mora najprej najti</b>: napada na kamp ne more, dokler te ne odkrije. Manj ko se izpostavljaš, dlje si varen.</li>
+        <li><b>Srečanja na poljih:</b> ko tvoja odprava naleti na AI enote, pride do spopada — <b>ti vedno izveš za AI</b>, AI pa zate <b>le, če nisi skrit</b>. 🌙 Skrivanje: 50 % možnost, da se boju izogneš, in AI ne izve zate.</li>
+      </ul>
+    ) },
     { id: 'obramba', icon: '🧱', title: 'Obramba & obzidje', body: (
       <ul>
         <li>Verjetnost AI napada na kamp raste z močjo AI, AI znanjem o nas in številom ljudi v kampu.</li>
@@ -4364,7 +4372,7 @@ function StartScreen({ onNew, loading, soundEnabled, onToggleSound }: { onNew: (
           ))}
         </div>
         <div className="start-legend dim small">
-          12 mesecev na fazo · 36 skupaj · Vsaka odločitev šteje · Izumrli ne vstanejo
+          12 mesecev na fazo · 36 skupaj · 🤖 AI raste močnejši — ne čakaj · Udari njegove ⚡🧪⚔️ šibke točke · Izumrli ne vstanejo
         </div>
         {/* Izbira števila igralcev */}
         <div className="diff-row" style={{ marginBottom: '.5rem' }}>
