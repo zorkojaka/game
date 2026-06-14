@@ -214,3 +214,33 @@ funkcije. Predlagani koraki:
 5. **Dolgi cilj:** simetrični AI → 2-player (poglavje 7).
 
 Naslednji korak: skupaj izberemo, kaj gre v prvi izvedbeni sveženj, in šele nato kodiramo.
+
+---
+
+## 9. Balansni pas (Korak 5) — 2-player simetrija
+
+Po izgradnji simetričnega AI (vir → produkcija → laboratorij → vloge + velikost ekip;
+vez šibkih točk ↔ funkcije; raid šele po najdbi kampa; vloge porabljajo energijo;
+pošiljka izbrana v zadnjem mesecu) je krivulja težavnosti zdrava in monotona.
+
+**Simulacija (`npm run sim`, 80 iger × profil × horizont):**
+
+| profil | pasivni bot | agresivni bot (84 mes.) |
+|---|---|---|
+| easy | izumre | **preživi 93 %**, zmaga 8 % |
+| normal | izumre | preživi 3 %, zmaga 3 % |
+| hard | izumre | izumre ~100 % |
+| brutal | izumre | izumre 100 % |
+
+- **Pasivni** (brez strategije) izumre povsod → "vse po malem" izgubi. ✓
+- **Agresivni** je ŠIBEK proksi (ne lootuje optimalno, ne maksira artefaktov);
+  pravi igralec zmaga bistveno več (evolucija: ~53 % na easy). Realna zgornja meja.
+- Krivulja monotona: easy dostopen → brutal smrtonosen. Brez glarantne nesimetrije.
+
+**2-player:** obe strani imata zdaj primerljiv akcijski prostor in ekonomijo (energija
+= skupna valuta), vsaka svojo zgodbo (klan: preživi+uniči točke; AI: najdi→razumi→iztrebi).
+Za fino 2-player uglaševanje je pot **deterministični replay resničnih iger** (poglavje
+self-improvement loop) — meri taktiko, ne dumb bota.
+
+**Sklep:** balans je v zdravem stanju; nadaljnje uglaševanje naj temelji na resničnih
+2-player partijah (telemetrija), ne na arbitrarnih spremembah konstant.
