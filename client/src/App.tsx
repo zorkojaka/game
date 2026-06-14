@@ -3643,11 +3643,16 @@ function HexMap({ observer = false, incomingRaids = [], tiles, draftPath, draftR
 
         {drawingMode && draftPath.length >= 2 && lastStep && (() => {
           const lp = shift(hexToPixel(lastStep.q, lastStep.r, SIZE));
-          const aboveCy = lp.y - SIZE * 1.15;
-          const cy = aboveCy - 25 < 0
-            ? lp.y + SIZE * 1.15 + 55   // premalo prostora zgoraj → pod heks
-            : aboveCy;
-          const cx = lp.x;
+          // Gumbi gredo NAD ciljni hex (dovolj nad ✓, da se ne prekrivajo). Če zgoraj ni
+          // prostora (zgornja vrstica), jih prestavimo OB STRAN proti notranjosti mape —
+          // NE pod hex (kjer je pot) in NE čez ✓.
+          let cx = lp.x;
+          let cy = lp.y - SIZE * 1.6;
+          if (cy - 25 < 4) {
+            cy = lp.y;
+            const SIDE = SIZE * 1.95;
+            cx = lp.x < W / 2 ? lp.x + SIDE : lp.x - SIDE;
+          }
           const RATIONS_EMOJI: Record<number, string> = { 1: '💀', 2: '🥄', 3: '🍞', 4: '🥗', 5: '🥩' };
           type DraftControlIcon = 'scout' | 'attack' | 'minus' | 'plus' | 'confirm';
           const DraftIcon = ({ icon, color }: { icon: DraftControlIcon; color: string }) => {
@@ -3683,6 +3688,8 @@ function HexMap({ observer = false, incomingRaids = [], tiles, draftPath, draftR
           );
           return (
             <g className="draft-controls">
+              {/* tanka povezava gumbov s ciljnim hexom (jasno, kateremu polju pripadajo) */}
+              {(cx !== lp.x || cy !== lp.y) && <line x1={lp.x} y1={lp.y} x2={cx} y2={cy} stroke="#ffffff26" strokeWidth="1.5" style={{ pointerEvents: 'none' }} />}
               {/* potrditev na sredini hexa */}
               <g className="dc-confirm" style={{ cursor: canConfirmDraft ? 'pointer' : 'default', opacity: canConfirmDraft ? 1 : 0.4 }}
                  onClick={(e) => { e.stopPropagation(); if (canConfirmDraft) onConfirmDraft(); }}>
