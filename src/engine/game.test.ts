@@ -376,7 +376,7 @@ describe('odprava se vrne in raziskuje nazaj grede', () => {
       newExpeditions: [{ kind: 'scout', path, returnPath, assigned: 2, rations: 5 }],
     }));
     expect(r.lastRoundLog?.narrative).toMatch(/2 ljudi, 4m tja\+nazaj, hrana za 6 hex-m/);
-    expect(r.lastRoundLog?.narrative).toMatch(/vzela 60 hrane/);
+    expect(r.lastRoundLog?.narrative).toMatch(/vzela 48 hrane/);  // obilje foodMult 5→4: 2×6×4
   });
 });
 

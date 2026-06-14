@@ -4,7 +4,7 @@ import type { GameState, HumanAxis, OddsPreview, AITreeNode, AIWeakPoint, RoundL
 import { tileId, hexLabel } from './types';
 import { createGame, getGame, playRound, previewOdds, sendFeedback, getStats } from './api';
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
-import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT, wpGarrisonUnits, RESEARCH_LEVEL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS } from '../../src/engine/constants';
+import { RATIONS_LEVELS, RATIONS_CHOICES, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT, wpGarrisonUnits, RESEARCH_LEVEL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS } from '../../src/engine/constants';
 import { missionSuccessProbability, aiEnergyInflow, aiCoreDestroyed, aiTargetArmy, wpEffectiveGarrison, effectiveRaidAttackPower, raidProbability } from '../../src/engine/game';
 import { aiAttackPower, AI_UNIT_ENERGY_COST, AI_ENERGY_LEVEL_COST, AI_ENERGY_LEVEL_MAX, ROUNDS_PER_PHASE } from '../../src/engine/constants';
 import { expeditionMonthsForSteps } from '../../src/engine/expedition';
@@ -295,7 +295,7 @@ const HELP: Record<string, { title: string; rows: [string, string][] }> = {
   ] },
   food: { title: 'Kako deluje — Prehrana', rows: [
     ['🌾', 'Nabiralci pridelajo hrano vsak mesec (×4 na nabiralca, pomnoženo z jakostjo obrokov).'],
-    ['🍽', 'Višji obroki (1–5) dajo večjo bojno moč in rast populacije, a porabijo več hrane.'],
+    ['🍽', 'Višji obroki (4 nivoji) dajo večjo bojno moč in rast populacije, a porabijo več hrane.'],
     ['⚠', 'Če zaloga pade na 0, klan strada in vsak mesec izgublja ljudi (25 % → 50 % → 75 %).'],
   ] },
   workshop: { title: 'Kako deluje — Delavnice', rows: [
@@ -811,7 +811,7 @@ function WeakPoints({ wps, aiTree, target, onTarget }: {
 function MissionRationsButtons({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   return (
     <div className="mr-buttons">
-      {[1,2,3,4,5].map(lvl => {
+      {RATIONS_CHOICES.map(lvl => {
         const t = RATIONS[lvl];
         return (
           <button key={lvl}
@@ -1260,7 +1260,7 @@ function RationsSelector({ value, onChange, pop }: { value: number; onChange: (n
   return (
     <div className="rations-block">
       <div className="rations-row">
-        {[1, 2, 3, 4, 5].map(lvl => {
+        {RATIONS_CHOICES.map((lvl, i) => {
           const t = RATIONS[lvl];
           return (
             <button key={lvl}
@@ -1269,7 +1269,7 @@ function RationsSelector({ value, onChange, pop }: { value: number; onChange: (n
               onClick={() => onChange(lvl)}
               title={`${t.label} — moč ×${t.strengthMult}, hrana ×${t.foodMult}, populacija ${t.popMin === t.popMax ? t.popMin : `${t.popMin} do ${t.popMax}`}`}>
               <span className="rb-emoji">{t.emoji}</span>
-              <span className="rb-num">{lvl}</span>
+              <span className="rb-num">{i + 1}</span>
             </button>
           );
         })}
@@ -2367,7 +2367,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
     { id: 'ljudje', icon: '👥', title: 'Razporeditev ljudi', body: (
       <ul>
         <li>🛡 <b>Obramba</b> — branilci odbijajo napade AI na kamp.</li>
-        <li>🌾 <b>Prehrana</b> — nabiralci zbirajo hrano; jakost obrokov (1–5) vpliva na porabo in moč.</li>
+        <li>🌾 <b>Prehrana</b> — nabiralci zbirajo hrano; jakost obrokov (💀 Lakota / 🍽 Normalno / 🥗 Dobro / 🥩 Obilje) vpliva na porabo in moč.</li>
         <li>🔨 <b>Delavnice</b> — delavci izdelujejo orožje ali gradijo obzidje.</li>
         <li>🔬 <b>Raziskave</b> — raziskovalci ustvarjajo intel, razkrivajo AI šibkosti in odklepajo nadgradnje.</li>
         <li>Pod ikonami so + / − za premik prostih ljudi v vsako območje.</li>
@@ -2376,7 +2376,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
     { id: 'karta', icon: '🔭', title: 'Karta & odprave', body: (
       <ul>
         <li>Karta je v megli; razkrivaš jo z odpravami — raziskanost polja raste z vsakim obiskom.</li>
-        <li>Pot narišeš s kliki na sosednje hekse. Na <b>zadnjem heksu</b> se prikažejo gumbi: vrsta/število ljudi, 🍽 obroki (klikni za 1–5) in 🌙 skrivanje.</li>
+        <li>Pot narišeš s kliki na sosednje hekse. Na <b>zadnjem heksu</b> se prikažejo gumbi: vrsta/število ljudi, 🍽 obroki (klikni za naslednji nivo) in 🌙 skrivanje.</li>
         <li>✓ (potrdi odpravo) je na sredini zadnjega hexa. Hrana se vzame za pot <b>tja in nazaj</b>.</li>
         <li>Na poti so možna srečanja z AI in najdbe (material, orožje, artefakt) — dostavljeno ob vrnitvi.</li>
         <li>Pot izvidnice je <b>rumena</b>, napadalna pot je <b>rdeča</b>.</li>
@@ -3355,7 +3355,7 @@ function HexMap({ observer = false, incomingRaids = [], tiles, draftPath, draftR
           const cs = CAMP_ZONES.map(z => shift(hexToPixel(z.q, z.r, SIZE)));
           const cx = cs.reduce((s, p) => s + p.x, 0) / cs.length;
           const cy = cs.reduce((s, p) => s + p.y, 0) / cs.length;
-          const RATIONS_EMOJI = [null, '💀', '🥄', '🍞', '🥗', '🥩'];
+          const RATIONS_EMOJI = [null, '💀', '🥄', '🍽', '🥗', '🥩'];
 
           return CAMP_ZONES.map(z => {
             const p = shift(hexToPixel(z.q, z.r, SIZE));
@@ -3366,7 +3366,7 @@ function HexMap({ observer = false, incomingRaids = [], tiles, draftPath, draftR
             type Btn = { label: string; active: boolean; onClick: () => void; title: string; locked?: boolean; highlight?: boolean; sub?: string; lvl?: number; segments?: { done: number; next: number; total: number } };
             let btns: Btn[] = [];
             if (z.adj === 'f') {
-              btns = [1,2,3,4,5].map(lvl => {
+              btns = RATIONS_CHOICES.map(lvl => {
                 const t = RATIONS[lvl];
                 const popHint = t.popMin === 0 && t.popMax === 0 ? '±0' : `${t.popMin}…${t.popMax}`;
                 const locked = !!rationsLocked[lvl];
@@ -3653,7 +3653,7 @@ function HexMap({ observer = false, incomingRaids = [], tiles, draftPath, draftR
             const SIDE = SIZE * 1.95;
             cx = lp.x < W / 2 ? lp.x + SIDE : lp.x - SIDE;
           }
-          const RATIONS_EMOJI: Record<number, string> = { 1: '💀', 2: '🥄', 3: '🍞', 4: '🥗', 5: '🥩' };
+          const RATIONS_EMOJI: Record<number, string> = { 1: '💀', 2: '🥄', 3: '🍽', 4: '🥗', 5: '🥩' };
           type DraftControlIcon = 'scout' | 'attack' | 'minus' | 'plus' | 'confirm';
           const DraftIcon = ({ icon, color }: { icon: DraftControlIcon; color: string }) => {
             if (icon === 'scout') {
@@ -3732,7 +3732,7 @@ function HexMap({ observer = false, incomingRaids = [], tiles, draftPath, draftR
                 const stealthX = isScout || canUseArtifact ? cx + 22 : cx + 16;
                 return (
                   <>
-                    <g className="dc-rations" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftRations(draftRations % 5 + 1); }}>
+                    <g className="dc-rations" style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onDraftRations(RATIONS_CHOICES[(RATIONS_CHOICES.indexOf(draftRations as 1 | 3 | 4 | 5) + 1) % RATIONS_CHOICES.length]); }}>
                       <title>{`Obroki: ${draftRations} — klikni za spremembo`}</title>
                       <circle cx={ratX} cy={cy + 30} r={9} fill="#0a1a0a" stroke="#668866" strokeWidth="1.5" />
                       <text x={ratX} y={cy + 30} textAnchor="middle" dominantBaseline="central" fontSize="10" style={{ userSelect: 'none', pointerEvents: 'none' }}>{RATIONS_EMOJI[draftRations] ?? '🍞'}</text>
@@ -3883,7 +3883,7 @@ function RationsMini({ value, onChange, locked = {} }: { value: number; onChange
   return (
     <div className="rations-mini">
       <div className="rm-row">
-        {[1,2,3,4,5].map(lvl => {
+        {RATIONS_CHOICES.map(lvl => {
           const t = RATIONS[lvl];
           const isLocked = !!locked[lvl];
           return (
@@ -5532,7 +5532,7 @@ export default function App() {
     4: foodProjectionForRations(4) < 0,
     5: foodProjectionForRations(5) < 0,
   };
-  const affordableRation = ([5, 4, 3, 2, 1] as const).find(lvl => !rationsLocked[lvl]) ?? 1;
+  const affordableRation = ([5, 4, 3, 1] as const).find(lvl => !rationsLocked[lvl]) ?? 1;
   const effectiveRations = rationsLocked[rations] ? affordableRation : rations;
   const rTier = RATIONS[effectiveRations];
   const foragerYield = Math.floor(foragers * 4 * rTier.strengthMult);

@@ -211,13 +211,17 @@ export interface RationsTier {
   label: string;
   emoji: string;
 }
+// 4 nivoji obrokov: Lakota / Normalno / Dobro / Obilje. (Nivo 2 'Skopo' ostane
+// definiran le za stare shranjene igre — v izbiri ga ni.)
 export const RATIONS_LEVELS: Record<number, RationsTier> = {
   1: { foodMult: 0.50, popMin: -5, popMax: -3, strengthMult: 0.55, label: 'Lakota',   emoji: '💀' },
-  2: { foodMult: 0.75, popMin: -2, popMax: -1, strengthMult: 0.80, label: 'Skopo',    emoji: '🥄' },
+  2: { foodMult: 0.75, popMin: -2, popMax: -1, strengthMult: 0.80, label: 'Skopo',    emoji: '🥄' },  // legacy
   3: { foodMult: 1.00, popMin:  0, popMax:  0, strengthMult: 1.00, label: 'Normalno', emoji: '🍽' },
-  4: { foodMult: 2.50, popMin:  1, popMax:  3, strengthMult: 1.30, label: 'Dobro',    emoji: '🍞' },
-  5: { foodMult: 5.00, popMin:  3, popMax:  6, strengthMult: 1.60, label: 'Obilje',   emoji: '🥩' },
+  4: { foodMult: 2.00, popMin:  1, popMax:  2, strengthMult: 1.20, label: 'Dobro',    emoji: '🥗' },
+  5: { foodMult: 4.00, popMin:  2, popMax:  4, strengthMult: 1.45, label: 'Obilje',   emoji: '🥩' },
 };
+// Nivoji, ki so na voljo v izbiri (brez 'Skopo'): Lakota, Normalno, Dobro, Obilje.
+export const RATIONS_CHOICES = [1, 3, 4, 5] as const;
 
 // Stopnjevana lakota: če hrana pade pod 0 dva meseca zapored, izgube se podvojijo
 export const STARVATION_LOSS_PCT_1ST = 0.25;  // 25 % populacije prvi mesec
