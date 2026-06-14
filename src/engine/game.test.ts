@@ -125,20 +125,27 @@ describe('AI enote po fazah (scouts/attackers/peopleKillers)', () => {
     expect(g.aiRobots).toBe(100);
   });
 
-  it('prehod v understand pripelje 75 napadalnih enot', () => {
-    const g: GameState = { ...newGame(2), aiPhaseProgress: 11, round: 12 };
+  it('prehod v understand: z dovolj olja pripelje do 1.5× napadalcev (cap 113)', () => {
+    const g: GameState = { ...newGame(2), aiPhaseProgress: 11, round: 12, aiOil: 5000 };
     const r = processRound(g, action({ foragers: 5 }));
     expect(r.phase).toBe('understand');
-    expect(r.aiUnits.attackers).toBe(75);
-    expect(r.aiRobots).toBe(r.aiUnits.scouts + 75 + r.aiUnits.peopleKillers);
+    expect(r.aiUnits.attackers).toBe(Math.round(75 * 1.5));  // 113
+    expect(r.aiRobots).toBe(r.aiUnits.scouts + r.aiUnits.attackers + r.aiUnits.peopleKillers);
   });
 
-  it('prehod v eliminate pripelje 25 people-killer enot', () => {
+  it('prehod v eliminate: z dovolj olja pripelje do 1.5× people-killerjev (cap 38)', () => {
     const g: GameState = { ...newGame(2), phase: 'understand', aiPhaseProgress: 11, round: 12,
-      aiUnits: { scouts: 100, attackers: 75, peopleKillers: 0 }, aiRobots: 175 };
+      aiUnits: { scouts: 100, attackers: 75, peopleKillers: 0 }, aiRobots: 175, aiOil: 5000 };
     const r = processRound(g, action({ foragers: 5 }));
     expect(r.phase).toBe('eliminate');
-    expect(r.aiUnits.peopleKillers).toBe(25);
+    expect(r.aiUnits.peopleKillers).toBe(Math.round(25 * 1.5));  // 38
+  });
+
+  it('olje določa velikost pošiljke: več olja → večja pošiljka', () => {
+    const base: GameState = { ...newGame(2), aiPhaseProgress: 11, round: 12 };
+    const low = processRound({ ...base, aiOil: 80 }, action({ foragers: 5 }));
+    const high = processRound({ ...base, aiOil: 5000 }, action({ foragers: 5 }));
+    expect(high.aiUnits.attackers).toBeGreaterThan(low.aiUnits.attackers);
   });
 
   it('faza 1 ima raide (tudi izvidniki napadajo) — verjetnost > 0', () => {
@@ -925,10 +932,12 @@ describe('AI izbira pošiljke ob prehodu faze (#1)', () => {
     // 25 people-killerjev × cena 10 = 250 → 25 pk
     expect(aiChoosePhaseShipment('eliminate', 25 * 10)).toEqual({ scouts: 0, attackers: 0, peopleKillers: 25 });
   });
-  it('prehod v understand še vedno pripelje natanko profilno število (ohranjen balans)', () => {
-    const g: GameState = { ...newGame(2, 'normal'), aiPhaseProgress: 11, round: 12 };
+  it('pri standardnem olju pošiljka ~ profilno število (ohranjen balans)', () => {
+    // olje ≈ standardni strošek (75×4) → pošiljka blizu 75 (ne na zgornji meji)
+    const g: GameState = { ...newGame(2, 'normal'), aiPhaseProgress: 11, round: 12, aiOil: 280 };
     const r = processRound(g, action({ foragers: 5 }));
-    expect(r.aiUnits.attackers).toBe(75);
+    expect(r.aiUnits.attackers).toBeGreaterThanOrEqual(70);
+    expect(r.aiUnits.attackers).toBeLessThanOrEqual(85);
   });
 });
 

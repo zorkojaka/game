@@ -118,6 +118,14 @@ export const AI_ENERGY_LEVEL_MAX  = 3;   // največ +150 % pritoka
 // RAID je mogoč šele, ko AI NAJDE kamp (z iskanjem dvigne znanje). Do takrat
 // iskanje na prvem mestu, raid izklopljen.
 export const CAMP_FOUND_KNOWLEDGE = 0.25;  // aiKnowledge, ko AI ve, kje je kamp
+
+// ─── AI OLJE (surovina) — drugi vir za gradnjo robotov ──────────────────────────
+// AI črpa olje vsako rundo; iz olja gradi pošiljko robotov ob prehodu v naslednjo
+// fazo. Črpanje PADE, ko AI veliko operira (raid/patrulja/iskanje) → manj kot se
+// bori, več nabere → MOČNEJŠA naslednja faza. Olje uporablja iste cene kot energija.
+export const AI_OIL_INFLOW_PER_ATTACKER = 0.42;  // olje/mesec na profilnega napadalca (pred operacijami)
+export const AI_OIL_OPS_MIN = 0.30;              // najmanjši faktor črpanja pri polni zasedenosti
+export const AI_SHIPMENT_MAX_MULT = 1.5;         // pošiljka največ 1.5× načrtovane (varčevanje → več)
 // VLOGE PORABLJAJO ENERGIJO: vsak robot na operaciji (raid/patrulja/iskanje) stane
 // energijo na rundo → manj ostane za gradnjo novih robotov. Varčevanje = več robotov.
 export const AI_ROLE_ENERGY_COST = 0.06;

@@ -294,6 +294,7 @@ export interface GameState {
   // AI ekonomija (temelj): energija iz jedra (= šibka točka wp_power) poganja
   // NADOMEŠČANJE izgubljenih enot. Uničeno jedro → pritok strmo pade.
   aiEnergy?: number;        // trenutna zaloga energije
+  aiOil?: number;           // surovina (olje) za gradnjo pošiljke robotov; črpa vsako rundo
   aiEnergyLevel?: number;   // AI nadgradnja pritoka (AI ga dviguje sam, ko ima presežek)
   aiAttackLevel?: number;   // Laboratorij: nadgradnja napada robotov (×1.3^level)
   aiDefenseLevel?: number;  // Laboratorij: nadgradnja obrambe robotov (×1.3^level)

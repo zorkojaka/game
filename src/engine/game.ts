@@ -22,6 +22,7 @@ import {
   SEARCH_KNOWLEDGE_PER_ROBOT, PATROL_ENCOUNTER_MAX_MULT,
   AI_TEAM_ROBOTS, PATROL_ENCOUNTER_PER_TEAM, AI_TEAM_WIPE_REF,
   CAMP_FOUND_KNOWLEDGE, AI_ROLE_ENERGY_COST,
+  AI_OIL_INFLOW_PER_ATTACKER, AI_OIL_OPS_MIN, AI_SHIPMENT_MAX_MULT,
   AI_LAB_LEVEL_COST, AI_LAB_LEVEL_MAX, aiLabMult, AI_LAB_WEAKPOINT, AI_COMMAND_WEAKPOINT, AI_COMMAND_DISRUPTED_MULT,
   AI_SCOUTS_INITIAL, AI_ATTACKERS_PHASE2, AI_PEOPLEKILLERS_PHASE3, PEOPLEKILLER_LETHALITY_PER_UNIT,
   AI_UNIT_DEFS, aiAttackPower, aiDefensePower,
@@ -218,19 +219,22 @@ export function decideAIAction(state: GameState): AIAction {
   const focus = (state.aiWeakPoints ?? [])
     .filter(w => w.discovered && !w.exploited)
     .sort((a, b) => (MISSION_WP_DIFFICULTY[a.id] ?? 100) - (MISSION_WP_DIFFICULTY[b.id] ?? 100))[0]?.id;
-  // ZADNJI MESEC pred novo fazo: izberi sestavo pošiljke za naslednjo fazo
-  // (proračun = energija za enote te faze). Privzeto signaturna enota.
-  let nextShipment: AIUnits | undefined;
-  const lastMonth = state.phase !== 'eliminate' && state.totalRounds < 36 && (state.aiPhaseProgress >= ROUNDS_PER_PHASE - 1);
-  if (lastMonth) {
-    const prof = difficultyProfile(state.difficulty);
-    const nextPh: AIPhase = state.phase === 'find' ? 'understand' : 'eliminate';
-    const budget = nextPh === 'understand'
-      ? prof.aiAttackers * AI_UNIT_ENERGY_COST.attackers
-      : prof.aiPeopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
-    nextShipment = aiChoosePhaseShipment(nextPh, budget);
-  }
-  return { production, upgrade, raidForcePct: raid, roles, focusWeakPoint: focus, labTarget, teamSize: 2, nextShipment };
+  // Računalnik (SP) NE fiksira pošiljke — engine jo zgradi iz nabranega OLJA
+  // (signaturna enota faze; več olja → močnejša). nextShipment je za igralca 2 (2P).
+  return { production, upgrade, raidForcePct: raid, roles, focusWeakPoint: focus, labTarget, teamSize: 2 };
+}
+
+/** Cena pošiljke v olju (iste cene kot energija). */
+export function shipmentOilCost(s: AIUnits): number {
+  return s.scouts * AI_UNIT_ENERGY_COST.scouts + s.attackers * AI_UNIT_ENERGY_COST.attackers + s.peopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
+}
+/** Omeji pošiljko z razpoložljivim oljem in zgornjo mejo enot (sorazmerno skrči). */
+export function capShipmentByOil(s: AIUnits, oil: number, maxRobots: number): AIUnits {
+  const total = s.scouts + s.attackers + s.peopleKillers;
+  const cost = shipmentOilCost(s);
+  if (total <= 0) return { scouts: 0, attackers: 0, peopleKillers: 0 };
+  const scale = Math.min(1, cost > 0 ? oil / cost : 1, maxRobots / total);
+  return { scouts: Math.floor(s.scouts * scale), attackers: Math.floor(s.attackers * scale), peopleKillers: Math.floor(s.peopleKillers * scale) };
 }
 
 /** Zgradi TOČNO želene enote (2-player: izbira igralca 2), omejeno z energijo. */
@@ -480,6 +484,7 @@ export function newGame(seed?: number, difficulty?: DifficultyId): GameState {
     aiUnits: { scouts: difficultyProfile(difficulty).aiScouts, attackers: 0, peopleKillers: 0 },
     aiKnowledge: INITIAL_AI_KNOWLEDGE,
     aiEnergy: AI_ENERGY_START,
+    aiOil: 0,
     aiEnergyLevel: 0,
     aiAttackLevel: 0,
     aiDefenseLevel: 0,
@@ -752,6 +757,11 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
   const campFound = (state.aiCampFound ?? false) || state.aiKnowledge >= CAMP_FOUND_KNOWLEDGE || state.totalRounds >= 36;
   // Operativni strošek vlog: roboti na raidu/patrulji/iskanju porabijo energijo → manj za gradnjo.
   const roleEnergyCost = (aiAct.roles.raid + aiAct.roles.patrol + aiAct.roles.search) * aiTotal0 * AI_ROLE_ENERGY_COST;
+  // OLJE: AI ga črpa vsako rundo. Več operacij (raid+patrulja+iskanje) → manj črpa →
+  // manj kot se bori, več nabere za MOČNEJŠO naslednjo pošiljko robotov.
+  const opsLoad = aiAct.roles.raid + aiAct.roles.patrol + aiAct.roles.search;
+  const oilInflow = difficultyProfile(state.difficulty).aiAttackers * AI_OIL_INFLOW_PER_ATTACKER * Math.max(AI_OIL_OPS_MIN, 1 - opsLoad);
+  let aiOil = (state.aiOil ?? 0) + oilInflow;
   // Sestava pošiljke za naslednjo fazo (izbrana v zadnjem mesecu; obstane do prehoda).
   const incomingShipment = aiAct.nextShipment ?? state.aiPendingShipment;
 
@@ -1236,18 +1246,27 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
   // Fazni prihod novih AI enot (ob prehodu v novo fazo)
   if (phaseComplete) {
     if (phase === 'understand') {
-      // Sestava pošiljke izbrana v zadnjem mesecu (incomingShipment); sicer privzeto.
-      const budget = difficultyProfile(state.difficulty).aiAttackers * AI_UNIT_ENERGY_COST.attackers;
-      const ship = incomingShipment ?? aiChoosePhaseShipment('understand', budget);
+      // Pošiljka se ZGRADI IZ OLJA (več nabranega → močnejša). Sestavo izbere igralec 2
+      // (incomingShipment), sicer signaturna enota; omejeno z oljem in zgornjo mejo.
+      const intended = difficultyProfile(state.difficulty).aiAttackers;
+      const cap = Math.round(intended * AI_SHIPMENT_MAX_MULT);
+      const ship = incomingShipment
+        ? capShipmentByOil(incomingShipment, aiOil, cap)
+        : { scouts: 0, attackers: Math.min(cap, Math.floor(aiOil / AI_UNIT_ENERGY_COST.attackers)), peopleKillers: 0 };
+      aiOil = Math.max(0, aiOil - shipmentOilCost(ship));
       aiUnits = { scouts: aiUnits.scouts + ship.scouts, attackers: aiUnits.attackers + ship.attackers, peopleKillers: aiUnits.peopleKillers + ship.peopleKillers };
       aiRobots = totalAIRobots(aiUnits);
-      expeditionEvents.push(`🤖 AI je pripeljal pošiljko (🔭${ship.scouts} ⚔️${ship.attackers} ☠${ship.peopleKillers}) — pričakuj napade.`);
+      expeditionEvents.push(`🤖 AI je iz olja zgradil pošiljko (🔭${ship.scouts} ⚔️${ship.attackers} ☠${ship.peopleKillers}) — pričakuj napade.`);
     } else if (phase === 'eliminate' && state.phase === 'understand') {
-      const budget = difficultyProfile(state.difficulty).aiPeopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
-      const ship = incomingShipment ?? aiChoosePhaseShipment('eliminate', budget);
+      const intended = difficultyProfile(state.difficulty).aiPeopleKillers;
+      const cap = Math.round(intended * AI_SHIPMENT_MAX_MULT);
+      const ship = incomingShipment
+        ? capShipmentByOil(incomingShipment, aiOil, cap)
+        : { scouts: 0, attackers: 0, peopleKillers: Math.min(cap, Math.floor(aiOil / AI_UNIT_ENERGY_COST.peopleKillers)) };
+      aiOil = Math.max(0, aiOil - shipmentOilCost(ship));
       aiUnits = { scouts: aiUnits.scouts + ship.scouts, attackers: aiUnits.attackers + ship.attackers, peopleKillers: aiUnits.peopleKillers + ship.peopleKillers };
       aiRobots = totalAIRobots(aiUnits);
-      expeditionEvents.push(`☠ AI je pripeljal pošiljko (🔭${ship.scouts} ⚔️${ship.attackers} ☠${ship.peopleKillers}) — napadi smrtonosnejši.`);
+      expeditionEvents.push(`☠ AI je iz olja zgradil pošiljko (🔭${ship.scouts} ⚔️${ship.attackers} ☠${ship.peopleKillers}) — napadi smrtonosnejši.`);
     }
     // (Konec 3. faze NI poraz — sledi era totalnega napada; napoved gre prek raidPlan-a.)
   }
@@ -1366,6 +1385,7 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
     aiInsight,
     aiKnowledge: finalAiKnowledge,
     aiEnergy,
+    aiOil,
     aiEnergyLevel,
     aiAttackLevel,
     aiDefenseLevel,

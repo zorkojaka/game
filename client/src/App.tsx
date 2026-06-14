@@ -4079,6 +4079,7 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
         <Sec t="🤖 AI — akcijski prostor" sub="kaj AI počne in lahko počne">
           <Row kc={C.energija} k="energija (zaloga)" v={f0(game.aiEnergy ?? 0)} hint="poganja nadomeščanje izgubljenih enot" />
           <Row kc={C.energija} k="energija (pritok/mesec)" v={`${f1(inflow)} ${(game.aiEnergyLevel ?? 0) > 0 ? `· nivo ${game.aiEnergyLevel}` : ''} ${coreDead ? '· jedro 💥 ×0.25' : '· jedro ✓'}`} hint="iz energijskega jedra; AI ga sam nadgrajuje s presežkom" />
+          <Row k="🛢 olje (za pošiljko robotov)" v={`${f0(game.aiOil ?? 0)}`} hint="AI ga črpa vsako rundo; manj operacij (raid/patrulja/iskanje) → več olja → močnejša naslednja pošiljka" />
           <Row k="enote" v={`🔭${units.scouts} · ⚔️${units.attackers} · ☠${units.peopleKillers} = ${game.aiRobots}`} />
           {game.aiLastAction && (() => { const a = game.aiLastAction!; const prod = a.production; const pb = prod.scouts + prod.attackers + prod.peopleKillers;
             const focusLbl = a.focusWeakPoint ? (wps.find(w => w.id === a.focusWeakPoint)?.label ?? a.focusWeakPoint) : '—';
@@ -4593,7 +4594,7 @@ function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading 
   // ZADNJI MESEC pred fazo: igralec 2 izbere sestavo pošiljke za naslednjo fazo (proračun = energija faze).
   const lastMonth = game.phase !== 'eliminate' && game.totalRounds < 36 && (game.aiPhaseProgress ?? 0) >= ROUNDS_PER_PHASE - 1;
   const nextPhaseLabel = game.phase === 'find' ? 'FAZA 2 (napadalci)' : 'FAZA 3 (people-killerji)';
-  const shipBudget = game.phase === 'find' ? prof.aiAttackers * AI_UNIT_ENERGY_COST.attackers : prof.aiPeopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
+  const shipBudget = Math.floor(game.aiOil ?? 0);  // pošiljka se gradi iz OLJA
   const shipDefault = game.phase === 'find'
     ? { scouts: 0, attackers: prof.aiAttackers, peopleKillers: 0 }
     : { scouts: 0, attackers: 0, peopleKillers: prof.aiPeopleKillers };
@@ -4672,6 +4673,7 @@ function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading 
               <div className="dim small" style={{ margin: '2px 0 6px' }}>{phG.d} <b>Zmaga = klan izumre.</b></div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: '.7rem' }}>
                 <span style={{ background: '#11171f', border: '1px solid #2a3a4a', borderRadius: 6, padding: '2px 7px' }}>🤖 vojska <b>{game.aiRobots}</b></span>
+                <span style={{ background: '#11171f', border: '1px solid #2a3a4a', borderRadius: 6, padding: '2px 7px' }}>🛢 olje <b>{Math.floor(game.aiOil ?? 0)}</b></span>
                 <span style={{ background: '#11171f', border: '1px solid #2a3a4a', borderRadius: 6, padding: '2px 7px' }}>👁 znanje o klanu <b>{Math.round(game.aiKnowledge * 100)}%</b></span>
                 {(() => { const f = (game.aiCampFound ?? false) || game.aiKnowledge >= 0.25 || game.totalRounds >= 36; return (
                   <span style={{ background: '#11171f', border: `1px solid ${f ? '#2a3a4a' : '#cc8800'}`, borderRadius: 6, padding: '2px 7px' }}>🎯 kamp <b style={{ color: f ? '#8df0a5' : '#ffcc66' }}>{f ? 'najden — raid mogoč' : 'iščem (raid zaklenjen)'}</b></span>
@@ -4709,10 +4711,10 @@ function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading 
         </div>
         {lastMonth && (
           <div style={{ background: '#0d141b', border: '1px solid #4a3a22', borderRadius: 10, padding: '.7rem .9rem', marginTop: '.6rem' }}>
-            <div style={{ fontSize: '.8rem', color: '#ffcc66', fontWeight: 700, marginBottom: 6 }}>📦 Pošiljka za naslednjo fazo — {nextPhaseLabel} <span className="dim small">(proračun {shipBudget}⚡)</span></div>
+            <div style={{ fontSize: '.8rem', color: '#ffcc66', fontWeight: 700, marginBottom: 6 }}>📦 Pošiljka za naslednjo fazo — {nextPhaseLabel} <span className="dim small">(olje {shipBudget}🛢 — manj operacij = več olja)</span></div>
             {([['scouts', '🔭', 'izvidniki'], ['attackers', '⚔️', 'napadalci'], ['peopleKillers', '☠', 'people-killerji']] as const).map(([k, ic, lbl]) => (
               <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #161f29' }}>
-                <span>{ic} {lbl} <span className="dim small">({AI_UNIT_ENERGY_COST[k]}⚡)</span></span>
+                <span>{ic} {lbl} <span className="dim small">({AI_UNIT_ENERGY_COST[k]}🛢)</span></span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <button className="ph-menu-btn" onClick={() => adjShip(k, -1)} disabled={ship[k] <= 0}>−</button>
                   <b style={{ minWidth: 28, textAlign: 'center' }}>{ship[k]}</b>
