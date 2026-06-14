@@ -2911,7 +2911,8 @@ function HexMap({ observer = false, incomingRaids = [], tiles, draftPath, draftR
           const wp = t.hidesWeakPointId ? wpById[t.hidesWeakPointId] : undefined;
           // Šibka točka je vidna, ko je ODKRITA (ali heks ≥ 50 % raziskan) — sicer
           // odkrita točka (npr. ob prihodu odprave) na mapi ne bi kazala ◆ in straže.
-          const wpVisible = !!wp && (wp.discovered || wp.exploited || t.researchProgress >= 0.50);
+          // V AI (observer) pogledu AI vidi VSE svoje šibke točke in garnizije; sicer megla igralca.
+          const wpVisible = !!wp && (observer || wp.discovered || wp.exploited || t.researchProgress >= 0.50);
           const wpLabelLines = wpVisible && wp ? splitMapLabel(wp.label, 15) : [];
 
           let { fill, stroke, labelColor } = hexColorByProgress(t.researchProgress);
@@ -3606,6 +3607,22 @@ function HexMap({ observer = false, incomingRaids = [], tiles, draftPath, draftR
           });
         })()}
 
+        {/* AI POGLED: glavna vojska ob jedru ☣ (garnizije so prikazane pri šibkih točkah) */}
+        {observer && aiUnits && (() => {
+          const core = tiles.find(t => t.isAICore);
+          if (!core) return null;
+          const p = shift(hexToPixel(core.q, core.r, SIZE));
+          const total = aiUnits.scouts + aiUnits.attackers + aiUnits.peopleKillers;
+          const garrisonTotal = wpGarrison * (wps?.filter(w => !w.exploited).length ?? 0);
+          const core_ = Math.max(0, total - garrisonTotal);
+          return (
+            <g style={{ pointerEvents: 'none' }}>
+              <rect x={p.x - 26} y={p.y - SIZE * 0.78} width="52" height="17" rx="4" fill="#220606" stroke="#cc3333" strokeWidth="1.2" />
+              <text x={p.x} y={p.y - SIZE * 0.78 + 12} textAnchor="middle" fontSize="10" fontWeight="bold" fill="#ff8866">🤖 {core_} jedro</text>
+            </g>
+          );
+        })()}
+
         {/* ─── Kontrole odprave na ZADNJEM heksu poti ─── */}
         {/* ZAČETNA točka poti — v ZGORNJI plasti (nad grafiko kampa), na robu kampa
             proti prvemu polju poti. Povlecljiva: izbere, kje pot zapusti kamp. */}
@@ -4107,11 +4124,12 @@ function EngineInspector({ game, onClose }: { game: GameState; onClose: () => vo
         <Sec t="◆ Šibke točke = AI funkcije" sub="uničiš = oslabiš tisto funkcijo (kot AI uniči cono kampa)">
           {wps.map(w => { const fn = w.id === 'wp_power' ? '⚡ Jedro' : w.id === 'wp_comm' ? '🧪 Laboratorij' : '⚔️ Poveljstvo';
             const eff = w.id === 'wp_power' ? 'pritok ×0.25' : w.id === 'wp_comm' ? 'nadgradnje odpadejo' : 'raid ×0.55';
+            const focused = game.aiLastAction?.focusWeakPoint === w.id;
             return (
             <Row key={w.id} kc={w.discovered && !w.exploited ? C.straza : undefined}
-              k={`${w.exploited ? '💥' : w.discovered ? '◆' : '❔'} ${fn}`}
-              v={w.exploited ? `UNIČENA → ${eff}` : w.discovered ? `straža ${wpEffectiveGarrison(game, w.id)} · uspeh z 10 ${pct(missionSuccessProbability(game, w.id, 10, 3))}` : 'neodkrita'}
-              hint={`${w.label} — uničenje: ${eff}`} />
+              k={`${w.exploited ? '💥' : w.discovered ? '◆' : '❔'} ${fn}${focused && !w.exploited ? ' 🎯' : ''}`}
+              v={w.exploited ? `UNIČENA → ${eff}` : `straža ${wpEffectiveGarrison(game, w.id)}${focused ? ' (fokus)' : ''} · uspeh z 10 ${pct(missionSuccessProbability(game, w.id, 10, 3))}`}
+              hint={`${w.label} — uničenje: ${eff}${focused ? ' · AI tu KONCENTRIRA stražo' : ''}`} />
           ); })}
         </Sec>
         </div>
@@ -4652,7 +4670,7 @@ function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading 
           <HexMap observer
             incomingRaids={(game.raidPlan?.months ?? []).filter(m => m >= game.totalRounds).map(m => ({ monthsAway: m - game.totalRounds, force: Math.floor(game.aiRobots * 0.2) }))}
             tiles={game.mapTiles ?? []} draftPath={[]} draftReturn={[]}
-            aiUnits={game.aiUnits} wpGarrison={0} draftKind={'scout'} plannedPaths={[]}
+            aiUnits={game.aiUnits} wpGarrison={wpGarrisonUnits(game.aiUnits)} draftKind={'scout'} plannedPaths={[]}
             onPathClick={() => {}} onWaypointMove={() => {}} onWpSelect={() => {}}
             selectedWpId={''} artifactCount={0} artifactTargetWpId={''} onArtifactTarget={() => {}}
             expeditions={game.expeditions ?? []} wps={game.aiWeakPoints ?? []} otherClans={game.otherClans ?? []}

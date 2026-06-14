@@ -35,6 +35,7 @@ import {
   INITIAL_AI_INSIGHT, AI_INSIGHT_PER_RESEARCHER, NON_ROBOT_RESEARCH_INSIGHT_FACTOR, INSIGHT_PHASE_CAP,
   LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, LOGICAL_WEAKNESS_ENCOUNTER_REDUCTION, LOGICAL_WEAKNESS_LETHALITY_REDUCTION,
   RAID_AI_FORCE_PCT, DEFENDER_EQUIPMENT_MULT, wpGarrisonUnits,
+  GARRISON_FOCUS_MULT, GARRISON_UNFOCUSED_MULT,
   RAID_COUNT_BY_PHASE, ASSAULT_RAIDS_PER_YEAR,
   RAID_BREACH_AREAS, RAID_FRONT_LOSS_MULT, RAID_AREA_LOSS_MULT, RAID_AREA_LOSS_ANNIHILATION,
   RAID_DESTROY_FOOD_PCT, RAID_DESTROY_WEAPONS_PCT, RAID_DESTROY_MATERIAL_PCT, RAID_DESTROY_WALL_LEVELS,
@@ -351,7 +352,10 @@ export function missionEncounterProbability(state: GameState, assigned: number):
 export function wpEffectiveGarrison(state: GameState, weakPointId: string): number {
   const wp = state.aiWeakPoints.find(w => w.id === weakPointId);
   const base = wpGarrisonUnits(readAIUnits(state));
-  return Math.max(0, base - (wp?.garrisonLoss ?? 0));
+  // AI KONCENTRIRA stražo na fokusno točko (odločitev Poveljstva): ta dobi več, ostale manj.
+  const focus = state.aiLastAction?.focusWeakPoint;
+  const focusMult = focus ? (weakPointId === focus ? GARRISON_FOCUS_MULT : GARRISON_UNFOCUSED_MULT) : 1;
+  return Math.max(0, Math.round(base * focusMult) - (wp?.garrisonLoss ?? 0));
 }
 
 export function missionSuccessProbability(state: GameState, weakPointId: string, assigned: number, rationsLevel: number = DEFAULT_RATIONS): number {

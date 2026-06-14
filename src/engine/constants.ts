@@ -89,6 +89,9 @@ export function wpGarrisonUnits(u?: { scouts: number; attackers: number; peopleK
 export function wpGarrisonMult(u?: { scouts: number; attackers: number; peopleKillers: number }): number {
   return 1 + wpGarrisonUnits(u) / 20;
 }
+// AI lahko KONCENTRIRA stražo na eno (fokus) točko: ta dobi več, ostale manj.
+export const GARRISON_FOCUS_MULT     = 1.4;  // fokusna točka: ×več straže
+export const GARRISON_UNFOCUSED_MULT = 0.8;  // ostale: ×manj straže
 // Stražena polja: heks s šibko točko ali AI jedrom ima več srečanj (straža).
 export const GUARD_TILE_ENCOUNTER_MULT = 2.2;
 export const NEAR_CORE_ENCOUNTER_MULT  = 1.5;
