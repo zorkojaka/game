@@ -218,7 +218,19 @@ export function decideAIAction(state: GameState): AIAction {
   const focus = (state.aiWeakPoints ?? [])
     .filter(w => w.discovered && !w.exploited)
     .sort((a, b) => (MISSION_WP_DIFFICULTY[a.id] ?? 100) - (MISSION_WP_DIFFICULTY[b.id] ?? 100))[0]?.id;
-  return { production, upgrade, raidForcePct: raid, roles, focusWeakPoint: focus, labTarget, teamSize: 2 };
+  // ZADNJI MESEC pred novo fazo: izberi sestavo pošiljke za naslednjo fazo
+  // (proračun = energija za enote te faze). Privzeto signaturna enota.
+  let nextShipment: AIUnits | undefined;
+  const lastMonth = state.phase !== 'eliminate' && state.totalRounds < 36 && (state.aiPhaseProgress >= ROUNDS_PER_PHASE - 1);
+  if (lastMonth) {
+    const prof = difficultyProfile(state.difficulty);
+    const nextPh: AIPhase = state.phase === 'find' ? 'understand' : 'eliminate';
+    const budget = nextPh === 'understand'
+      ? prof.aiAttackers * AI_UNIT_ENERGY_COST.attackers
+      : prof.aiPeopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
+    nextShipment = aiChoosePhaseShipment(nextPh, budget);
+  }
+  return { production, upgrade, raidForcePct: raid, roles, focusWeakPoint: focus, labTarget, teamSize: 2, nextShipment };
 }
 
 /** Zgradi TOČNO želene enote (2-player: izbira igralca 2), omejeno z energijo. */
@@ -740,6 +752,8 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
   const campFound = (state.aiCampFound ?? false) || state.aiKnowledge >= CAMP_FOUND_KNOWLEDGE || state.totalRounds >= 36;
   // Operativni strošek vlog: roboti na raidu/patrulji/iskanju porabijo energijo → manj za gradnjo.
   const roleEnergyCost = (aiAct.roles.raid + aiAct.roles.patrol + aiAct.roles.search) * aiTotal0 * AI_ROLE_ENERGY_COST;
+  // Sestava pošiljke za naslednjo fazo (izbrana v zadnjem mesecu; obstane do prehoda).
+  const incomingShipment = aiAct.nextShipment ?? state.aiPendingShipment;
 
   const isExploiting = targetWeakPoint
     ? aiWeakPoints.some(wp => wp.id === targetWeakPoint && wp.discovered)
@@ -1222,18 +1236,18 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
   // Fazni prihod novih AI enot (ob prehodu v novo fazo)
   if (phaseComplete) {
     if (phase === 'understand') {
-      // AI iz proračuna (= načrtovane napadalne enote × cena) IZBERE sestavo pošiljke.
+      // Sestava pošiljke izbrana v zadnjem mesecu (incomingShipment); sicer privzeto.
       const budget = difficultyProfile(state.difficulty).aiAttackers * AI_UNIT_ENERGY_COST.attackers;
-      const ship = aiChoosePhaseShipment('understand', budget);
+      const ship = incomingShipment ?? aiChoosePhaseShipment('understand', budget);
       aiUnits = { scouts: aiUnits.scouts + ship.scouts, attackers: aiUnits.attackers + ship.attackers, peopleKillers: aiUnits.peopleKillers + ship.peopleKillers };
       aiRobots = totalAIRobots(aiUnits);
-      expeditionEvents.push(`🤖 AI je pripeljal ${ship.attackers} napadalnih enot — pričakuj napade na kamp.`);
+      expeditionEvents.push(`🤖 AI je pripeljal pošiljko (🔭${ship.scouts} ⚔️${ship.attackers} ☠${ship.peopleKillers}) — pričakuj napade.`);
     } else if (phase === 'eliminate' && state.phase === 'understand') {
       const budget = difficultyProfile(state.difficulty).aiPeopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
-      const ship = aiChoosePhaseShipment('eliminate', budget);
+      const ship = incomingShipment ?? aiChoosePhaseShipment('eliminate', budget);
       aiUnits = { scouts: aiUnits.scouts + ship.scouts, attackers: aiUnits.attackers + ship.attackers, peopleKillers: aiUnits.peopleKillers + ship.peopleKillers };
       aiRobots = totalAIRobots(aiUnits);
-      expeditionEvents.push(`☠ AI je pripeljal ${ship.peopleKillers} people-killer enot — napadi so zdaj smrtonosnejši.`);
+      expeditionEvents.push(`☠ AI je pripeljal pošiljko (🔭${ship.scouts} ⚔️${ship.attackers} ☠${ship.peopleKillers}) — napadi smrtonosnejši.`);
     }
     // (Konec 3. faze NI poraz — sledi era totalnega napada; napoved gre prek raidPlan-a.)
   }
@@ -1356,6 +1370,7 @@ export function processRound(state: GameState, action: PlayerAction, aiActionOve
     aiAttackLevel,
     aiDefenseLevel,
     aiCampFound: campFound,
+    aiPendingShipment: phaseComplete ? undefined : incomingShipment,
     aiLastAction,
     aiTree: finalTree,
     aiWeakPoints,

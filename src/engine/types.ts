@@ -141,6 +141,7 @@ export interface AIAction {
   raidForcePct: number;      // delež napadalne moči v raidu
   labTarget?: 'attack' | 'defense' | null;  // kaj AI nadgrajuje v laboratoriju to potezo
   teamSize?: 1 | 2 | 3;      // velikost terenskih ekip: majhne(1)/srednje(2)/velike(3)
+  nextShipment?: AIUnits;    // sestava enot za naslednjo fazo (izbrana v zadnjem mesecu)
   // razporeditev robotov po vlogah (deleži): napad / straža točk / patrulja (ujame
   // odprave na poti) / iskanje (dviga znanje o kampu). Zrcalo razporeditve ljudi.
   roles: { raid: number; garrison: number; patrol: number; search: number };
@@ -297,6 +298,7 @@ export interface GameState {
   aiAttackLevel?: number;   // Laboratorij: nadgradnja napada robotov (×1.3^level)
   aiDefenseLevel?: number;  // Laboratorij: nadgradnja obrambe robotov (×1.3^level)
   aiCampFound?: boolean;    // ali je AI našel kamp (omogoči raid); ostane true
+  aiPendingShipment?: AIUnits;  // sestava pošiljke za naslednjo fazo (izbrana v zadnjem mesecu)
   aiLastAction?: AIAction;  // odločitve AI v zadnji potezi (za inšpektor / 2-player)
   aiTree: AITreeNode[];
   aiWeakPoints: AIWeakPoint[];

@@ -79,6 +79,9 @@ function validateAIAction(a: unknown): AIAction | undefined {
     roles: { raid: frac(r.raid, 0.2), garrison: frac(r.garrison, 0), patrol: frac(r.patrol, 0), search: frac(r.search, 0) },
     labTarget: o.labTarget === 'attack' || o.labTarget === 'defense' ? o.labTarget : null,
     teamSize: o.teamSize === 1 || o.teamSize === 3 ? o.teamSize : 2,
+    nextShipment: o.nextShipment && typeof o.nextShipment === 'object'
+      ? (() => { const s = o.nextShipment as Record<string, unknown>; return { scouts: intOr0(s.scouts), attackers: intOr0(s.attackers), peopleKillers: intOr0(s.peopleKillers) }; })()
+      : undefined,
     focusWeakPoint: typeof o.focusWeakPoint === 'string' ? o.focusWeakPoint : undefined,
   };
 }

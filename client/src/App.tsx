@@ -6,7 +6,7 @@ import { createGame, getGame, playRound, previewOdds, sendFeedback, getStats } f
 // Deljene konstante iz enginea (en vir resnice — NE podvajaj številk).
 import { RATIONS_LEVELS, aiDefensePower, COMBAT_BASE_HUMAN_MULTIPLIER, DEFENDER_EQUIPMENT_MULT, researchMult, AI_UNIT_DEFS, LOGICAL_WEAKNESS_RAID_DEFENSE_BONUS, RAID_AI_FORCE_PCT, wpGarrisonUnits, RESEARCH_LEVEL_WORKER_MONTHS, ARTIFACT_WORKER_MONTHS } from '../../src/engine/constants';
 import { missionSuccessProbability, aiEnergyInflow, aiCoreDestroyed, aiTargetArmy, wpEffectiveGarrison, effectiveRaidAttackPower, raidProbability } from '../../src/engine/game';
-import { aiAttackPower, AI_UNIT_ENERGY_COST, AI_ENERGY_LEVEL_COST, AI_ENERGY_LEVEL_MAX } from '../../src/engine/constants';
+import { aiAttackPower, AI_UNIT_ENERGY_COST, AI_ENERGY_LEVEL_COST, AI_ENERGY_LEVEL_MAX, ROUNDS_PER_PHASE } from '../../src/engine/constants';
 import { expeditionMonthsForSteps } from '../../src/engine/expedition';
 import { logicalWeaknessBonus, logicalWeaknessByRobot } from '../../src/engine/combat';
 import { MAP_COLS, MAP_ROWS, collapseCampRuns } from '../../src/engine/map';
@@ -4580,6 +4580,7 @@ function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading 
   onConfirm: (a: AIAction) => void; onBack: () => void; loading: boolean;
 }) {
   const [revealed, setRevealed] = useState(false);
+  const prof = difficultyProfile(game.difficulty);
   const units = game.aiUnits ?? { scouts: game.aiRobots, attackers: 0, peopleKillers: 0 };
   const target = aiTargetArmy(game, game.totalRounds + 1);
   const budget = Math.floor((game.aiEnergy ?? 0) + aiEnergyInflow(game));
@@ -4589,6 +4590,19 @@ function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading 
   const suggest = (() => { let e = budget; const s = { scouts: 0, attackers: 0, peopleKillers: 0 };
     (['peopleKillers', 'attackers', 'scouts'] as const).forEach(t => { const c = AI_UNIT_ENERGY_COST[t]; const n = Math.min(def(t), Math.floor(e / c)); s[t] = n; e -= n * c; }); return s; })();
   const [build, setBuild] = useState(suggest);
+  // ZADNJI MESEC pred fazo: igralec 2 izbere sestavo pošiljke za naslednjo fazo (proračun = energija faze).
+  const lastMonth = game.phase !== 'eliminate' && game.totalRounds < 36 && (game.aiPhaseProgress ?? 0) >= ROUNDS_PER_PHASE - 1;
+  const nextPhaseLabel = game.phase === 'find' ? 'FAZA 2 (napadalci)' : 'FAZA 3 (people-killerji)';
+  const shipBudget = game.phase === 'find' ? prof.aiAttackers * AI_UNIT_ENERGY_COST.attackers : prof.aiPeopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
+  const shipDefault = game.phase === 'find'
+    ? { scouts: 0, attackers: prof.aiAttackers, peopleKillers: 0 }
+    : { scouts: 0, attackers: 0, peopleKillers: prof.aiPeopleKillers };
+  const [ship, setShip] = useState(shipDefault);
+  const shipCost = ship.scouts * AI_UNIT_ENERGY_COST.scouts + ship.attackers * AI_UNIT_ENERGY_COST.attackers + ship.peopleKillers * AI_UNIT_ENERGY_COST.peopleKillers;
+  const adjShip = (k: 'scouts' | 'attackers' | 'peopleKillers', d: number) => {
+    const c = AI_UNIT_ENERGY_COST[k];
+    setShip(s => { const n = Math.max(0, s[k] + d); const nc = shipCost - s[k] * c + n * c; return nc <= shipBudget ? { ...s, [k]: n } : s; });
+  };
   // Vloge / laboratorij / nadgradnja so VZTRAJNI (App stanje) — nastaviš enkrat, ostane.
   const roles = plan.roles; const lab = plan.lab; const upgrade = plan.upgrade;
   const setLab = (v: 'attack' | 'defense' | null) => onPlanChange({ ...plan, lab: v });
@@ -4693,6 +4707,22 @@ function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading 
             ))}
           </div>
         </div>
+        {lastMonth && (
+          <div style={{ background: '#0d141b', border: '1px solid #4a3a22', borderRadius: 10, padding: '.7rem .9rem', marginTop: '.6rem' }}>
+            <div style={{ fontSize: '.8rem', color: '#ffcc66', fontWeight: 700, marginBottom: 6 }}>📦 Pošiljka za naslednjo fazo — {nextPhaseLabel} <span className="dim small">(proračun {shipBudget}⚡)</span></div>
+            {([['scouts', '🔭', 'izvidniki'], ['attackers', '⚔️', 'napadalci'], ['peopleKillers', '☠', 'people-killerji']] as const).map(([k, ic, lbl]) => (
+              <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #161f29' }}>
+                <span>{ic} {lbl} <span className="dim small">({AI_UNIT_ENERGY_COST[k]}⚡)</span></span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button className="ph-menu-btn" onClick={() => adjShip(k, -1)} disabled={ship[k] <= 0}>−</button>
+                  <b style={{ minWidth: 28, textAlign: 'center' }}>{ship[k]}</b>
+                  <button className="ph-menu-btn" onClick={() => adjShip(k, 1)}>+</button>
+                </span>
+              </div>
+            ))}
+            <div className="dim small" style={{ marginTop: 4 }}>porabljeno {shipCost}⚡ / {shipBudget}⚡ — sestava prispe ob prehodu v naslednjo fazo.</div>
+          </div>
+        )}
         <div style={{ background: '#0d141b', border: '1px solid #223344', borderRadius: 10, padding: '.7rem .9rem', marginTop: '.6rem' }}>
           <div style={{ fontSize: '.8rem', color: '#9fd0ff', fontWeight: 700, marginBottom: 6 }}>Razporedi robote (vloge)</div>
           {(() => { const campFound = (game.aiCampFound ?? false) || game.aiKnowledge >= 0.25 || game.totalRounds >= 36;
@@ -4717,7 +4747,7 @@ function AIControlScreen({ game, plan, onPlanChange, onConfirm, onBack, loading 
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: '.8rem' }}>
           <button className="start-btn" style={{ flex: 1 }} disabled={loading}
-            onClick={() => onConfirm({ production: build, upgrade: upgrade && canUpgrade, raidForcePct: roles.raid, roles: { raid: roles.raid, garrison: 0, patrol: roles.patrol, search: roles.search }, labTarget: lab, teamSize: plan.teamSize })}>
+            onClick={() => onConfirm({ production: build, upgrade: upgrade && canUpgrade, raidForcePct: roles.raid, roles: { raid: roles.raid, garrison: 0, patrol: roles.patrol, search: roles.search }, labTarget: lab, teamSize: plan.teamSize, nextShipment: lastMonth ? ship : undefined })}>
             {loading ? '⟳' : 'Izvedi potezo AI →'}
           </button>
           <button className="ph-menu-btn" onClick={onBack} title="Nazaj na klanovo potezo">↩</button>
